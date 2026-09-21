@@ -2793,6 +2793,19 @@ async function zeigeUebersicht() {
   // eine Weltkarte warten muessen. Der Abgleichszustand geht mit, weil er
   // erklaert, warum "von aussen angenommen" gerade 0 ist.
   ladeKarte(false, !!(k && k.im_erstsync));
+  // DER BEFUND VOM 21.09.2026 aus dem Betrieb: "der kurs von btc laedt
+  // gefuehlt garnicht auf der uebersichts seite".
+  //
+  // Er lud dort nie. ladeKurs() LAESST die Uebersicht ausdruecklich zu --
+  // ANSICHT !== "uebersicht" steht in seiner Abbruchbedingung --, gerufen
+  // wurde es aber nur beim Wechsel nach News oder Rechner. Wer neu lud und
+  // auf der Uebersicht blieb, sah dauerhaft einen Gedankenstrich; erst ein
+  // Ausflug in eine andere Ansicht fuellte den Kasten.
+  //
+  // Ebenfalls nicht abgewartet: der Endpunkt liest nur aus dem
+  // Zwischenspeicher, geholt wird im Waechter. Er kostet also nichts, und
+  // die Uebersicht soll auch darauf nicht warten.
+  ladeKurs();
   // Die Auswertung sammelt erst nach dem Abgleich -- vorher gaebe es nichts
   // zu holen, und der Abruf waere Last fuer nichts.
   if (k) ladeBeitrag(false);

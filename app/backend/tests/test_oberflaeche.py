@@ -2761,3 +2761,38 @@ def test_zur_schiefen_verteilung_gibt_es_eine_erklaerung(js):
         text = re.search(r'\n    gb_netz_schief: "([^"]*)"', block).group(1)
         assert len(text) > 150, sprache
         assert ("ppm" in text), sprache
+
+
+def test_die_uebersicht_holt_den_kurs_auch_selbst(js):
+    """Der Befund vom 21.09.2026 aus dem Betrieb: "der kurs von btc laedt
+    gefuehlt garnicht auf der uebersichts seite".
+
+    Er lud dort nie. Der Kasten auf der Uebersicht (#d-kurs-wert) wird von
+    zeichneKursKurz() gefuellt, und die wird ausschliesslich aus ladeKurs()
+    gerufen. ladeKurs() LAESST die Uebersicht ausdruecklich zu -- sie steht
+    in seiner Abbruchbedingung --, aber gerufen wurde es nur beim Wechsel
+    nach News oder Rechner. Wer neu lud und auf der Uebersicht blieb, sah
+    dauerhaft einen Gedankenstrich.
+
+    Ein halb gemachter Umbau: die Bedingung wurde erweitert, der Aufruf
+    vergessen. Der Test haelt beide Haelften zusammen.
+    """
+    anf = js.index("async function zeigeUebersicht()")
+    ende = min(x for x in (js.index("\nasync function ", anf + 10),
+                           js.index("\nfunction ", anf + 10)) if x > anf)
+    # OHNE die Kommentare. Beim ersten Anlauf am 21.09.2026 fand dieser Test
+    # den Namen in der Erklaerung darueber und blieb gruen, nachdem ich den
+    # Aufruf zur Gegenprobe entfernt hatte. Ein Test, der den Kommentar
+    # prueft, prueft nichts.
+    rumpf = "\n".join(z for z in js[anf:ende].splitlines()
+                      if not z.lstrip().startswith("//"))
+    assert "ladeKurs(" in rumpf, \
+        "die Uebersicht muss den Kurs selbst anstossen"
+    # NICHT abgewartet -- der Endpunkt liest nur aus dem Zwischenspeicher,
+    # aber die Uebersicht soll auf gar nichts warten muessen.
+    assert "await ladeKurs" not in rumpf, \
+        "der Kurs darf die Uebersicht nicht aufhalten"
+    # Und die Abbruchbedingung muss die Uebersicht weiterhin zulassen,
+    # sonst liefe der Aufruf ins Leere.
+    stelle = js.index("async function ladeKurs(")
+    assert '"uebersicht"' in js[stelle:stelle + 400]
