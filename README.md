@@ -397,6 +397,11 @@ password hashes to generate, no permissions to set.
 
 For the internals: [GUIDE.md](GUIDE.md).
 
+Working on this with a coding agent? [AGENTS.md](AGENTS.md) states the
+conventions that are easy to mistake for accidents — the source is German on
+purpose, every number comes from your own node, and there is no Docker
+socket.
+
 ## Protect it with Pocket ID (or any OIDC provider)
 
 By default you sign in with a local account. If you run your own OIDC provider
