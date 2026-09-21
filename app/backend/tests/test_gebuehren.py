@@ -348,3 +348,60 @@ def test_der_graphpfad_steht_in_LNDs_routentabelle():
               datei.read_text(encoding="utf-8").splitlines()
               if zeile and not zeile.startswith("#")}
     assert gebuehren.GRAPH_PFAD in routen
+
+
+# ── Die Verteilung statt der Erklaerung ────────────────────────────────────
+#
+# Der Betreiber, 21.09.2026, zu dem Absatz, der unter dem Median stand: "was
+# das den bitte fuer ein riesen text ?? ... kann mann nicht einfach machen:
+# 50% 0-100 die anderen 50% 100-600".
+#
+# Doch. Der Absatz erklaerte in fuenf Zeilen, dass die Verteilung schief ist.
+# Ein paar Prozentzahlen ZEIGEN es -- und sagen nebenbei mehr, als der Absatz
+# je gesagt hat.
+
+def test_die_verteilung_zeigt_die_form_der_saetze():
+    saetze = ([0] * 4          # nimmt nichts
+              + [1, 5, 9]      # 1 bis 9
+              + [10, 99]       # 10 bis 99
+              + [100]          # 100 bis 999
+              )                # zusammen zehn
+    stufen = gebuehren.verteilung(saetze)
+    assert [s["anteil"] for s in stufen] == [40, 30, 20, 10, 0]
+    # Die Stufen sagen selbst, wofuer sie stehen -- die Oberflaeche muss
+    # nichts ueber die Grenzen wissen.
+    assert stufen[0] == {"von": 0, "bis": 0, "anteil": 40}
+    assert stufen[1]["von"] == 1 and stufen[1]["bis"] == 9
+    assert stufen[4] == {"von": 1000, "bis": None, "anteil": 0}
+
+
+def test_die_anteile_ergeben_genau_hundert():
+    """Wer nachrechnet, soll recht behalten.
+
+    Drei Drittel ergeben einzeln gerundet 33 + 33 + 33 = 99. Unter einer
+    Zeile, die "so verteilt sich das Netz" heisst, ist das ein Widerspruch,
+    den der Leser findet und nicht erklaeren kann.
+    """
+    for saetze in ([0, 5, 50],                       # drei Drittel
+                   [0] * 3 + [5] * 3 + [50],         # sieben
+                   list(range(0, 2000, 7)),          # krumm
+                   [0, 0, 1, 10, 100, 1000, 5000]):
+        assert sum(s["anteil"] for s in gebuehren.verteilung(saetze)) == 100
+
+
+def test_ohne_saetze_wird_keine_verteilung_behauptet():
+    assert gebuehren.verteilung([]) == []
+
+
+def test_sehr_hohe_saetze_landen_in_der_obersten_stufe():
+    """Nach oben gibt es im Lightning-Netz keine Grenze -- die oberste Stufe
+    ist deshalb offen und nicht "1000 bis 2000"."""
+    stufen = gebuehren.verteilung([50_000, 1_000, 999_999])
+    assert stufen[4]["anteil"] == 100
+    assert stufen[4]["bis"] is None
+
+
+def test_die_verteilung_kommt_aus_der_auswertung_mit():
+    d = gebuehren.auswerten([_kante(satz1=0, satz2=0),
+                             _kante(satz1=100, satz2=2_000)])
+    assert [s["anteil"] for s in d["stufen"]] == [50, 0, 0, 25, 25]

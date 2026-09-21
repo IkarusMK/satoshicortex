@@ -374,6 +374,14 @@
         </div>
 
         <div class="raster">
+          <!-- Die Uhr, nach der Bitcoin wirklich geht: die Blockhoehe, nicht
+               der Kalender. Auf Anregung aus dem Betrieb (21.09.2026) -- und
+               alle Zahlen darin stehen schon in der Antwort, die die
+               Uebersicht ohnehin holt. -->
+          <div class="panel">
+            <h3 data-i18n="d_blockzeit"></h3>
+            <div id="d-blockzeit"></div>
+          </div>
           <div class="panel">
             <h3 data-i18n="d_teilnahme"></h3>
             <div id="d-chain"></div>
@@ -1080,6 +1088,12 @@
                       data-i18n="gb_messen"></button>
             </div>
             <div id="gb-netz-zahlen" class="dim small"></div>
+            <!-- Wie sich die Saetze verteilen. Bis zum 21.09.2026 stand hier
+                 ein Absatz, der die Schiefe der Verteilung ERKLAERTE -- und
+                 der sich bei jedem Anzeigen ein weiteres Mal anhaengte. Eine
+                 Leiste sagt dasselbe auf einen Blick und dazu, wo die Masse
+                 liegt. -->
+            <div id="gb-netz-verteilung" class="gb-verteilung"></div>
             <div id="gb-netz-band" class="dim small"></div>
             <div id="gb-verlauf" class="gb-verlauf"></div>
             <div class="netzgebuehren-fuss">

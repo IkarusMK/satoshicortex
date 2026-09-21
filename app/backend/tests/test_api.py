@@ -1,6 +1,7 @@
 import ast
 import re
 import shutil
+import time
 from collections import namedtuple
 from pathlib import Path
 
@@ -469,14 +470,21 @@ def test_ohne_adresse_im_assistenten_startet_der_schalter_aus(client):
     assert wahl["adresse_ankuendigen"] is False
 
 
-def test_status_nennt_beide_projekte(client):
-    """Lightning wird genauso geprueft wie Bitcoin Core -- und weil die
-    Oberflaeche daraus die Zeile zum Uebernehmen baut, muss der Abbildname
-    mitkommen. Ohne ihn stuende dort "image: :0.21.2-beta"."""
+def test_status_nennt_alle_drei_projekte(client):
+    """Lightning wird genauso geprueft wie Bitcoin Core -- und seit dem
+    21.09.2026 die Anwendung selbst.
+
+    Der Anlass kam aus dem Betrieb: der Knoten lief auf 0.66, 1.0.1 lag
+    bereit, und die Oberflaeche erwaehnte es mit keinem Wort. Wer seine
+    eigene Software ausliefert, soll auch sagen, wenn es eine neuere gibt.
+
+    Der Abbildname muss mitkommen, weil die Oberflaeche daraus die Zeile zum
+    Uebernehmen baut. Ohne ihn stuende dort "image: :0.21.2-beta"."""
     d = client.get("/api/status").json()["neuerungen"]
-    assert set(d) == {"bitcoind", "lnd"}
+    assert set(d) == {"satcortex", "bitcoind", "lnd"}
     assert d["bitcoind"]["abbild"].endswith("satcortex-bitcoind")
     assert d["lnd"]["abbild"].endswith("satcortex-lnd")
+    assert d["satcortex"]["abbild"].endswith("/satcortex")
     # Noch nichts nachgeschlagen: die Anzeige sagt dann "noch nicht gesehen"
     # statt "aktuell". Der Unterschied ist wichtig.
     assert d["lnd"]["stand"] is None and d["lnd"]["gefunden"] is None
@@ -501,14 +509,14 @@ def test_die_fassungspruefung_braucht_keinen_knoten(client, monkeypatch):
     monkeypatch.setattr(rpc_modul, "lage_mit_grund", keiner)
 
     d = client.get("/api/neuerungen").json()["neuerungen"]
-    assert set(d) == {"bitcoind", "lnd"}
+    assert set(d) == {"satcortex", "bitcoind", "lnd"}
 
 
 def test_der_kasten_nennt_immer_beide_zahlen(client):
     """Was laeuft, und was es draussen gibt -- notfalls als None, aber die
     Felder sind da. Ohne sie kann die Anzeige nur Fliesstext zeigen."""
     d = client.get("/api/neuerungen").json()["neuerungen"]
-    for name in ("bitcoind", "lnd"):
+    for name in ("satcortex", "bitcoind", "lnd"):
         assert "laufend" in d[name], name
         assert "neueste" in d[name], name
 
@@ -6713,3 +6721,53 @@ def test_werte_ausserhalb_der_spanne_werden_abgelehnt(client, monkeypatch, wert)
                     json={"alias": "MyLightningNode", "minchansize": wert})
     assert r.status_code == 400
     assert r.json()["detail"]["meldung"] == "minchansize_ungueltig"
+
+
+# ── Die Uhr der Kette in der Uebersicht ────────────────────────────────────
+
+def test_status_zaehlt_bis_zur_naechsten_halbierung(client, monkeypatch):
+    """Der Betreiber, 21.09.2026: "anzahl der bloecke bis zum naechsten
+    halving .. geschaetztes datum .. und wie hoch die revard ist".
+
+    Gerechnet, nicht geholt: die Hoehe liegt ohnehin in der Antwort.
+    """
+    from satcortex import rpc as rpc_modul
+    _richte_ein(client)
+
+    monkeypatch.setattr(rpc_modul, "kettenlage", lambda _k, *_a: {
+        "kette": "main", "hoehe": 967_296, "kopfzeilen": 967_296,
+        "fortschritt": 1.0, "im_erstsync": False, "belegt_bytes": 1,
+        "verbindungen_ein": 3, "verbindungen_aus": 10, "erreichbar": True,
+        "blockzeit": 1_758_400_000, "adressen": [], "netze": {},
+        "empfangen_bytes": 0, "gesendet_bytes": 0})
+    h = client.get("/api/status").json()["halbierung"]
+    assert h["naechste_hoehe"] == 1_050_000
+    assert h["bloecke_bis"] == 82_704
+    assert h["belohnung_sat"] == 312_500_000
+    assert h["belohnung_danach_sat"] == 156_250_000
+    assert h["geschaetzt_ts"] > time.time()
+
+
+def test_die_halbierung_zaehlt_ab_der_spitze_des_netzes(client, monkeypatch):
+    """DER PUNKT, an dem es sonst falsch waere.
+
+    Waehrend des Abgleichs steht die eigene Hoehe Jahre zurueck. Von ihr aus
+    zu zaehlen ergaebe eine Auskunft ueber eine Halbierung, die laengst war.
+    Die Kopfzeilen kennt der Knoten dagegen nach Minuten -- und sie sind die
+    Spitze, die das Netz gerade hat.
+    """
+    from satcortex import rpc as rpc_modul
+    _richte_ein(client)
+
+    monkeypatch.setattr(rpc_modul, "kettenlage", lambda _k, *_a: {
+        "kette": "main", "hoehe": 400_000, "kopfzeilen": 967_296,
+        "fortschritt": 0.07, "im_erstsync": True, "belegt_bytes": 1,
+        "verbindungen_ein": 0, "verbindungen_aus": 10, "erreichbar": False,
+        "blockzeit": 1_452_000_000, "adressen": [], "netze": {},
+        "empfangen_bytes": 0, "gesendet_bytes": 0})
+    h = client.get("/api/status").json()["halbierung"]
+    assert h["hoehe"] == 967_296                  # nicht 400.000
+    assert h["naechste_hoehe"] == 1_050_000
+    # Waehrend des Abgleichs ist der eigene Takt nicht messbar -- unsere
+    # Bloecke sind von 2016. Dann der Zielabstand, und die Antwort sagt es.
+    assert h["gemessen"] is False

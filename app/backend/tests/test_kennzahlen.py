@@ -341,3 +341,132 @@ def test_die_ruecklage_kommt_von_lnd_durch():
     assert d["ruecklage_sat"] == 10_000
     # Die Kanal-Reserve ist etwas anderes und steht immer dabei.
     assert d["reserve_prozent"] == kennzahlen.KANAL_RESERVE_PROZENT
+
+
+# ── Die Uhr der Kette: Halbierung ──────────────────────────────────────────
+#
+# Der Betreiber, 21.09.2026: "sone arte block zeit in der uebersicht .. anzahl
+# der bloecke bis zum naechsten halving .. geschaetztes datum .. und wie hoch
+# die revard ist beim naechsten halving".
+
+def test_die_belohnung_folgt_cores_eigener_rechnung():
+    """Ganzzahlig geschoben, nicht in Gleitkomma geteilt.
+
+    3,125 BTC sind in Gleitkomma nicht darstellbar; 312.500.000 Satoshi
+    schon. Cores GetBlockSubsidy schiebt deshalb ganzzahlig, und hier wird
+    genauso gerechnet.
+    """
+    assert kennzahlen.belohnung_sat(0) == 5_000_000_000            # 50 BTC
+    assert kennzahlen.belohnung_sat(209_999) == 5_000_000_000
+    assert kennzahlen.belohnung_sat(210_000) == 2_500_000_000      # 25 BTC
+    assert kennzahlen.belohnung_sat(630_000) == 625_000_000        # 6,25
+    assert kennzahlen.belohnung_sat(840_000) == 312_500_000        # 3,125
+    assert kennzahlen.belohnung_sat(1_050_000) == 156_250_000      # 1,5625
+
+
+def test_die_letzte_halbierung_endet_bei_null():
+    """Das Ende der Ausschuettung, rund im Jahr 2140.
+
+    Nach 33 Halbierungen ist von 5.000.000.000 nichts mehr uebrig -- genau
+    wie in Cores validation.cpp, wo derselbe Schiebevorgang steht.
+    """
+    letzte = 32 * kennzahlen.HALBIERUNG_PERIODE
+    assert kennzahlen.belohnung_sat(letzte) == 1                   # ein Satoshi
+    assert kennzahlen.belohnung_sat(33 * kennzahlen.HALBIERUNG_PERIODE) == 0
+
+
+def test_bis_zur_naechsten_halbierung_wird_gezaehlt_nicht_geschaetzt():
+    d = kennzahlen.halbierung(967_296, 600.0, jetzt=1_758_400_000.0)
+    assert d["naechste_hoehe"] == 1_050_000
+    assert d["bloecke_bis"] == 82_704
+    assert d["belohnung_sat"] == 312_500_000
+    assert d["belohnung_danach_sat"] == 156_250_000
+
+
+def test_das_datum_rechnet_mit_dem_gemessenen_takt():
+    """Nicht mit dem Lehrbuchwert, wenn die eigene Kette einen echten hat."""
+    jetzt = 1_758_400_000.0
+    d = kennzahlen.halbierung(967_296, 570.0, jetzt=jetzt)
+    assert d["schnitt_sekunden"] == 570.0
+    assert d["gemessen"] is True
+    # Die Fensterbreite kommt mit, damit die Oberflaeche sie nicht ein
+    # zweites Mal kennen muss und irgendwann eine falsche Zahl nennt.
+    assert d["rueckblick"] == kennzahlen.TAKT_RUECKBLICK
+    assert d["geschaetzt_ts"] == pytest.approx(jetzt + 82_704 * 570.0)
+
+
+def test_ohne_messung_gilt_der_zielabstand_und_sagt_es_auch():
+    """Waehrend des Abgleichs gibt es keinen brauchbaren eigenen Takt.
+
+    Dann sind zehn Minuten die ehrlichste Annahme -- aber die Antwort muss
+    dazusagen, dass gerechnet und nicht gemessen wurde.
+    """
+    d = kennzahlen.halbierung(967_296, None, jetzt=1_758_400_000.0)
+    assert d["gemessen"] is False
+    assert d["schnitt_sekunden"] == kennzahlen.ZIELABSTAND_SEKUNDEN
+
+
+def test_das_geschaetzte_datum_ist_plausibel():
+    """Die Gegenprobe gegen die Wirklichkeit.
+
+    Fuenfte Halbierung: Block 840.000 am 20.04.2024. Von dort mit dem
+    tatsaechlichen Takt weitergerechnet muss die sechste im Fruehjahr 2028
+    landen -- nicht 2026 und nicht 2035. Faellt die Zahl aus diesem Fenster,
+    stimmt die Rechnung nicht, egal wie gruen die anderen Tests sind.
+    """
+    import datetime as dt
+    # Stand 21.09.2026, mit 9,7 min je Block seit der letzten Halbierung.
+    jetzt = dt.datetime(2026, 9, 21, tzinfo=dt.timezone.utc).timestamp()
+    d = kennzahlen.halbierung(967_296, 582.0, jetzt=jetzt)
+    ziel = dt.datetime.fromtimestamp(d["geschaetzt_ts"], dt.timezone.utc)
+    assert ziel.year == 2028
+    assert 1 <= ziel.month <= 6
+
+
+def test_nach_der_letzten_halbierung_gibt_es_keine_naechste():
+    """Kein erfundenes Datum im Jahr 2140 und keine Division durch nichts."""
+    d = kennzahlen.halbierung(33 * kennzahlen.HALBIERUNG_PERIODE, 600.0,
+                              jetzt=1_758_400_000.0)
+    assert d["naechste_hoehe"] is None
+    assert d["bloecke_bis"] is None
+    assert d["geschaetzt_ts"] is None
+    assert d["belohnung_sat"] == 0
+
+
+# ── Der gemessene Takt ─────────────────────────────────────────────────────
+
+def test_der_takt_kommt_aus_der_eigenen_kette():
+    """Zwei Kopfzeilen, sonst nichts -- und daraus der wirkliche Abstand."""
+    rueck = kennzahlen.TAKT_RUECKBLICK
+    zeiten = {967_296: 1_758_400_000, 967_296 - rueck: 1_758_400_000 - 15_000_000}
+    k = Attrappe({
+        "getblockhash": lambda h: f"hash-{h}",
+        "getblockheader": lambda h: {"time": zeiten[int(h.split("-")[1])]},
+    })
+    schnitt = kennzahlen.takt(k, 967_296)
+    assert schnitt == pytest.approx(15_000_000 / rueck)
+
+
+def test_ohne_genug_kette_wird_kein_takt_behauptet():
+    k = Attrappe({})
+    assert kennzahlen.takt(k, 100) is None
+    assert not k.gefragt                   # gar nicht erst gefragt
+
+
+def test_ein_unbrauchbarer_zeitstempel_ergibt_keinen_takt():
+    """Blockzeiten duerfen laut Protokoll rueckwaerts springen.
+
+    Ueber 26.280 Bloecke faellt das nicht ins Gewicht -- eine Reihenfolge,
+    die insgesamt rueckwaerts laeuft, ist aber keine Messung, sondern ein
+    Fehler. Dann lieber nichts.
+    """
+    k = Attrappe({
+        "getblockhash": lambda h: f"hash-{h}",
+        "getblockheader": lambda h: {"time": 1_000_000},
+    })
+    assert kennzahlen.takt(k, 967_296) is None
+
+
+def test_ein_stiller_knoten_reisst_den_takt_nicht_mit():
+    k = Attrappe({"getblockhash": rpc.NichtErreichbar("weg")})
+    assert kennzahlen.takt(k, 967_296) is None

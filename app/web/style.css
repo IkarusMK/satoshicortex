@@ -2021,3 +2021,57 @@ body.ansicht-welt .weltkarte .kleine circle { cursor: pointer; }
 .gb-band { fill: var(--ok); opacity: .14; }
 .gb-linie { fill: none; stroke: var(--warn); stroke-width: 1.5;
             stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+
+/* ── Die Gebuehrenverteilung des Netzes ──────────────────────────────────
+   Eine schmale Leiste und darunter, was in ihr steht. Sie ersetzt seit dem
+   21.09.2026 einen fuenfzeiligen Absatz, der dasselbe in Worten sagte.
+
+   Fuenf Stufen, ein Verlauf von matt nach hell: je hoeher der Satz, desto
+   kraeftiger. Die Farbe traegt dabei KEINE Wertung -- teuer ist nicht
+   schlecht -- deshalb Gelb-Orange und nicht Rot. */
+.gb-verteilung { margin: 8px 0 2px; }
+.gb-verteilung:empty { display: none; }
+
+.gb-vt-balken {
+  display: flex;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: #ffffff10;
+}
+.gb-vt-teil { display: block; height: 100%; min-width: 2px; }
+
+.gb-vt-legende {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 7px;
+  font-size: .82rem;
+  color: var(--dim);
+}
+/* Der Punkt davor bindet den Eintrag an sein Stueck der Leiste. */
+.gb-vt-eintrag::before {
+  content: "";
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 2px;
+  margin-right: 6px;
+  vertical-align: baseline;
+}
+.gb-vt-eintrag { white-space: nowrap; }
+
+/* Die Stufenfarbe steht EINMAL je Stufe und wird von beiden Stellen
+   geholt -- vom Stueck der Leiste und vom Punkt vor dem Eintrag.
+
+   Der erste Anlauf schrieb stattdessen "color UND background" auf dieselbe
+   Klasse. Die Leiste sah damit richtig aus, und die Legende bestand aus
+   farbigen Kloetzen: die Schrift lag farbgleich auf ihrem eigenen Grund.
+   Im Quelltext faellt das nicht auf, im Bild sofort. */
+.gb-vt-0 { --stufe: #7b6a52; }
+.gb-vt-1 { --stufe: #b08a3e; }
+.gb-vt-2 { --stufe: var(--btc); }
+.gb-vt-3 { --stufe: var(--btc-2); }
+.gb-vt-4 { --stufe: var(--gold); }
+
+.gb-vt-teil { background: var(--stufe); }
+.gb-vt-eintrag::before { background: var(--stufe); }

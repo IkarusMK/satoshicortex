@@ -489,3 +489,58 @@ def test_ohne_datenbank_bleibt_es_still(tmp_path):
     leer.netzgebuehren_merken("2026-09-18", 1, _messung(100))
     assert leer.netzgebuehren_verlauf() == []
     assert leer.netzgebuehren_aufraeumen() == 0
+
+
+# ── Die Verteilung, und eine Datenbank, die es schon gibt ──────────────────
+
+STUFEN = [{"von": 0, "bis": 0, "anteil": 40},
+          {"von": 1, "bis": 9, "anteil": 30},
+          {"von": 10, "bis": 99, "anteil": 20},
+          {"von": 100, "bis": 999, "anteil": 10},
+          {"von": 1000, "bis": None, "anteil": 0}]
+
+
+def test_die_verteilung_ueberlebt_den_neustart(ablage):
+    """Gemessen wird einmal am Tag. Ohne Ablage waere die Verteilung nach
+    jedem Neustart der Anwendung bis zum naechsten Messtag weg."""
+    ablage.netzgebuehren_merken("2026-09-21", 1758400000,
+                                {**_messung(100), "stufen": STUFEN})
+    assert ablage.netzgebuehren_verlauf()[0]["stufen"] == STUFEN
+
+
+def test_eine_messung_ohne_verteilung_bleibt_lesbar(ablage):
+    """Alle Zeilen von vor dem 21.09.2026 haben keine."""
+    ablage.netzgebuehren_merken("2026-09-20", 1758300000, _messung(100))
+    assert ablage.netzgebuehren_verlauf()[0]["stufen"] is None
+
+
+def test_eine_bestehende_datenbank_bekommt_die_spalte_nachgereicht(tmp_path):
+    """DER PUNKT, an dem das sonst schiefgeht.
+
+    Das Schema steht als CREATE TABLE IF NOT EXISTS da -- auf einer Datei,
+    die es schon gibt, passiert also NICHTS. Wer die Anwendung seit Wochen
+    laufen hat, haette die neue Spalte damit nie bekommen: der Fehler kaeme
+    nicht beim Update, sondern beim naechsten Messen einen Tag spaeter.
+    """
+    pfad = str(tmp_path / "alt.db")
+    alt = store.Ablage(pfad)
+    alt.v.execute("DROP TABLE netzgebuehren")
+    alt.v.execute("CREATE TABLE netzgebuehren (tag TEXT PRIMARY KEY, "
+                  "zeit_s INTEGER NOT NULL, median_ppm INTEGER, "
+                  "p25_ppm INTEGER, p75_ppm INTEGER, "
+                  "basis_median_msat INTEGER, linien INTEGER, "
+                  "kanaele INTEGER, eigen_ppm INTEGER)")
+    alt.v.execute("INSERT INTO netzgebuehren (tag, zeit_s, median_ppm) "
+                  "VALUES ('2026-09-01', 1, 88)")
+    alt.v.commit()
+    alt.schliesse()
+
+    neu = store.Ablage(pfad)
+    try:
+        # Die alte Zeile steht noch da -- nachgereicht heisst nicht neu.
+        assert neu.netzgebuehren_verlauf()[0]["median_ppm"] == 88
+        neu.netzgebuehren_merken("2026-09-21", 2,
+                                 {**_messung(100), "stufen": STUFEN})
+        assert neu.netzgebuehren_verlauf()[0]["stufen"] == STUFEN
+    finally:
+        neu.schliesse()

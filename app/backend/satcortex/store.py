@@ -24,7 +24,7 @@ import sqlite3
 import threading
 import time
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 log = logging.getLogger(__name__)
 
@@ -165,9 +165,26 @@ CREATE TABLE IF NOT EXISTS netzgebuehren (
     -- bin ich davon weg" -- und weil die Automatik damit sehen kann, ob sie
     -- ueberhaupt etwas zu tun hat, ohne sich auf ihre eigene Erinnerung zu
     -- verlassen.
-    eigen_ppm         INTEGER
+    eigen_ppm         INTEGER,
+    -- Wie sich die Saetze auf ein paar runde Stufen verteilen, als JSON.
+    -- Nachgereicht am 21.09.2026 -- siehe NACHGEREICHT unten.
+    stufen            TEXT
 );
 """
+
+# Spalten, die spaeter dazugekommen sind.
+#
+# Das Schema oben steht als CREATE TABLE IF NOT EXISTS da: auf einer Datei,
+# die es schon gibt, passiert dadurch GAR NICHTS. Wer die Anwendung seit
+# Wochen laufen hat, bekaeme eine neue Spalte also nie zu sehen -- und den
+# Fehler nicht beim Update, sondern beim naechsten Schreibvorgang.
+#
+# ALTER TABLE ADD COLUMN ist in SQLite ein Eintrag im Schema und beruehrt die
+# Zeilen nicht; bestehende bekommen NULL. Deshalb steht hier auch nur diese
+# eine Form: eine Spalte anhaengen, nie eine aendern oder entfernen.
+NACHGEREICHT = (
+    ("netzgebuehren", "stufen", "TEXT"),
+)
 
 
 def _median(werte: List[int]) -> Optional[int]:
@@ -185,6 +202,26 @@ def _median(werte: List[int]) -> Optional[int]:
     if len(werte) % 2:
         return werte[mitte]
     return (werte[mitte - 1] + werte[mitte]) // 2
+
+
+def _stufen_lesen(roh: Any) -> Optional[List[Dict]]:
+    """Die gespeicherte Verteilung zurueckholen -- oder None.
+
+    None heisst "an diesem Tag wurde noch keine erhoben", nicht "sie war
+    leer". Jede Zeile von vor dem 21.09.2026 ist so eine, und die Oberflaeche
+    zeigt dann die Spanne statt der Stufen, statt eine leere Leiste zu malen.
+
+    Kaputtes JSON wird verschluckt: eine unlesbare Nebenauskunft darf die
+    ganze Messreihe nicht mitreissen.
+    """
+    if not roh:
+        return None
+    try:
+        wert = json.loads(roh)
+    except (TypeError, ValueError):
+        log.debug("Unlesbare Stufen in der Ablage.")
+        return None
+    return wert if isinstance(wert, list) else None
 
 
 def _platzhalter(anzahl: int) -> str:
@@ -214,6 +251,18 @@ class Ablage:
         # Einmal beim Anlegen: Schema und Einstellungen.
         with self._neu() as v:
             v.executescript(SCHEMA)
+            self._spalten_nachreichen(v)
+
+    @staticmethod
+    def _spalten_nachreichen(v: sqlite3.Connection) -> None:
+        """Was einer bestehenden Datei noch fehlt, anhaengen."""
+        for tabelle, spalte, typ in NACHGEREICHT:
+            da = {z["name"] for z in
+                  v.execute(f"PRAGMA table_info({tabelle})").fetchall()}
+            if da and spalte not in da:
+                log.info("Spalte %s.%s wird nachgereicht.", tabelle, spalte)
+                v.execute(
+                    f"ALTER TABLE {tabelle} ADD COLUMN {spalte} {typ}")
 
     def _neu(self) -> sqlite3.Connection:
         v = sqlite3.connect(str(self.pfad), timeout=20.0)
@@ -590,12 +639,14 @@ class Ablage:
         self.v.execute(
             "INSERT OR REPLACE INTO netzgebuehren "
             "(tag, zeit_s, median_ppm, p25_ppm, p75_ppm, basis_median_msat,"
-            " linien, kanaele, eigen_ppm) VALUES (?,?,?,?,?,?,?,?,?)",
+            " linien, kanaele, eigen_ppm, stufen)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?)",
             (str(tag), int(zeit_s), werte.get("median_ppm"),
              werte.get("p25_ppm"), werte.get("p75_ppm"),
              werte.get("basis_median_msat"), werte.get("linien"),
              werte.get("kanaele"),
-             (werte.get("eigen") or {}).get("satz_ppm")))
+             (werte.get("eigen") or {}).get("satz_ppm"),
+             json.dumps(werte["stufen"]) if werte.get("stufen") else None))
         self.v.commit()
 
     def netzgebuehren_verlauf(self, tage: int = 28) -> List[Dict]:
@@ -609,7 +660,8 @@ class Ablage:
         zeilen = self.v.execute(
             "SELECT * FROM netzgebuehren ORDER BY tag DESC LIMIT ?",
             (max(1, int(tage)),)).fetchall()
-        return [dict(z) for z in zeilen]
+        return [{**dict(z), "stufen": _stufen_lesen(z["stufen"])}
+                for z in zeilen]
 
     def netzgebuehren_aufraeumen(self, behalten: int = 400) -> int:
         """Alte Tageszeilen wegwerfen. Ein gutes Jahr bleibt stehen."""

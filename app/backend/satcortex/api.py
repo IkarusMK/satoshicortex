@@ -1773,6 +1773,34 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
     verlauf_stand: Dict[str, Any] = {"hoehe": 0, "wert": None}
     VERLAUF_FRISCHE_BLOECKE = 6
 
+    # Der wirkliche Abstand zweier Bloecke, gemessen an der eigenen Kette.
+    #
+    # Eigener, noch langsamerer Takt als alles andere: gemessen wird ueber ein
+    # halbes Jahr zurueck, und daran aendert ein Tag so gut wie nichts. Einmal
+    # taeglich genuegt -- und es sind ohnehin nur vier Aufrufe, die keine
+    # Plattenlast erzeugen.
+    takt_stand: Dict[str, Any] = {"hoehe": 0, "wert": None}
+    TAKT_FRISCHE_BLOECKE = 144
+
+    def takt_anstossen(hoehe: int) -> None:
+        """Den Blockabstand nachmessen lassen, wenn die Messung alt genug ist.
+
+        Die Hoehe wird auch dann fortgeschrieben, wenn nichts herauskam --
+        sonst liefe alle zwanzig Sekunden ein neuer Anlauf.
+        """
+        if hoehe <= 0 or hoehe - takt_stand["hoehe"] < TAKT_FRISCHE_BLOECKE:
+            return
+
+        def rechnen() -> None:
+            wert = kennzahlen.takt(knotenverbindung(), hoehe)
+            takt_stand["hoehe"] = hoehe
+            if wert is not None:
+                takt_stand["wert"] = wert
+                log.info("Blockabstand gemessen: %.1f s je Block ueber %s "
+                         "Bloecke.", wert, kennzahlen.TAKT_RUECKBLICK)
+
+        im_hintergrund("blocktakt", rechnen)
+
     def verlauf_anstossen(hoehe: int) -> None:
         """Die Wochenverteilung nachrechnen lassen, wenn sie alt genug ist.
 
@@ -1880,6 +1908,9 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         })
         if not im_erstsync:
             verlauf_anstossen(int(lage.get("hoehe") or 0))
+            # Waehrend des Abgleichs nicht: unsere juengsten Bloecke sind dann
+            # Jahre alt, und ihr Takt sagt ueber das heutige Netz nichts.
+            takt_anstossen(int(lage.get("hoehe") or 0))
         # Der HTLC-Dauerlaeufer. Kostet nichts, wenn er schon laeuft.
         htlc_anstossen()
 
@@ -5226,6 +5257,18 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
             # /status-Aufruf wieder volle vier Sekunden, obwohl die
             # Kettenlage laengst bereitlag.
             antwort["mempool"] = mempoolspeicher["wert"]
+        # Die Uhr der Kette: wie weit es bis zur naechsten Halbierung ist.
+        #
+        # Gerechnet, nicht geholt -- die Hoehe steht schon in der Antwort.
+        # Genommen wird die KOPFZEILEN-Hoehe: das ist die Spitze, die das Netz
+        # gerade hat. Waehrend des Abgleichs steht die eigene Hoehe Jahre
+        # zurueck, und von ihr aus gezaehlt waere es eine Auskunft ueber eine
+        # Halbierung, die laengst war.
+        if knoten:
+            antwort["halbierung"] = kennzahlen.halbierung(
+                knoten.get("kopfzeilen") or knoten.get("hoehe") or 0,
+                takt_stand["wert"])
+
         # Was jetzt zu tun ist -- oder gar nichts. Siehe naechster_schritt().
         try:
             antwort["naechster_schritt"] = naechster_schritt(e, knoten)
@@ -5830,6 +5873,20 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         # Knoten sichtbar die Kette lud. Eine Fassungsnummer aendert sich
         # aber nur, wenn jemand das Abbild tauscht -- die letzte bekannte
         # ist also richtig, bis eine neue kommt.
+        # DIE EIGENE FASSUNG ZUERST. Nachgetragen am 21.09.2026.
+        #
+        # Sie ist die einzige, deren Nummer ohne jeden Aufruf feststeht: sie
+        # wird beim Bauen ins Abbild gebrannt (ARG SATCORTEX_VERSION) und
+        # steht in der Umgebung. Auch dann, wenn in der .env "latest" steht
+        # -- die Compose reicht die Variable nicht zur Laufzeit durch.
+        #
+        # "dev" heisst: aus dem Arbeitsverzeichnis gestartet, nicht aus einem
+        # veroeffentlichten Abbild. Dann gibt es nichts zu vergleichen, und
+        # zerlege() liefert None -- die Ansicht sagt dann "Fassung
+        # unbekannt" statt eine Neuerung zu erfinden.
+        eine_pruefung(updates.SATCORTEX, updates.zerlege(konf.version),
+                      True, tor_an, jetzt)
+
         if (lage or {}).get("kennung"):
             kennungsspeicher["wert"] = lage["kennung"]
         core = updates.laufende_version(kennungsspeicher["wert"])

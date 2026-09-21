@@ -326,8 +326,15 @@ def _antwortet_mit(monkeypatch, text: str):
 
 
 def test_die_quellen_sind_der_feed_und_nicht_die_api():
+    """Atom, nicht die API.
+
+    Seit dem 21.09.2026 ist auch die EIGENE Fassung dabei -- und weil es
+    fuer dieses Projekt keine Releases gibt, sondern nur Tags, ist ihre
+    Quelle tags.atom. Derselbe Weg, dasselbe Format, dieselbe Regel: kein
+    Aufruf an api.github.com, der ein Kennzeichen hinterliesse.
+    """
     for projekt in updates.PROJEKTE:
-        assert projekt.quelle.endswith("/releases.atom"), projekt.name
+        assert projekt.quelle.endswith((".atom",)), projekt.name
         assert "api.github.com" not in projekt.quelle, projekt.name
 
 

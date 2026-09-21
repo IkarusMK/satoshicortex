@@ -158,6 +158,18 @@ def _lnd_beschriftung(v: Tuple[int, ...]) -> str:
     return "%d.%d.%d-beta" % v[:3]
 
 
+def _satcortex_beschriftung(v: Tuple[int, ...]) -> str:
+    """Drei Stellen -- und genau so heisst auch der Abbild-Tag.
+
+    Bei Bitcoin Core sind es zwei (31.1), weil dort die dritte die
+    Wartungsnummer ist und das Abbild sie nicht traegt. Hier traegt es sie:
+    ghcr.io/ikarusmk/satcortex:1.0.1. Wer die Zahl aus der Oberflaeche in
+    die .env abtippt, muss damit etwas ziehen koennen -- "1.0" gibt es
+    nicht.
+    """
+    return "%d.%d.%d" % (v + (0, 0, 0))[:3]
+
+
 @dataclass(frozen=True)
 class Projekt:
     """Alles, was sich zwischen Core und LND unterscheidet, an einer Stelle."""
@@ -201,7 +213,30 @@ LND = Projekt(
     beschrifte=_lnd_beschriftung,
 )
 
-PROJEKTE = (BITCOIN_CORE, LND)
+# DIE EIGENE FASSUNG. Nachgetragen am 21.09.2026.
+#
+# Bis dahin sah diese Anwendung nach Neuerungen fuer bitcoind und LND -- und
+# schwieg ueber sich selbst. Aus dem Betrieb kam der Fall: der Knoten lief auf
+# 0.66, 1.0.1 lag seit Stunden bereit, und die Oberflaeche erwaehnte es mit
+# keinem Wort. Der Betreiber ging stattdessen ueber die Docker-Oberflaeche
+# seines NAS, die nur das zieht, was in der .env steht -- also wieder 0.66.
+#
+# Wer seine eigene Software ausliefert, soll auch sagen, wenn es eine neuere
+# gibt. Die Quelle ist der Tag-Feed des Projekts: Releases gibt es nicht,
+# Tags schon, und sie heissen genauso wie die Abbilder.
+SATCORTEX = Projekt(
+    name="satcortex",
+    quelle="https://github.com/IkarusMK/satoshicortex/tags.atom",
+    abbild="ghcr.io/ikarusmk/satcortex",
+    variable="SATCORTEX_VERSION",
+    tag_praefix="",
+    # Zwei: 1.0 und 1.1 sind verschiedene Zweige, 1.0.1 ist Wartung darin.
+    zweigtiefe=2,
+    zerlege_tag=zerlege,
+    beschrifte=_satcortex_beschriftung,
+)
+
+PROJEKTE = (SATCORTEX, BITCOIN_CORE, LND)
 
 # Die LND-Fassung, die SatoshiCortex ausliefert.
 #

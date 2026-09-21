@@ -4,6 +4,84 @@ All notable changes to SatoshiCortex. Format loosely after
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning after
 [SemVer](https://semver.org/).
 
+## [1.0.2] — 2026-09-21
+
+### Fixed: an explanation that printed itself nine times
+
+Reported from operation, with a screenshot: the paragraph under the network
+fee median stood **nine times** in a row, filling most of the panel.
+
+`zeichneNetzgebuehren()` runs on every refresh and attached that paragraph
+with `zahlen.after()` — as a new sibling. Nothing ever removed it. The same
+trap had already been hit once before in this project, which is why
+`zeigeUebersicht()` carries the note "a fixed element instead of `.after()`".
+
+### Changed: the fee spread is shown, not explained
+
+The paragraph existed to explain why the median does not sit in the centre of
+the interquartile range. The reaction to it was fair: *"what on earth is that
+huge text? … couldn't you just do: 50 % 0–100, the other 50 % 100–600?"*
+
+You can, and it is the better answer. The panel now carries a distribution
+across five round steps — 0 · 1–9 · 10–99 · 100–999 · 1000+ ppm — as a slim
+bar with the shares written beside it. It shows the skew at a glance and adds
+what the paragraph never said: **where the mass actually sits.**
+
+The shares are whole percentages that add up to exactly 100 (largest
+remainder). Three thirds rounded separately would read 33 + 33 + 33, and
+under a line that claims to be a distribution a reader who adds them up
+deserves to be right.
+
+Measurements taken before this version have no distribution stored; those
+days keep the old interquartile sentence rather than showing an empty bar.
+
+### Added: block time on the overview
+
+On request from operation: how many blocks until the next halving, the
+estimated date, and what the reward becomes.
+
+All of it is arithmetic on numbers the overview already fetches, so the panel
+costs no extra call. Three details are deliberate:
+
+- **It counts from the header height**, not from our own verified height.
+  During the initial sync the latter is years behind, and counting from it
+  would describe a halving that happened long ago.
+- **The pace is measured on this chain** — the real spacing over the last
+  26,280 blocks (about half a year), not the textbook ten minutes. Why not
+  the current difficulty period: this projects over more than a year, and
+  retargeting pulls the two-week pace back to ten minutes every 2016 blocks.
+  What half a year measures is the lasting deviation, and that is the figure
+  this projection needs.
+- **It says which of the two it used.** Before the sync completes no own pace
+  is measurable; the panel then states that it is computing with the
+  protocol's target spacing instead of claiming a measurement.
+
+The estimate is given as month and year. Over more than a year, a day would
+be a claim, not an estimate.
+
+The reward is computed by integer shifting, the same way Core's
+`GetBlockSubsidy` does it — 3.125 BTC is not representable in floating point,
+312,500,000 satoshi is.
+
+### Added: the application reports its own new versions
+
+The version panel checked Bitcoin Core and LND but never SatoshiCortex
+itself. A node could sit on an old version with a newer one published and the
+interface would not mention it.
+
+### Changed: the block view now shows what the application already knew
+
+Each block in the strip carries its time, transaction count and fee total.
+The header measures its own text and drops to a shorter form rather than
+running into the neighbouring column.
+
+### Added: `AGENTS.md`
+
+Working conventions for coding agents, stating the decisions that look like
+accidents: the source is German on purpose, there is no Docker socket, every
+figure comes from your own node, large answers are streamed. All check
+commands in it were executed before it was written.
+
 ## [1.0.1] — 2026-09-21
 
 ### Fixed: the price was never fetched on the overview

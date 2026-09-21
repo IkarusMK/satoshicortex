@@ -320,3 +320,136 @@ def einordnung(satz: float, verlauf: Optional[Dict[str, Any]]) -> Optional[str]:
     if satz >= verlauf["oberes_viertel"]:
         return "teuer"
     return "normal"
+
+
+# ── Die Uhr der Kette ──────────────────────────────────────────────────────
+#
+# Der Betreiber, 21.09.2026: "sone arte block zeit in der uebersicht .. anzahl
+# der bloecke bis zum naechsten halving .. geschaetztes datum .. und wie hoch
+# die revard ist beim naechsten halving".
+#
+# Die Blockhoehe ist die einzige Uhr, nach der Bitcoin geht -- nicht der
+# Kalender. Alle drei Auskuenfte haengen an ihr, und die Hoehe hat dieser
+# Knoten ohnehin.
+
+# Alle so vielen Bloecke halbiert sich, was ein Block an neuen Satoshi
+# schafft. Steht in Cores chainparams.cpp als nSubsidyHalvingInterval.
+HALBIERUNG_PERIODE = 210_000
+# Womit es 2009 anfing: 50 BTC.
+ANFANGSBELOHNUNG_SAT = 50 * 100_000_000
+# Ab so vielen Halbierungen ist von den 5.000.000.000 nichts mehr uebrig --
+# rund im Jahr 2140. Die Zahl steht hier nicht, weil Python ueberliefe (das
+# tut es nicht), sondern damit das Ende einen Namen hat.
+HALBIERUNGEN_ENDE = 33
+
+# Ueber wieviele Bloecke zurueck der wirkliche Takt gemessen wird: rund ein
+# halbes Jahr.
+#
+# Warum nicht die laufende Schwierigkeitsperiode, also zwei Wochen? Weil hier
+# ueber anderthalb JAHRE hochgerechnet wird. Der Takt der letzten zwei Wochen
+# sagt etwas ueber die gerade laufende Periode -- ueber die naechsten achtzig
+# Perioden sagt er nichts, denn genau dafuer gibt es die Anpassung alle 2016
+# Bloecke: sie zieht den Abstand immer wieder auf zehn Minuten zurueck.
+#
+# Was ein halbes Jahr dagegen wirklich misst, ist die bleibende Abweichung:
+# waechst die Rechenleistung im Mittel, kommen die Bloecke im Mittel etwas zu
+# frueh, und die Halbierung faellt entsprechend frueher. Das ist die Groesse,
+# die man fuer diese Hochrechnung braucht.
+TAKT_RUECKBLICK = 26_280
+
+
+def belohnung_sat(hoehe: int) -> int:
+    """Was ein Block in dieser Hoehe an neuen Satoshi schafft.
+
+    Ganzzahlig geschoben, nicht in Gleitkomma geteilt -- genauso wie Cores
+    GetBlockSubsidy es macht. 3,125 BTC sind in Gleitkomma naemlich gar nicht
+    darstellbar; 312.500.000 Satoshi schon.
+    """
+    halbierungen = max(0, int(hoehe)) // HALBIERUNG_PERIODE
+    if halbierungen >= HALBIERUNGEN_ENDE:
+        return 0
+    return ANFANGSBELOHNUNG_SAT >> halbierungen
+
+
+def halbierung(hoehe: int, schnitt_sekunden: Optional[float] = None,
+               jetzt: Optional[float] = None) -> Dict[str, Any]:
+    """Wie weit es bis zur naechsten Halbierung ist.
+
+    Reine Rechnung, kein einziger Aufruf: die Hoehe steht in der Kettenlage,
+    die ohnehin bei jedem Takt hereinkommt. Der gemessene Takt kommt von
+    ``takt()`` und wird HEREINGEGEBEN statt hier geholt -- er aendert sich in
+    einer Stunde nicht messbar und braucht deshalb einen eigenen, viel
+    langsameren Takt.
+
+    ``schnitt_sekunden`` ist None, solange nichts gemessen werden konnte.
+    Dann wird mit dem Zielabstand gerechnet -- und die Antwort sagt es dazu.
+    Kein ``or``: ein Abstand von 0.0 waere ein Messfehler und kein "nicht
+    gesetzt", und die Unterscheidung hat dieses Projekt schon dreimal Zeit
+    gekostet.
+    """
+    gemessen = schnitt_sekunden is not None
+    schnitt = float(schnitt_sekunden) if gemessen \
+        else float(ZIELABSTAND_SEKUNDEN)
+    hoehe = max(0, int(hoehe))
+    d: Dict[str, Any] = {
+        "hoehe": hoehe,
+        "belohnung_sat": belohnung_sat(hoehe),
+        "schnitt_sekunden": schnitt,
+        "gemessen": gemessen,
+        # Ueber wieviele Bloecke gemessen wurde. Steht in der Antwort, damit
+        # die Oberflaeche die Zahl nicht ein zweites Mal kennen muss -- sonst
+        # nennt sie irgendwann 26.280, waehrend hier laengst etwas anderes
+        # steht, und niemand merkt es.
+        "rueckblick": TAKT_RUECKBLICK,
+        "naechste_hoehe": None,
+        "bloecke_bis": None,
+        "belohnung_danach_sat": None,
+        "geschaetzt_ts": None,
+    }
+    # Ist schon nichts mehr da, gibt es auch nichts mehr zu halbieren. Ein
+    # Datum im Jahr 2140 waere keine Auskunft, sondern Zierrat.
+    if not d["belohnung_sat"]:
+        return d
+
+    naechste = (hoehe // HALBIERUNG_PERIODE + 1) * HALBIERUNG_PERIODE
+    offen = naechste - hoehe
+    d["naechste_hoehe"] = naechste
+    d["bloecke_bis"] = offen
+    d["belohnung_danach_sat"] = belohnung_sat(naechste)
+    d["geschaetzt_ts"] = (time.time() if jetzt is None else jetzt) \
+        + offen * schnitt
+    return d
+
+
+def takt(knoten: rpc.Knoten, hoehe: int,
+         rueckblick: int = TAKT_RUECKBLICK) -> Optional[float]:
+    """Wie lange ein Block auf DIESER Kette wirklich gebraucht hat.
+
+    Zwei Kopfzeilen, sonst nichts -- und daraus der Abstand. Nicht "zehn
+    Minuten, weil es so im Buch steht", sondern gemessen an den Bloecken, die
+    hier auf der Platte liegen.
+
+    Dass einzelne Blockzeiten rueckwaerts springen duerfen (das Protokoll
+    laesst zwei Stunden Spielraum), stoert dabei nicht: verteilt auf 26.280
+    Bloecke sind zwei Stunden ein Viertel einer Sekunde je Block. Laeuft die
+    Reihe aber INSGESAMT rueckwaerts, ist das keine Messung mehr, sondern ein
+    Fehler -- dann lieber nichts.
+    """
+    if hoehe <= rueckblick:
+        return None
+    try:
+        jung = _kopfzeit(knoten, hoehe)
+        alt = _kopfzeit(knoten, hoehe - rueckblick)
+    except (rpc.NichtErreichbar, rpc.RpcFehler) as fehler:
+        log.debug("Takt nicht messbar: %s", fehler)
+        return None
+    if jung <= 0 or alt <= 0 or jung <= alt:
+        return None
+    return (jung - alt) / rueckblick
+
+
+def _kopfzeit(knoten: rpc.Knoten, hoehe: int) -> float:
+    """Der Zeitstempel einer Kopfzeile. Zwei Aufrufe, beide ohne Plattenlast."""
+    hash_ = knoten.ruf("getblockhash", hoehe)
+    kopf = knoten.ruf("getblockheader", hash_) or {}
+    return float(kopf.get("time") or 0)

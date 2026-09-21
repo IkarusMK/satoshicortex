@@ -270,6 +270,55 @@ def _linie(politik: Any) -> Optional[Dict[str, int]]:
     return {"satz_ppm": _zahl(politik.get("fee_rate_milli_msat")),
             "basis_msat": _zahl(politik.get("fee_base_msat"))}
 
+# Die Stufen, auf die die Saetze verteilt werden. Runde Grenzen, fest
+# gewaehlt -- nicht aus der Verteilung selbst gerechnet. Eine Stufe, die
+# jeden Tag woanders liegt, kann man nicht mit gestern vergleichen.
+#
+# Warum ueberhaupt Stufen: bis zum 21.09.2026 stand unter dem Median ein
+# fuenfzeiliger Absatz, der ERKLAERTE, dass die Verteilung schief ist. Der
+# Betreiber dazu: "was das den bitte fuer ein riesen text ??". Er hat recht
+# -- fuenf Prozentzahlen zeigen dieselbe Schiefe auf einen Blick, und sie
+# sagen zusaetzlich, WO die Masse liegt. Das stand in dem Absatz nicht.
+STUFEN_GRENZEN = (1, 10, 100, 1000)
+
+
+def verteilung(saetze: List[int]) -> List[Dict[str, Any]]:
+    """Wie sich die Saetze auf die Stufen verteilen, in ganzen Prozent.
+
+    Die Anteile ergeben zusammen GENAU hundert. Einzeln gerundet taeten sie
+    das naemlich nicht -- drei Drittel ergaeben 99 --, und unter einer Zeile,
+    die "so verteilt sich das Netz" heisst, ist das ein Widerspruch, den der
+    Leser findet und nicht aufloesen kann. Die uebrigen Prozentpunkte gehen
+    deshalb an die groessten Nachkommateile (die uebliche Sitzverteilung
+    nach groesstem Rest).
+
+    Leere Stufen bleiben in der Liste stehen: die Form soll von Tag zu Tag
+    dieselbe Gestalt haben, auch wenn eine Stufe gerade niemanden enthaelt.
+    """
+    if not saetze:
+        return []
+    koerbe = [0] * (len(STUFEN_GRENZEN) + 1)
+    for satz in saetze:
+        stufe = 0
+        while stufe < len(STUFEN_GRENZEN) and satz >= STUFEN_GRENZEN[stufe]:
+            stufe += 1
+        koerbe[stufe] += 1
+
+    roh = [k * 100.0 / len(saetze) for k in koerbe]
+    anteile = [int(x) for x in roh]
+    nach = sorted(range(len(roh)), key=lambda i: anteile[i] - roh[i])
+    for i in nach[:100 - sum(anteile)]:
+        anteile[i] += 1
+
+    von = (0,) + STUFEN_GRENZEN
+    return [{
+        "von": von[i],
+        # Die oberste Stufe ist offen: nach oben gibt es im Lightning-Netz
+        # keine Grenze, und "1000 bis 2000" waere schlicht falsch.
+        "bis": (STUFEN_GRENZEN[i] - 1) if i < len(STUFEN_GRENZEN) else None,
+        "anteil": anteile[i],
+    } for i in range(len(anteile))]
+
 
 def auswerten(kanten: Iterable[Dict[str, Any]],
               eigene_kennung: str = "") -> Dict[str, Any]:
@@ -300,6 +349,7 @@ def auswerten(kanten: Iterable[Dict[str, Any]],
                 eigene.append(linie)
     return {
         "median_ppm": _median(saetze),
+        "stufen": verteilung(saetze),
         "p25_ppm": _quantil(saetze, 0.25),
         "p75_ppm": _quantil(saetze, 0.75),
         "basis_median_msat": _median(basen),

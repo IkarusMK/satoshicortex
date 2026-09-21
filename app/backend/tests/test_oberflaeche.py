@@ -2737,30 +2737,21 @@ def test_die_gebuehrenspanne_wird_nicht_mitte_genannt(js):
         text = re.search(r'\n    gb_netz_zahlen: "([^"]*)"', block).group(1)
         assert "Mitte des Netzes" not in text, sprache
         assert "Middle of the network" not in text, sprache
-        assert wort in text, (sprache, text)
         # Und der Median muss als solcher benannt sein, nicht als Schnitt.
         assert "Median" in text, sprache
         assert "urchschnitt" not in text and "verage" not in text, sprache
+        # Die Spanne steht seit dem 21.09.2026 in einem eigenen Text -- sie
+        # erscheint nur noch, wo keine Verteilung vorliegt. Auch dort muss
+        # sie sagen, WAS in ihr liegt.
+        spanne = re.search(r'\n    gb_netz_spanne: "([^"]*)"', block).group(1)
+        assert wort in spanne, (sprache, spanne)
 
 
-def test_zur_schiefen_verteilung_gibt_es_eine_erklaerung(js):
-    """Und sie erscheint nur, wenn der Median wirklich aus der Mitte faellt.
-
-    Ein Satz, der immer dasteht, beantwortet auch die Faelle, in denen
-    niemand gefragt haette.
-    """
-    import re
-    stelle = js.index('zahlen.textContent = t("gb_netz_zahlen"')
-    rumpf = js[stelle:stelle + 1600]
-    assert "gb_netz_schief" in rumpf
-    assert "Math.abs(heute.median_ppm - mitte)" in rumpf, \
-        "der Satz muss an einer Bedingung haengen, nicht immer stehen"
-    for sprache in ("de", "en"):
-        anfang = js.index("\n  %s: {" % sprache)
-        block = js[anfang:anfang + 200000]
-        text = re.search(r'\n    gb_netz_schief: "([^"]*)"', block).group(1)
-        assert len(text) > 150, sprache
-        assert ("ppm" in text), sprache
+# Hier stand bis zum 21.09.2026 test_zur_schiefen_verteilung_gibt_es_eine_
+# erklaerung -- die Wache ueber den Absatz, der die Schiefe in Worten
+# erklaerte. Der Absatz ist weg, die Verteilungsleiste zeigt dieselbe Schiefe
+# als Bild. Was davon bleibt, steht weiter unten unter
+# test_der_erklaerabsatz_ist_weg.
 
 
 def test_die_uebersicht_holt_den_kurs_auch_selbst(js):
@@ -2796,3 +2787,165 @@ def test_die_uebersicht_holt_den_kurs_auch_selbst(js):
     # sonst liefe der Aufruf ins Leere.
     stelle = js.index("async function ladeKurs(")
     assert '"uebersicht"' in js[stelle:stelle + 400]
+
+
+def test_der_blockkopf_zeigt_was_die_anwendung_laengst_weiss(js):
+    """Der Befund vom 21.09.2026, als Vergleich mit mempool.space gemeldet:
+    "sieht unsere block anzeige irgendwie vergleichbar oder genau so
+    uebersichtlich aus ... ich glaube nicht".
+
+    Sie sah es nicht, und der Grund war nicht das Aussehen: die Kopfzeile
+    zeigte den Blocknamen und die Gebuehrenspanne, mehr nicht. Die Anzahl
+    der Transaktionen und die Summe der Gebuehren liefert der Endpunkt
+    (b.anzahl, b.sat) seit jeher mit -- sie wurden ausgelesen und
+    weggeworfen. Die Zeit bis zum Block fehlte ganz, obwohl das die Frage
+    ist, die man an eine Blockliste hat.
+    """
+    stelle = js.index("function zeichneKacheln")
+    rumpf = js[stelle:stelle + 6000]
+    for was, wo in (("b.anzahl", "die Zahl der Transaktionen"),
+                    ("b.sat", "die Summe der Gebuehren"),
+                    ("a_kb_wann", "die Zeit bis zum Block")):
+        assert was in rumpf, f"{wo} fehlt im Blockkopf"
+
+
+def test_der_blockkopf_laeuft_nicht_in_die_nachbarspalte(js):
+    """Im selben Bildschirmfoto las sich die erste Spalte "ock".
+
+    Bei acht Bloecken auf einem schmalen Fenster ist "naechster Block"
+    breiter als die Spalte, und der Text lief einfach weiter. Gemessen wurde
+    nie. Jetzt schon -- und was nicht ganz hinpasst, faellt weg, statt halb
+    dazustehen: "0.11 - 2.…" beantwortet keine Frage.
+    """
+    stelle = js.index("function zeichneKacheln")
+    rumpf = js[stelle:stelle + 6000]
+    assert "measureText" in rumpf, "die Breite muss gemessen werden"
+    # Die beiden unteren Zeilen haengen an einer Platzpruefung, nicht am
+    # Kuerzen.
+    assert "c.measureText(spanne).width <= spalte" in rumpf
+    assert "c.measureText(inhalt).width <= spalte" in rumpf
+
+
+def test_der_fassungskasten_nennt_auch_die_eigene_fassung(js):
+    """Der Befund vom 21.09.2026 aus dem Betrieb.
+
+    Der Knoten lief auf 0.66, 1.0.1 lag seit Stunden in der Registry, und
+    die Anwendung erwaehnte es mit keinem Wort -- sie sah nur nach
+    Neuerungen fuer bitcoind und LND. Der Betreiber ging stattdessen ueber
+    die Docker-Oberflaeche seines NAS, die nur zieht, was in der .env steht.
+
+    Zwei Haelften, und beide mussten nachgetragen werden: die Pruefung im
+    Hintergrund (updates.SATCORTEX) und diese Liste hier. Sie war fest
+    verdrahtet -- dieselbe Falle wie beim Kurs am selben Tag: die
+    Schnittstelle liefert es, die Oberflaeche zaehlt es nicht auf.
+    """
+    stelle = js.index("function zeichneNeuerungen")
+    rumpf = js[stelle:stelle + 1500]
+    assert '"satcortex"' in rumpf, "die eigene Fassung fehlt in der Liste"
+    # Und sie steht oben: es ist die einzige, die dieser Kasten selbst meint.
+    assert rumpf.index('"satcortex"') < rumpf.index('"bitcoind"')
+
+
+# ── Die Gebuehrenverteilung: gezeigt, nicht erklaert ───────────────────────
+#
+# Der Befund vom 21.09.2026 aus dem Betrieb, mit Bild: derselbe fuenfzeilige
+# Absatz stand NEUNMAL untereinander im Gebuehrenkasten. Dazu der Betreiber:
+# "was das den bitte fuer ein riesen text ?? was soll sowas immer ... kann
+# mann nicht einfach machen: 50% 0-100 die anderen 50% 100-600".
+#
+# Zwei Fehler in einem Bild. Der zweite ist der eigentliche.
+
+def test_die_gebuehrenzeile_haengt_nichts_an_ihren_nachbarn(js):
+    """DER FEHLER, der das Bild erzeugt hat.
+
+    zeichneNetzgebuehren() lief bei jedem Anzeigen und haengte den Absatz per
+    zahlen.after() als NEUES Geschwister an. Entfernt hat ihn nie jemand.
+    Nach neun Durchlaeufen stand er neunmal da.
+
+    Dieselbe Falle ist an anderer Stelle schon einmal aufgeschlagen -- in
+    zeigeUebersicht() steht seitdem "Festes Element statt .after()". Hier
+    wird sie festgenagelt: in dieser Funktion wird nichts angehaengt, was
+    nicht vorher geleert wurde.
+    """
+    import re
+    anfang = js.index("function zeichneNetzgebuehren(")
+    ende = re.search(r"\n(?:async )?function ", js[anfang + 10:])
+    rumpf = js[anfang:anfang + 10 + ende.start()]
+    # OHNE Kommentarzeilen. Beim ersten Anlauf war dieser Test gruen aus dem
+    # falschen Grund: er fand "zahlen.after()" in dem Kommentar, der den
+    # Fehler BESCHREIBT. Genau die Falle, vor der AGENTS.md warnt.
+    code = "\n".join(z for z in rumpf.splitlines()
+                     if not z.lstrip().startswith("//"))
+    assert ".after(" not in code
+
+
+def test_der_erklaerabsatz_ist_weg(js):
+    """Fuenf Zeilen, die erklaerten, dass die Verteilung schief ist. Die
+    Verteilung zeigt das jetzt selbst -- und sagt zusaetzlich, WO die Masse
+    liegt. Das stand in dem Absatz nie."""
+    assert "gb_netz_schief" not in js
+
+
+def test_die_verteilung_wird_gezeichnet(js, html):
+    assert 'id="gb-netz-verteilung"' in html
+    assert "function zeichneVerteilung(" in js
+
+
+def test_die_stufen_nennen_ihre_spanne_und_ihren_anteil(js):
+    """Eine Leiste ohne Beschriftung waere Dekoration. Gefragt war
+    "50% 0-100" -- also beides."""
+    for schluessel in ("gb_stufe_von_bis", "gb_stufe_ab",
+                       "gb_stufe_anteil"):
+        assert js.count(schluessel + ":") == 2       # deutsch und englisch
+
+
+def test_ohne_stufen_steht_dort_die_spanne(js):
+    """Jede Messung von vor dem 21.09.2026 hat keine Verteilung. Dann die
+    alte Spannenzeile -- und keine leere Leiste."""
+    assert js.count("gb_netz_spanne:") == 2
+
+
+# ── Die Blockzeit in der Uebersicht ────────────────────────────────────────
+
+def test_die_uebersicht_hat_eine_blockzeit(html, js):
+    """Der Betreiber, 21.09.2026: "sone arte block zeit in der uebersicht"."""
+    abschnitt = html[html.index('<section data-ansicht="uebersicht">'):]
+    abschnitt = abschnitt[:abschnitt.index("</section>")]
+    assert 'id="d-blockzeit"' in abschnitt
+    assert "function zeichneBlockzeit(" in js
+
+
+def test_die_blockzeit_wird_aus_dem_status_gefuellt(js):
+    """Kein eigener Abruf: die Zahlen stehen in der Antwort, die die
+    Uebersicht ohnehin holt."""
+    anfang = js.index("async function zeigeUebersicht()")
+    rumpf = js[anfang:anfang + 9000]
+    code = "\n".join(z for z in rumpf.splitlines()
+                     if not z.lstrip().startswith("//"))
+    assert "zeichneBlockzeit(d.halbierung)" in code
+
+
+def test_die_belohnung_bekommt_so_viele_stellen_wie_sie_braucht(js):
+    """3,125 und nicht 3,12500000 -- aber ab der neunten Halbierung werden
+    es wirklich acht Stellen, und dann muessen sie dastehen."""
+    assert "function belohnungBtc(" in js
+
+
+def test_das_geschaetzte_datum_gibt_sich_nicht_genauer_als_es_ist(js):
+    """Ueber anderthalb Jahre hochgerechnet ist ein Tagesdatum eine
+    Behauptung. Monat und Jahr sind die ehrliche Genauigkeit -- dafuer gibt
+    es monatJahr() schon."""
+    import re
+    anfang = js.index("function zeichneBlockzeit(")
+    ende = re.search(r"\n(?:async )?function ", js[anfang + 10:])
+    rumpf = js[anfang:anfang + 10 + ende.start()]
+    assert "monatJahr(" in rumpf
+    assert "toLocaleDateString" not in rumpf
+
+
+def test_die_blockzeit_sagt_ob_gemessen_oder_gerechnet_wurde(js):
+    """Waehrend des Abgleichs ist der eigene Takt nicht messbar. Dann steht
+    dort der Zielabstand -- und die Zeile muss das zugeben, statt eine
+    Messung zu behaupten."""
+    for schluessel in ("bz_takt_gemessen", "bz_takt_gerechnet"):
+        assert js.count(schluessel + ":") == 2

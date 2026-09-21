@@ -38,8 +38,11 @@ const I18N = {
     gb_netz_titel: "Was das Netz nimmt",
     gb_messen: "Jetzt messen",
     gb_messen_laeuft: "Der Graph wird gelesen …",
-    gb_netz_zahlen: "Median {median} ppm — die Hälfte aller Richtungen nimmt weniger. Die mittleren 50 % liegen zwischen {p25} und {p75} ppm · Grundgebühr {basis} msat · {linien} Richtungen in {kanaele} Kanälen · gemessen am {tag}",
-    gb_netz_schief: "Dass der Median nicht in der Mitte dieser Spanne liegt, ist kein Rechenfehler, sondern die Form des Netzes: sehr viele Richtungen stehen bei null oder einem ppm — Kanäle unter Bekannten, unveränderte Vorgaben —, und nach oben gibt es kaum eine Grenze. Der Durchschnitt wäre hier die falsche Zahl; er läge weit über dem, was tatsächlich üblich ist.",
+    gb_netz_zahlen: "Median {median} ppm — die Hälfte aller Richtungen nimmt weniger · Grundgebühr {basis} msat · {linien} Richtungen in {kanaele} Kanälen · gemessen am {tag}",
+    gb_netz_spanne: "Die mittleren 50 % liegen zwischen {p25} und {p75} ppm.",
+    gb_stufe_von_bis: "{von}–{bis}",
+    gb_stufe_ab: "ab {von}",
+    gb_stufe_anteil: "{anteil} % {spanne} ppm",
     gb_netz_nie: "Noch nicht gemessen. Dein Knoten liest dafür den gesamten Netzgraphen — das dauert und passiert einmal am Tag von selbst.",
     gb_netz_eigen: "Du nimmst zurzeit {eigen} ppm.",
     gb_netz_eigen_keine: "Was du zurzeit nimmst, steht noch nicht im Graphen — dafür braucht es mindestens einen öffentlichen Kanal.",
@@ -642,6 +645,8 @@ const I18N = {
     a_kx_stand: "{n} Transaktionen im Mempool, {gezeigt} davon gezeichnet.",
     a_kx_naechster: "nächster Block",
     a_kx_spaeter: "Block {n}",
+    a_kb_wann: "in ~{min} min",
+    a_kb_inhalt: "{n} TX · {btc} BTC",
     a_kx_tx: "Transaktion",
     a_kx_rate: "Gebühr",
     a_kx_groesse: "Größe",
@@ -863,6 +868,18 @@ const I18N = {
     d_purge_ruhig: "Dein Mempool ist nicht voll — es wird nichts verworfen. Aufgenommen wird alles ab {n} sat/vB; ob es bald in einen Block kommt, zeigt das Feerate-Diagramm.",
     d_purge_voll: "Dein Mempool ist voll. Alles unter {n} sat/vB fliegt gerade raus.",
     d_teilnahme: "Teilnahme",
+    d_blockzeit: "Blockzeit",
+    bz_takt: "Takt",
+    bz_takt_wert: "{min} min je Block",
+    bz_takt_gemessen: "Takt gemessen an dieser Kette, über die letzten {n} Blöcke.",
+    bz_takt_gerechnet: "Der eigene Takt ist erst nach dem Abgleich messbar — bis dahin gerechnet mit dem Zielabstand von zehn Minuten.",
+    bz_halbierung: "Nächste Halbierung",
+    bz_wann: "Geschätzt",
+    bz_etwa: "etwa {monat}",
+    bz_belohnung: "Belohnung",
+    bz_belohnung_wert: "{jetzt} → {danach} BTC",
+    bz_wartet: "Sobald der Knoten antwortet.",
+    bz_ende: "Es wird nichts mehr ausgeschüttet — alle Bitcoin sind da.",
     d_kurs: "Bitcoin-Kurs",
     d_kurs_je_euro: "Für eine Einheit",
     d_kurs_wartet: "Der Kurs wird über Tor geholt — beim ersten Mal dauert das bis zu einer Minute.",
@@ -1189,8 +1206,11 @@ const I18N = {
     gb_netz_titel: "What the network charges",
     gb_messen: "Measure now",
     gb_messen_laeuft: "Reading the graph …",
-    gb_netz_zahlen: "Median {median} ppm — half of all directions charge less. The middle 50 % sit between {p25} and {p75} ppm · base fee {basis} msat · {linien} directions across {kanaele} channels · measured on {tag}",
-    gb_netz_schief: "That the median does not sit in the middle of that range is not an arithmetic error but the shape of the network: a great many directions stand at zero or one ppm — channels between people who know each other, untouched defaults — and there is barely a ceiling at the top. The average would be the wrong number here; it would land far above what is actually usual.",
+    gb_netz_zahlen: "Median {median} ppm — half of all directions charge less · base fee {basis} msat · {linien} directions across {kanaele} channels · measured on {tag}",
+    gb_netz_spanne: "The middle 50 % sit between {p25} and {p75} ppm.",
+    gb_stufe_von_bis: "{von}–{bis}",
+    gb_stufe_ab: "{von}+",
+    gb_stufe_anteil: "{anteil} % {spanne} ppm",
     gb_netz_nie: "Not measured yet. Your node reads the entire network graph for this — it takes a while and happens once a day by itself.",
     gb_netz_eigen: "You currently charge {eigen} ppm.",
     gb_netz_eigen_keine: "What you currently charge is not in the graph yet — that needs at least one public channel.",
@@ -1791,6 +1811,8 @@ const I18N = {
     a_kx_stand: "{n} transactions in the mempool, {gezeigt} of them drawn.",
     a_kx_naechster: "next block",
     a_kx_spaeter: "block {n}",
+    a_kb_wann: "in ~{min} min",
+    a_kb_inhalt: "{n} TX · {btc} BTC",
     a_kx_tx: "Transaction",
     a_kx_rate: "Fee",
     a_kx_groesse: "Size",
@@ -2012,6 +2034,18 @@ const I18N = {
     d_purge_ruhig: "Your mempool is not full — nothing is being dropped. Everything from {n} sat/vB is accepted; whether it makes it into a block soon is shown by the feerate diagram.",
     d_purge_voll: "Your mempool is full. Anything below {n} sat/vB is being dropped right now.",
     d_teilnahme: "Participation",
+    d_blockzeit: "Block time",
+    bz_takt: "Pace",
+    bz_takt_wert: "{min} min per block",
+    bz_takt_gemessen: "Pace measured on this chain, over the last {n} blocks.",
+    bz_takt_gerechnet: "Your own pace can only be measured after the sync — until then this uses the protocol's target spacing of ten minutes.",
+    bz_halbierung: "Next halving",
+    bz_wann: "Estimated",
+    bz_etwa: "around {monat}",
+    bz_belohnung: "Reward",
+    bz_belohnung_wert: "{jetzt} → {danach} BTC",
+    bz_wartet: "As soon as the node answers.",
+    bz_ende: "Nothing is issued any more — every bitcoin exists.",
     d_kurs: "Bitcoin price",
     d_kurs_je_euro: "Per unit",
     d_kurs_wartet: "The price is fetched over Tor — the first time that can take up to a minute.",
@@ -2806,6 +2840,9 @@ async function zeigeUebersicht() {
   // Zwischenspeicher, geholt wird im Waechter. Er kostet also nichts, und
   // die Uebersicht soll auch darauf nicht warten.
   ladeKurs();
+  // Die Uhr der Kette. Rein gerechnet, aus Zahlen, die schon da sind --
+  // deshalb kein Aufruf und kein Warten.
+  zeichneBlockzeit(d.halbierung);
   // Die Auswertung sammelt erst nach dem Abgleich -- vorher gaebe es nichts
   // zu holen, und der Abruf waere Last fuer nichts.
   if (k) ladeBeitrag(false);
@@ -6732,7 +6769,9 @@ function zeichneKommendeBloecke(roh) {
  * zwoelftausend divs, und der Browser haette daran zu kauen. Gezeichnet wird
  * einmal, darueber liegt eine Trefferliste fuer die Maus.
  */
-const KACHEL_HOEHE = 420;
+// 446 statt 420 seit dem 21.09.2026: der Kopf braucht 48 statt 22 Punkte,
+// und die Kacheln sollen dadurch nicht kleiner werden.
+const KACHEL_HOEHE = 446;
 // Welche Spalte gerade aufgeklappt ist. null heisst: keine.
 let KACHEL_OFFEN = null;
 // Wo die Spalten liegen -- einmal beim Zeichnen gemerkt, damit der Klick
@@ -6839,22 +6878,73 @@ function zeichneKacheln() {
   KACHEL_TREFFER = [];
   KACHEL_SPALTEN = [];
 
-  const KOPF = 22, LUFT = 6;
+  // VIER Zeilen Kopf statt zwei. Der Befund vom 21.09.2026 kam als
+  // Vergleich mit mempool.space: dort steht je Block, WANN er kommt, wie
+  // viele Transaktionen darin stehen und was sie zusammen zahlen -- hier
+  // stand nur die Gebuehrenspanne, obwohl die Anwendung anzahl und sat
+  // laengst mitliefert. Sie wurden gezeichnet und weggeworfen.
+  //
+  // Dazu ein Zweites aus demselben Bild: die erste Spalte las sich "ock".
+  // Die Beschriftung war breiter als die Spalte und lief in den Nachbarn --
+  // bei acht Bloecken auf einem schmalen Fenster passt "naechster Block"
+  // schlicht nicht. Gemessen wird jetzt, und was nicht passt, wird gekuerzt.
+  const KOPF = 48, LUFT = 6;
   const spalte = (breite - LUFT * (bloecke.length - 1)) / bloecke.length;
+
+  // Wie lange ein Block im Schnitt braucht. Zehn Minuten ist die Zielgroesse
+  // des Protokolls; genauer waere die Zeit seit dem letzten Block, und die
+  // hat diese Ansicht nicht. "~" steht davor, weil es eine Erwartung ist.
+  const BLOCKMINUTEN = 10;
+
+  // Text, der in die Spalte passt -- sonst lieber gekuerzt als ueberlappend.
+  const passend = (text, platz) => {
+    if (c.measureText(text).width <= platz) return text;
+    let kurz = text;
+    while (kurz.length > 1 && c.measureText(kurz + "…").width > platz) {
+      kurz = kurz.slice(0, -1);
+    }
+    return kurz.length > 1 ? kurz + "…" : "";
+  };
 
   bloecke.forEach((b, i) => {
     const x = i * (spalte + LUFT);
     KACHEL_SPALTEN.push({ x, breite: spalte, block: i });
-    // Die Kopfzeile der Spalte: welcher Block, und was er kostet.
-    c.fillStyle = "rgba(255,190,105,.75)";
-    c.font = '600 11px ui-monospace, "SF Mono", Menlo, monospace';
     c.textBaseline = "top";
-    c.fillText(i === 0 ? t("a_kx_naechster") : t("a_kx_spaeter", { n: i + 1 }),
-               x, 0);
-    c.fillStyle = "rgba(255,190,105,.45)";
-    c.fillText(b.tiefste != null ? t("a_kb_spanne", {
+    c.font = '600 11px ui-monospace, "SF Mono", Menlo, monospace';
+    // Der naechste Block ist der, auf den es ankommt -- er wird heller.
+    c.fillStyle = i === 0 ? "rgba(255,205,130,.95)" : "rgba(255,190,105,.7)";
+    c.fillText(passend(
+      i === 0 ? t("a_kx_naechster") : t("a_kx_spaeter", { n: i + 1 }),
+      spalte), x, 0);
+
+    c.font = '11px ui-monospace, "SF Mono", Menlo, monospace';
+    // WANN. Die Frage, die man an eine Blockliste wirklich hat -- und die
+    // einzige Zeile, die auch auf der schmalsten Spalte noch hinpasst.
+    c.fillStyle = "rgba(255,190,105,.55)";
+    c.fillText(passend(t("a_kb_wann", { min: (i + 1) * BLOCKMINUTEN }),
+                       spalte), x, 12);
+
+    // Ab hier nach Platz. Vier halbe Zeilen sind schlechter als zwei ganze:
+    // "0.11 – 2.…" beantwortet keine Frage. Also wird weggelassen, was
+    // nicht vollstaendig hinpasst -- nicht gekuerzt.
+    const spanne = b.tiefste != null ? t("a_kb_spanne", {
       tief: diaGebuehrText(b.tiefste), hoch: diaGebuehrText(b.hoechste),
-    }) : "", x, 11);
+    }) : "";
+    const inhalt = t("a_kb_inhalt", {
+      n: zahl(b.anzahl), btc: (b.sat / 1e8).toFixed(4),
+    });
+    c.fillStyle = "rgba(255,190,105,.45)";
+    if (spanne && c.measureText(spanne).width <= spalte) {
+      c.fillText(spanne, x, 24);
+    }
+    if (c.measureText(inhalt).width <= spalte) {
+      c.fillText(inhalt, x, 36);
+    } else {
+      // Passt die lange Form nicht, wenigstens die Zahl der Transaktionen
+      // -- sie ist die aussagekraeftigere Haelfte.
+      const kurz = zahl(b.anzahl) + " TX";
+      if (c.measureText(kurz).width <= spalte) c.fillText(kurz, x, 36);
+    }
 
     const eigene = (d.kacheln || []).filter((k) => k.block === i);
     // Absteigend nach Groesse -- ohne das arbeitet der Algorithmus, aber
@@ -7881,6 +7971,65 @@ function zeichneKursKurz(d) {
   raeumeAuf(zusatz);
 }
 
+/* Die Uhr, nach der Bitcoin wirklich geht.
+
+   Auf Anregung aus dem Betrieb, 21.09.2026: "sone arte block zeit in der
+   uebersicht .. anzahl der bloecke bis zum naechsten halving .. geschaetztes
+   datum .. und wie hoch die revard ist beim naechsten halving".
+
+   Kein eigener Abruf: alles steht in der Antwort, die die Uebersicht ohnehin
+   holt. Und wie ueberall hier werden die Zeilen wiederverwendet statt neu
+   gebaut -- die Seite laedt alle zehn Sekunden nach. */
+function zeichneBlockzeit(h) {
+  const ziel = $("#d-blockzeit");
+  if (!ziel) return;
+  if (!h) {
+    textZeile(ziel, "wartet", t("bz_wartet"), "note");
+    raeumeAuf(ziel);
+    return;
+  }
+
+  kennzahl(ziel, "hoehe", t("w_hoehe"), zahl(h.hoehe));
+  // Eine Nachkommastelle. Mehr waere bei einem Mittel ueber ein halbes Jahr
+  // keine Genauigkeit, sondern Zierrat.
+  kennzahl(ziel, "takt", t("bz_takt"), t("bz_takt_wert", {
+    min: nachkomma((h.schnitt_sekunden || 600) / 60, 1) }));
+
+  if (h.bloecke_bis == null) {
+    // Nach der letzten Halbierung, rund im Jahr 2140. Kostet zwei Zeilen und
+    // haelt die Anzeige davon ab, ein Datum zu erfinden.
+    textZeile(ziel, "ende", t("bz_ende"), "note");
+    raeumeAuf(ziel);
+    return;
+  }
+
+  kennzahl(ziel, "halbierung", t("bz_halbierung"),
+           t("w_in_bloecken", { n: zahl(h.bloecke_bis) }));
+  // Monat und Jahr, kein Tagesdatum: ueber anderthalb Jahre hochgerechnet
+  // waere ein Tag eine Behauptung, keine Schaetzung.
+  kennzahl(ziel, "wann", t("bz_wann"),
+           t("bz_etwa", { monat: monatJahr(h.geschaetzt_ts) }));
+  kennzahl(ziel, "belohnung", t("bz_belohnung"), t("bz_belohnung_wert", {
+    jetzt: belohnungBtc(h.belohnung_sat),
+    danach: belohnungBtc(h.belohnung_danach_sat) }));
+
+  // Woher der Takt kommt, gehoert dazu. "etwa April 2028" sieht gemessen
+  // aus, auch wenn dahinter nur der Zielabstand des Protokolls steckt.
+  textZeile(ziel, "quelle", h.gemessen
+    ? t("bz_takt_gemessen", { n: zahl(h.rueckblick) })
+    : t("bz_takt_gerechnet"), "note");
+  raeumeAuf(ziel);
+}
+
+/* Die Belohnung in Bitcoin, mit so vielen Nachkommastellen wie noetig:
+   3,125 statt 3,12500000 -- aber ab der neunten Halbierung braucht es
+   wirklich alle acht, und dann stehen sie da. */
+function belohnungBtc(sat) {
+  let stellen = 0;
+  while (stellen < 8 && sat % Math.pow(10, 8 - stellen) !== 0) stellen++;
+  return nachkomma(sat / 1e8, stellen);
+}
+
 function zeichneLightningKurz(d) {
   const ziel = $("#d-ln-kurz");
   const geld = $("#d-wallet");
@@ -8076,8 +8225,20 @@ function zeichneNeuerungen(alle) {
     return;
   }
   ziel.textContent = "";
-  // Feste Reihenfolge: Bitcoin zuerst, weil ohne Kette kein Lightning.
-  [["bitcoind", "Bitcoin Core"], ["lnd", "Lightning (LND)"]].forEach(
+  // Feste Reihenfolge, und SatoshiCortex steht oben: es ist die einzige
+  // Fassung, die dieser Kasten selbst betrifft.
+  //
+  // Nachgetragen am 21.09.2026 zusammen mit der Pruefung dahinter. Bis
+  // dahin sah die Anwendung nach Neuerungen fuer bitcoind und LND und
+  // schwieg ueber sich selbst -- der Knoten lief auf 0.66, 1.0.1 lag seit
+  // Stunden bereit, und hier stand nichts davon. Dieselbe Falle wie beim
+  // Kurs am selben Tag: die Schnittstelle liefert es, die Oberflaeche
+  // zaehlt es nicht auf.
+  //
+  // Danach Bitcoin, dann Lightning: ohne Kette kein Lightning.
+  [["satcortex", "SatoshiCortex"],
+   ["bitcoind", "Bitcoin Core"],
+   ["lnd", "Lightning (LND)"]].forEach(
     ([schluessel, titel]) => {
       if (alle[schluessel]) ziel.append(neuerungsBlock(alle[schluessel], titel));
     });
@@ -10212,6 +10373,72 @@ function gbVerlaufBild(verlauf, band) {
   kasten.append(svg);
 }
 
+/* Wie sich die Gebuehrensaetze des Netzes verteilen -- als Leiste und als
+   Zeile darunter.
+
+   Der Betreiber am 21.09.2026: "kann mann nicht einfach machen: 50% 0-100 die
+   anderen 50% 100-600". Kann man, und es ist die bessere Auskunft: der Absatz,
+   der vorher hier stand, ERKLAERTE fuenf Zeilen lang, dass die Verteilung
+   schief ist. Die Leiste zeigt das und sagt zusaetzlich, wo die Masse liegt.
+
+   Das feste Element wird bei JEDEM Aufruf zuerst geleert. Genau daran ist die
+   alte Fassung gescheitert: sie haengte per .after() ein neues Geschwister an,
+   und nach neun Durchlaeufen stand der Absatz neunmal da. */
+function zeichneVerteilung(heute) {
+  const kasten = $("#gb-netz-verteilung");
+  if (!kasten) return;
+  kasten.textContent = "";
+  if (!heute) return;
+
+  const stufen = heute.stufen;
+  if (!Array.isArray(stufen) || !stufen.length) {
+    // Jede Messung von vor dem 21.09.2026 hat keine Verteilung -- dann die
+    // Spanne, wie sie vorher dort stand. Eine leere Leiste waere schlechter
+    // als die aeltere Auskunft.
+    if (heute.p25_ppm != null && heute.p75_ppm != null) {
+      const zeile = document.createElement("div");
+      zeile.className = "dim small";
+      zeile.textContent = t("gb_netz_spanne",
+        { p25: zahl(heute.p25_ppm), p75: zahl(heute.p75_ppm) });
+      kasten.append(zeile);
+    }
+    return;
+  }
+
+  const balken = document.createElement("div");
+  balken.className = "gb-vt-balken";
+  const legende = document.createElement("div");
+  legende.className = "gb-vt-legende";
+
+  stufen.forEach((stufe, i) => {
+    // Leere Stufen bleiben draussen -- fuenfmal "0 %" ist keine Auskunft.
+    if (!stufe.anteil) return;
+    const text = t("gb_stufe_anteil",
+                   { anteil: stufe.anteil, spanne: spanneText(stufe) });
+
+    const teil = document.createElement("span");
+    teil.className = "gb-vt-teil gb-vt-" + i;
+    teil.style.width = stufe.anteil + "%";
+    teil.title = text;
+    balken.append(teil);
+
+    const eintrag = document.createElement("span");
+    eintrag.className = "gb-vt-eintrag gb-vt-" + i;
+    eintrag.textContent = text;
+    legende.append(eintrag);
+  });
+  kasten.append(balken, legende);
+}
+
+/* Die Spanne einer Stufe als Text. Oben offen, weil es nach oben im
+   Lightning-Netz keine Grenze gibt. */
+function spanneText(stufe) {
+  if (stufe.bis == null) return t("gb_stufe_ab", { von: zahl(stufe.von) });
+  if (stufe.von === stufe.bis) return zahl(stufe.von);
+  return t("gb_stufe_von_bis",
+           { von: zahl(stufe.von), bis: zahl(stufe.bis) });
+}
+
 function zeichneNetzgebuehren(d) {
   NETZGEBUEHREN = d;
   const zahlen = $("#gb-netz-zahlen");
@@ -10221,34 +10448,26 @@ function zeichneNetzgebuehren(d) {
 
   if (d.misst_gerade) {
     zahlen.textContent = t("gb_messen_laeuft");
+    zeichneVerteilung(null);
   } else if (heute && heute.median_ppm !== null) {
     zahlen.textContent = t("gb_netz_zahlen", {
-      median: heute.median_ppm, p25: heute.p25_ppm, p75: heute.p75_ppm,
-      basis: heute.basis_median_msat, linien: heute.linien,
-      kanaele: heute.kanaele, tag: heute.tag,
+      median: heute.median_ppm, basis: heute.basis_median_msat,
+      linien: heute.linien, kanaele: heute.kanaele, tag: heute.tag,
     });
-    // Der Befund vom 21.09.2026 aus dem Betrieb: "dann sagt er mir das dass
-    // netzwerk zwischen 100 - 600 sat als gebüren nimmt und sagt mir dann
-    // das 100 der durchschnitt ist .. das kann ja nicht richtig sein oder".
+    // DER BEFUND VOM 21.09.2026 aus dem Betrieb, mit Bild: hier stand ein
+    // fuenfzeiliger Absatz, der ERKLAERTE, warum der Median nicht in der
+    // Mitte der Spanne liegt -- und er stand NEUNMAL untereinander, weil er
+    // per zahlen.after() angehaengt und nie entfernt wurde. Dazu der
+    // Betreiber: "was das den bitte fuer ein riesen text ?? ... kann mann
+    // nicht einfach machen: 50% 0-100 die anderen 50% 100-600".
     //
-    // Doch, und die Rechnung war nie das Problem: 100 ist der MEDIAN, die
-    // Spanne ist das mittlere Viertelpaar. Weil die Verteilung schief ist,
-    // liegt der Median nicht in ihrer Mitte -- wer "Mitte des Netzes" liest,
-    // rechnet aber genau das nach und findet einen Widerspruch, den es nicht
-    // gibt. Eine Zahl, die man erklaeren muss, gehoert erklaert.
-    if (heute.p25_ppm !== null && heute.p75_ppm !== null) {
-      const mitte = (heute.p25_ppm + heute.p75_ppm) / 2;
-      // Nur wenn der Median spuerbar aus der Mitte faellt -- sonst waere der
-      // Satz eine Antwort auf eine Frage, die niemand gestellt hat.
-      if (Math.abs(heute.median_ppm - mitte) > (heute.p75_ppm - heute.p25_ppm) * 0.15) {
-        const schief = document.createElement("div");
-        schief.className = "dim small";
-        schief.textContent = t("gb_netz_schief");
-        zahlen.after(schief);
-      }
-    }
+    // Beides ist damit erledigt: die Verteilung wird GEZEIGT statt erklaert,
+    // und sie geht in ein festes Element, das jedes Mal geleert wird. Sie
+    // sagt zusaetzlich, WO die Masse liegt -- das stand in dem Absatz nie.
+    zeichneVerteilung(heute);
   } else {
     zahlen.textContent = d.fehler ? t(d.fehler) : t("gb_netz_nie");
+    zeichneVerteilung(null);
   }
 
   // Was WIR nehmen, aus dem Graphen gelesen — nicht aus unserer Erinnerung.
