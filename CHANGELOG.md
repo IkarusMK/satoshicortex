@@ -4,7 +4,51 @@ All notable changes to SatoshiCortex. Format loosely after
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning after
 [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [1.0.1] — 2026-09-21
+
+### Fixed: the price was never fetched on the overview
+
+Reported from operation: the BTC price on the overview page seemed never to
+load.
+
+It never did. The panel (`#d-kurs-wert`, default "—") is filled by
+`zeichneKursKurz()`, which is only ever called from `ladeKurs()`. And
+`ladeKurs()` only ran when switching to the news or calculator view —
+although its own guard clause explicitly permits the overview:
+
+```js
+if (ANSICHT !== "news" && ANSICHT !== "rechner"
+    && ANSICHT !== "uebersicht" && !sofort) return;
+```
+
+A half-finished rebuild: the condition was widened, the call forgotten.
+Anyone reloading and staying on the overview saw a dash forever; only a
+detour into another view filled the panel.
+
+`zeigeUebersicht()` now triggers it itself — not awaited, like the world map
+beside it: the endpoint only reads from the cache.
+
+Related question answered along the way — *"do I have to wait 4:30 min to see
+the price?"* No. The five-minute cycle is the *refresh*. On startup the
+application fetches once immediately, and a browser reload does not touch the
+server's cache at all.
+
+### Fixed: "middle of the network" was a label that contradicted itself
+
+The fee panel showed `Median 100 ppm · middle of the network 1–600 ppm`, and
+the question came promptly: reading "middle", you compute (1+600)/2 = 300 and
+find 100 next to it.
+
+Both numbers are right. 100 is the **median** — half of all directions charge
+less — and 1–600 is the interquartile range. The median does not sit in its
+centre because of the shape of the network: a great many directions stand at
+zero or one ppm, and there is barely a ceiling at the top.
+
+So the number was never wrong, its name was. The range now says *what* lies
+in it ("the middle 50 %"), and where the median falls noticeably off centre,
+a sentence below explains why — only then.
+
+## [1.0.0] — 2026-09-19
 
 ### Fixed: a full mempool took the whole interface down
 
@@ -44,7 +88,7 @@ encoded the whole document inside the measurement, which made the parser look
 like it was leaking. The fix was in the test; the note is here because the
 mistake is easy to repeat.
 
-## [1.0.0] — 2026-09-19
+### The release itself
 
 First public release. Everything before this date happened in a private
 repository and is not carried over — this is day one.
