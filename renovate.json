@@ -1,0 +1,50 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard"
+  ],
+  "timezone": "Europe/Berlin",
+  "//": "Since 2026-09-02 every third-party version is recorded exactly ONCE, in example.env. The Compose file points there twice (image name and build argument) and no longer contains a number itself -- so the Docker manager finds nothing there, and this regex manager is the only place where Renovate notices new versions at all. Point it at the wrong file and the watchdog goes silent.",
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/(^|/)example\\.env$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)(?: extractVersion=(?<extractVersion>\\S+))?\\s+\\w+=(?<currentValue>\\S+)"
+      ]
+    }
+  ],
+  "packageRules": [
+    {
+      "//": "Green: our own code and the tooling. If the checks fail, the pull request never gets through in the first place.",
+      "matchManagers": [
+        "pip_requirements",
+        "github-actions"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "automerge": true
+    },
+    {
+      "//": "Red: never merge automatically. A major release of Core changes policy and database format; with LND a database migration is even irreversible. IMPORTANT for context: this concerns MERGING, not building. Once the pull request is accepted the image is created and sits ready in the registry -- WHEN it gets deployed is still decided by the number in your own .env on the machine.",
+      "matchDepNames": [
+        "bitcoin/bitcoin",
+        "lightningnetwork/lnd",
+      ],
+      "automerge": false,
+      "addLabels": [
+        "review-by-hand"
+      ]
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "labels": [
+      "security"
+    ],
+    "automerge": false
+  }
+}

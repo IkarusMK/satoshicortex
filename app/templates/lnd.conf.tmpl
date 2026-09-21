@@ -1,0 +1,113 @@
+# Von SatoshiCortex erzeugt — nicht von Hand aendern.
+# Aenderungen hier werden beim naechsten Speichern in der Weboberflaeche
+# ueberschrieben. Was du einstellen kannst, findest du dort.
+#
+# Erzeugt am {{ERZEUGT_AM}}
+
+[Application Options]
+
+# ============================================================ Identitaet
+# Alias und Farbe sind das sichtbare "ich bin dabei": unter diesem Namen
+# taucht der Knoten im Graphen und auf amboss.space auf.
+alias={{ALIAS}}
+color={{FARBE}}
+
+# ============================================================ Erreichbarkeit
+# Ohne eingehende Verbindungen oeffnet der Knoten nur ausgehende Kanaele und
+# ist im Graphen eine Sackgasse: niemand kann einen Kanal zu ihm aufmachen,
+# und Zahlungen finden keinen Weg hindurch. Der Port gehoert im Router
+# weitergeleitet -- das ist die Eintrittskarte, nicht ein Extra.
+listen=0.0.0.0:9735
+{{EXTERNE_ADRESSEN}}
+
+# Nach innen: gRPC und REST fuer die Weboberflaeche. Beide Ports werden in der
+# Compose NICHT nach aussen veroeffentlicht -- sie sind nur im Compose-Netz
+# erreichbar. Wer hier 127.0.0.1 einsetzt, sperrt die eigene Oberflaeche aus:
+# sie laeuft in einem anderen Container.
+rpclisten=0.0.0.0:10009
+restlisten=0.0.0.0:8080
+
+# LND erzeugt sein TLS-Zertifikat selbst. Ohne diesen Eintrag gilt es nur fuer
+# die IP des Containers, und die wechselt bei jedem Neustart -- die Oberflaeche
+# muesste dann die Pruefung abschalten. Mit dem Compose-Namen im Zertifikat
+# bleibt sie an.
+tlsextradomain=lnd
+
+# Nach einem Neustart alle Gegenstellen gleichzeitig anzusprechen, ist ein
+# Sturm ohne Gewinn. Zufaellig verteilt ueber dreissig Sekunden ist sanfter
+# fuer die Gegenseite und fuer die eigene Leitung.
+stagger-initial-reconnect=true
+
+# ============================================================ Kanaele
+# Die kleinste Kanalgroesse, die dieser Knoten ANNIMMT -- laut LNDs eigener
+# Beschreibung betrifft sie nur EINGEHENDE Kanaele. Was du selbst oeffnest,
+# begrenzt sie nicht.
+#
+# Bewusst niedrig: ein eingehender Kanal ist geschenkte Empfangs-Liquiditaet.
+# Die Gegenstelle zahlt die On-Chain-Gebuehr und bindet ihr eigenes Geld --
+# ihn abzulehnen, weil er fuer einen Grossrouter zu klein waere, hilft
+# niemandem.
+minchansize={{MINCHANSIZE}}
+
+# ============================================================ Wachtuerme
+# Zwei Richtungen, und beide sind gewollt:
+#   watchtower.active — wir bewachen FREMDE Kanaele. Das ist der direkteste
+#                       Beitrag ueberhaupt: wir verhindern Betrug bei Leuten,
+#                       die wir nie treffen werden.
+#   wtclient.active   — und lassen unsere eigenen bewachen. Bei einer Wallet
+#                       auf einem erreichbaren Geraet ist das keine Kuer.
+[watchtower]
+watchtower.active=true
+# Kein eigener Port hier, mit Absicht: LND horcht ohne Angabe auf :9911
+# (sample-lnd.conf: "listening on :9911 by default") -- genau der Port, den
+# die Compose abbildet. Eine ausdrueckliche Zeile aenderte am Verhalten
+# nichts, zwaenge aber beim Einspielen jeden bestehenden Knoten zu einem
+# LND-Neustart.
+{{WACHTURM_ADRESSEN}}
+
+[wtclient]
+wtclient.active=true
+
+[Bitcoin]
+bitcoin.mainnet=true
+bitcoin.node=bitcoind
+
+# Gebuehren. Die Lightning-Labs-Vorlage nennt 2000 ppm -- die zielt auf grosse
+# Router. Der Netz-Median lag 2026 bei rund 143 ppm, die uebliche Spanne bei
+# 20 bis 150. Mit 2000 ppm wuerde der Knoten schlicht gemieden.
+#
+# Die Werte gelten fuer NEUE Kanaele. Im Betrieb wird je Kanal nachgesteuert:
+# teuer machen, wo er leerlaeuft, billig, wo er aufgefuellt werden soll.
+bitcoin.basefee={{BASEFEE}}
+bitcoin.feerate={{FEERATE}}
+bitcoin.timelockdelta=144
+
+[protocol]
+# Seit LND 0.21.0 produktionsreif: rund 20 % guenstigere Oeffnungen und
+# Schliessungen, und on-chain nicht von gewoehnlichen Einzelsignatur-Ausgaben
+# zu unterscheiden.
+protocol.simple-taproot-chans=true
+
+[Bitcoind]
+bitcoind.rpchost=bitcoind:8332
+
+# KEIN Passwort in dieser Datei.
+#
+# Bitcoin Core erzeugt eine Cookie-Datei, sobald "rpcpassword" NICHT gesetzt
+# ist -- ein gesetztes "rpcauth" verhindert das nicht (geprueft in Cores
+# httprpc.cpp, InitRPCAuthentication, gegen 31.1). Unsere bitcoin.conf nutzt
+# genau diese Kombination. LND nimmt die Cookie-Datei als vollwertigen Ersatz
+# fuer rpcuser/rpcpass.
+#
+# Der Gewinn ist konkret: ohne das stuende das RPC-Passwort im Klartext in
+# dieser Datei -- ein zweiter Ort fuer dasselbe Geheimnis, auf einem Geraet,
+# auf dem ohnehin eine Wallet liegt.
+bitcoind.rpccookie=/fast/bitcoind/.cookie
+
+# Ueber ZMQ erfaehrt LND sofort von neuen Bloecken und Transaktionen, statt
+# bitcoind in Abstaenden zu fragen. Fuer einen Knoten, der HTLCs mit
+# Zeitschloessern verwaltet, ist das kein Komfort, sondern Voraussetzung.
+bitcoind.zmqpubrawblock=tcp://bitcoind:28332
+bitcoind.zmqpubrawtx=tcp://bitcoind:28333
+
+{{TOR_BLOCK}}

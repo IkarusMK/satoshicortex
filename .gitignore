@@ -1,0 +1,33 @@
+# Echte Werte und Laufzeitdaten — niemals committen
+.env
+*.env
+!example.env
+bitcoin.conf
+lnd.conf
+lit.conf
+torrc
+diun.yml
+# Mit Schraegstrich am ANFANG: nur das Laufzeitverzeichnis in der Wurzel,
+# das example.env als DATA_BULK/DATA_FAST vorgibt. Ohne ihn trifft "data/"
+# jedes so benannte Verzeichnis auf jeder Ebene -- am 05.09.2026 hat das
+# app/data/regionen.json verschluckt, eine Quelldatei. Sie fehlte im
+# Checkout, und die CI fiel um, waehrend hier alles gruen war.
+/data/
+/db/
+/logs/
+*.macaroon
+*.cert
+*.key
+tls.*
+channel.backup
+.DS_Store
+observatorium/web/node_modules/
+observatorium/web/dist/
+__pycache__/
+*.pyc
+.coverage
+.pytest_cache/
+htmlcov/
+
+# Nur lokal: zeigt auf Pfade des jeweiligen Entwicklungsrechners
+.claude/

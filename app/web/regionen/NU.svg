@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1128.6" class="regionskarte" preserveAspectRatio="xMidYMid meet" data-land="NU" data-minlon="-169.9555" data-maxlon="-169.7779" data-minlat="-19.1481" data-maxlat="-18.9587" data-umbruch="0">
+<!-- Umrisse: Natural Earth (ne_10m_admin_1_states_provinces),
+     gemeinfrei. Erzeugt von tools/regionen_bauen.py, nicht von
+     Hand aendern. -->
+<g class="regionen">
+<path id="r-NU-X01~" data-de="Niue" data-en="Niue" data-cx="500" data-cy="564.3" d="M587.4,38.2L732.9,55.2L748.1,82.9L907.8,527L971.7,656.9L893.1,686.5L841.8,734.5L741.2,855.7L507,1018.6L464.4,996.3L419.5,1015.2L318.4,1096.7L300.8,1038.5L256.1,1012.3L193.5,1008.9L122.5,1018.6L140.4,999.2L154.8,977.9L172.7,957L202.9,937.1L176.8,838.2L164.4,811.6L28.3,766.5L43.7,659.8L164.4,469.8L154.8,435.8L134.4,404.3L118.6,370.8L122.5,327.2L142,296.2L163.7,290.4L189.4,287.9L222.2,264.7L335.8,38.2L516.6,31.9L587.4,38.2Z"><title>Niue</title></path>
+</g>
+</svg>

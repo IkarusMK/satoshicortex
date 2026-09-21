@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 667.3" class="regionskarte" preserveAspectRatio="xMidYMid meet" data-land="HM" data-minlon="73.2187" data-maxlon="73.8295" data-minlat="-53.1995" data-maxlat="-52.9547" data-umbruch="0">
+<!-- Umrisse: Natural Earth (ne_10m_admin_1_states_provinces),
+     gemeinfrei. Erzeugt von tools/regionen_bauen.py, nicht von
+     Hand aendern. -->
+<g class="regionen">
+<path id="r-HM-X01~" data-de="Heard und McDonaldinseln" data-en="Heard Island and McDonald Islands" data-cx="500" data-cy="333.6" d="M845.5,429.9L889.4,447.7L933.9,452.1L971.7,446.6L725.2,523.3L639.9,613.8L592.9,634.9L472.6,648.4L417,639.3L362.6,595.8L346.6,574.1L303.6,503.3L249.2,370.3L237.5,327.4L249.8,299.7L230.8,284L220.3,264.4L221.8,244L238.6,225.2L206.3,203.2L180.3,191.9L85.6,182.8L57.2,164.6L37.6,129.6L28.3,74.6L82.9,56.2L128,18.9L183.7,82.1L193.9,84.8L206.1,114L233.1,148.7L259.9,169.9L272.1,159.3L279.1,117.6L296.1,99L318,104.1L340.2,132.2L317.8,149.1L338.8,192.6L373.8,200.1L411.8,182.4L440.8,149.1L473.1,165.3L565.7,169.3L603.9,196.6L621.8,215.9L658.6,231.6L677.6,243.8L690,261.8L715.3,308.8L728,318.3L770,369.6L787.2,398.4L845.5,429.9Z"><title>Heard Island and McDonald Islands</title></path>
+</g>
+</svg>

@@ -1,0 +1,2023 @@
+/* SatoshiCortex — Oberflaeche.
+ *
+ * Gestalterisch bewusst dieselbe Familie wie AIcortex: dunkler Grund, glaesern
+ * wirkende Flaechen, ein Verlauf als Akzent, viel Ruhe. Nur die Farben sind
+ * andere -- Bitcoin-Orange (#f7931a, die Farbe des Logos) statt Purple/Cyan.
+ * Wer beide Oberflaechen kennt, soll sie als Geschwister erkennen.
+ */
+
+:root {
+  --bg: #0a0805;                             /* warmes Fast-Schwarz */
+  --surface: rgba(34, 26, 16, .76);
+  --surface-2: rgba(48, 36, 21, .55);
+  --border: rgba(255, 201, 140, .13);
+  --border-hi: rgba(247, 147, 26, .5);
+  --text: #f6f1e9;
+  --dim: #a8967e;
+  --btc: #f7931a;                            /* offizielles Bitcoin-Orange */
+  --btc-2: #ffb45a;
+  --gold: #fbbf24;
+  --danger: #f87171;
+  --ok: #34d399;
+  --warn: #fbbf24;
+  --grad: linear-gradient(135deg, var(--btc), var(--gold));
+  --radius: 14px;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.6;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.glow {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(42% 55% at 62% 34%, rgba(247, 147, 26, .10), transparent 70%),
+    radial-gradient(35% 45% at 14% 10%, rgba(251, 191, 36, .09), transparent 70%),
+    radial-gradient(45% 50% at 88% 90%, rgba(247, 147, 26, .07), transparent 70%);
+}
+
+.hidden { display: none !important; }
+
+/* ── Marke ──────────────────────────────────────────────────────────────── */
+.brand-row { display: flex; align-items: center; gap: 12px; }
+.brand-row.center { justify-content: center; flex-direction: column; gap: 14px; }
+.logo { width: 34px; height: 34px; }
+.logo.lg { width: 62px; height: 62px; }
+.brand {
+  font-size: 24px; font-weight: 800; letter-spacing: .4px;
+  background: linear-gradient(120deg, #ffd9a0 0%, #f7931a 40%, #fff4e2 62%, #ffc978 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.brand em { font-style: normal; font-weight: 600; }
+/* ── Flaechen ───────────────────────────────────────────────────────────── */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px 24px;
+  backdrop-filter: blur(10px);
+  transition: border-color .25s ease;
+}
+.panel h3 {
+  font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--btc-2); margin-bottom: 12px; font-weight: 700;
+}
+
+/* Ein zugeklappter Abschnitt ist trotzdem ein Abschnitt.
+
+   <summary> erbt nichts von ".panel h3" und bekommt die Vorgabeschrift des
+   Browsers: zwischen lauter orangenen Versalien stand beim Wallet-Loeschen
+   eine weisse Zeile. Aus dem Betrieb, 10.09.2026: "in einem anderen text disgin
+   find ich nicht gut!"
+
+   Die Werte sind bewusst dieselben wie oben statt in eine gemeinsame Regel
+   gezogen -- ein Test haelt sie deckungsgleich, und so bleibt die
+   Ueberschrift der Kaesten an einer Stelle lesbar. */
+details.panel > summary {
+  font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--btc-2); font-weight: 700;
+  cursor: pointer; list-style: none;
+  display: flex; align-items: center; gap: 10px;
+}
+/* list-style allein genuegt WebKit nicht -- sonst stehen zwei Marken da. */
+details.panel > summary::-webkit-details-marker { display: none; }
+details.panel > summary::after {
+  content: ""; width: 6px; height: 6px; margin-top: -3px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg); transition: transform .18s ease;
+}
+details.panel > summary:hover { filter: brightness(1.25); }
+details.panel[open] > summary { margin-bottom: 12px; }
+details.panel[open] > summary::after {
+  transform: rotate(-135deg); margin-top: 2px;
+}
+
+/* ── Schaltflaechen ─────────────────────────────────────────────────────── */
+.btn {
+  border: 1px solid transparent; border-radius: 10px; cursor: pointer;
+  padding: 11px 20px; font-family: var(--sans); font-size: 14px;
+  font-weight: 600; color: #1a1206; background: var(--grad);
+  transition: filter .18s, transform .12s, opacity .18s;
+}
+.btn:hover:not(:disabled) { filter: brightness(1.1); }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: .38; cursor: not-allowed; }
+.btn.big { padding: 14px 26px; font-size: 15px; }
+.btn.ghost { background: transparent; color: var(--dim); border-color: var(--border); }
+.btn.ghost:hover { color: var(--text); border-color: var(--border-hi); }
+/* Es liegt etwas an. Kein Blinken -- ein ruhiger Ring, der nicht
+   uebersehen wird und nicht draengt. */
+.btn.offen { box-shadow: 0 0 0 3px rgb(255 190 105 / .3); }
+
+/* ── Sprachumschalter ───────────────────────────────────────────────────── */
+.lang-switch {
+  display: inline-flex; border: 1px solid var(--border);
+  border-radius: 9px; overflow: hidden; width: max-content;
+}
+.lang-switch button {
+  background: transparent; color: var(--dim); border: 0; cursor: pointer;
+  padding: 6px 13px; font-family: var(--sans); font-size: 12px;
+  font-weight: 600; letter-spacing: .08em;
+}
+.lang-switch button.active { background: var(--grad); color: #1a1206; }
+
+/* ── Assistent ──────────────────────────────────────────────────────────── */
+.wizard { min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+          padding: 40px 20px 60px; }
+.wizard-top { width: 100%; max-width: 720px; display: flex; align-items: center;
+              justify-content: space-between; margin-bottom: 34px; }
+
+.stepper { display: flex; gap: 0; width: 100%; max-width: 720px; margin-bottom: 26px; }
+.stepper .step { flex: 1; display: flex; flex-direction: column; gap: 7px; }
+.stepper .bar { height: 3px; border-radius: 2px; background: var(--border); transition: background .3s ease; }
+.stepper .step.done .bar { background: var(--grad); }
+.stepper .step.now .bar { background: var(--btc); }
+.stepper .lbl { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase;
+                color: var(--dim); padding-right: 10px; }
+.stepper .step.now .lbl { color: var(--btc-2); }
+
+.card { width: 100%; max-width: 720px; }
+.card h1 { font-size: 27px; letter-spacing: .2px; margin-bottom: 10px; font-weight: 700; }
+.card .lead { color: var(--dim); margin-bottom: 24px; font-size: 15.5px; }
+.card p + p { margin-top: 12px; }
+.card ul { margin: 14px 0 0 20px; color: var(--dim); }
+.card li { margin-bottom: 7px; }
+.card li b { color: var(--text); font-weight: 600; }
+
+.actions { display: flex; gap: 12px; margin-top: 28px; align-items: center; }
+.actions .spacer { flex: 1; }
+
+/* ── Auswahlkacheln ─────────────────────────────────────────────────────── */
+.choices { display: grid; gap: 12px; margin-top: 6px; }
+.choice {
+  display: block; text-align: left; width: 100%; cursor: pointer;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 16px 18px; color: var(--text);
+  font-family: var(--sans); font-size: 14.5px; transition: border-color .2s, background .2s;
+}
+.choice:hover { border-color: var(--border-hi); }
+.choice.sel { border-color: var(--btc); background: rgba(247, 147, 26, .09); }
+.choice .t { font-weight: 650; display: flex; align-items: center; gap: 9px; }
+.choice .d { color: var(--dim); font-size: 13.5px; margin-top: 5px; }
+
+/* ── Zustandsanzeigen ───────────────────────────────────────────────────── */
+.stat { display: flex; align-items: baseline; justify-content: space-between; gap: 14px;
+        padding: 11px 0; border-bottom: 1px solid var(--border); }
+.stat:last-child { border-bottom: 0; }
+.stat .k { color: var(--dim); font-size: 13.5px; }
+.stat .v { font-family: var(--mono); font-size: 14px; }
+
+.note { border-radius: 11px; padding: 13px 16px; font-size: 14px; margin-top: 14px;
+        border: 1px solid var(--border); background: var(--surface-2); color: var(--dim); }
+.note.ok    { border-color: rgba(52, 211, 153, .38); color: #9ff0cd; }
+.note.warn  { border-color: rgba(251, 191, 36, .40); color: #f6dfa3; }
+.note.bad   { border-color: rgba(248, 113, 113, .42); color: #f6b6b6; }
+
+.dot { width: 8px; height: 8px; border-radius: 50%; flex: none; display: inline-block; }
+.dot.ok { background: var(--ok); } .dot.warn { background: var(--warn); }
+.dot.bad { background: var(--danger); } .dot.idle { background: var(--dim); opacity: .5; }
+
+/* ── Regler ─────────────────────────────────────────────────────────────── */
+.field { margin-top: 18px; }
+.field label { display: block; font-size: 13px; color: var(--dim); margin-bottom: 7px; }
+.field input[type=range] { width: 100%; accent-color: var(--btc); }
+.field input[type=text], .field input[type=password] {
+  width: 100%; padding: 11px 13px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--surface-2);
+  color: var(--text); font-family: var(--sans); font-size: 15px;
+}
+.field input[type=text]:focus, .field input[type=password]:focus {
+  outline: none; border-color: var(--btc);
+}
+.field .val { font-family: var(--mono); color: var(--btc-2); font-size: 14px; }
+
+.switch { display: flex; align-items: flex-start; gap: 11px; cursor: pointer; margin-top: 18px; }
+.switch input { margin-top: 3px; }        /* an der ersten Textzeile ausrichten */
+.switch input { accent-color: var(--btc); width: 17px; height: 17px; cursor: pointer; }
+
+/* Eingeklappte Erklaerung. Der Pfeil ist Sache des Browsers; hier geht es
+   nur darum, dass die Zeile nicht wie ein Knopf aussieht und der Text
+   darunter denselben Einzug bekommt wie der Schaltertext darueber. */
+.erklaerung { margin: 5px 0 0 28px; }
+.erklaerung summary {
+  cursor: pointer; color: var(--dim); font-size: 12.5px;
+  width: max-content; padding: 2px 0;
+}
+.erklaerung summary:hover { color: var(--text); }
+.erklaerung p { margin: 6px 0 0; }
+
+.small { font-size: 12.5px; }
+.dim { color: var(--dim); }
+
+@media (max-width: 640px) {
+  .wizard { padding: 24px 14px 46px; }
+  .card h1 { font-size: 22px; }
+  .panel { padding: 18px 16px; }
+  .stepper .lbl { display: none; }
+  /* Der Sprachumschalter darf NIE abgedraengt werden -- sonst kommt man auf
+     dem Handy nicht mehr an die andere Sprache. Deshalb schrumpft die Marke. */
+  .wizard-top { gap: 10px; }
+  .brand { font-size: 18px; }
+  .logo { width: 26px; height: 26px; }
+  .lang-switch { flex: none; }
+  .lang-switch button { padding: 6px 10px; }
+  .stat { flex-wrap: wrap; }
+}
+
+
+/* ---- Fortschritt des Abgleichs -------------------------------------------
+   Der Erstsync dauert Tage. Ohne sichtbaren Fortschritt haelt jeder das
+   Geraet fuer kaputt -- deshalb steht der Balken ganz oben und nicht als
+   Kachel unter vielen. */
+.panel.sync { margin-bottom: 16px; }
+.sync-head { display: flex; align-items: baseline; justify-content: space-between;
+             gap: 12px; margin-bottom: 10px; }
+.sync-phase { font-size: 14.5px; font-weight: 600; }
+.sync-pct { font-family: var(--mono); font-size: 20px; color: var(--btc); }
+.bar { height: 8px; border-radius: 999px; background: rgba(255,255,255,.07); overflow: hidden; }
+.bar > span { display: block; height: 100%; width: 0;
+              background: linear-gradient(90deg, var(--btc), var(--gold));
+              transition: width .6s cubic-bezier(.16,1,.3,1); }
+.sync-sub { margin-top: 10px; color: var(--dim); font-size: 13.5px; }
+/* Solange nichts antwortet, soll der Balken nicht faelschlich 0 % behaupten. */
+.panel.sync.unbekannt .bar > span { width: 100%; opacity: .18; }
+.panel.sync.unbekannt .sync-pct { color: var(--dim); }
+
+/* Eingabefeld mit Beschriftung darueber -- gleiche Anmutung wie die
+   Schalter im Assistenten. */
+.feld { display: block; margin: 16px 0 0; }
+.feld > b { display: block; margin-bottom: 2px; }
+/* Hinweistexte duerfen umbrechen -- auch mitten in einer Adresse.
+   Am 06.09.2026 auf 375 Punkten Breite gemessen: der Hinweis unter dem
+   Sicherungsziel enthaelt
+   "https://cloud.example/remote.php/dav/files/DEINNAME/Sicherungen",
+   dreiundsechzig Zeichen ohne ein einziges Leerzeichen. Die schob den
+   ganzen Rahmen von 375 auf 427 Punkte -- die Seite lief quer. */
+.feld > span, .feld > .dim { overflow-wrap: break-word; }
+.feld > input,
+.feld > textarea {
+  display: block;
+  /* Ohne die zweite Zeile blieb ein Textfeld auf seiner Spaltenzahl stehen:
+     177 Punkte in einem Kasten von 1148. Gemessen am 04.09.2026, als der
+     Ausweis-Kasten das erste Mal wirklich angesehen wurde. */
+  width: 100%;
+  resize: vertical;
+  margin-top: 8px;
+  padding: 11px 13px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(10, 8, 5, .55);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 14px;
+}
+.feld > input::placeholder,
+.feld > textarea::placeholder { color: var(--dim); opacity: .55; }
+.feld > input:hover,
+.feld > textarea:hover { border-color: var(--border-hi); }
+.feld > input:focus-visible,
+.feld > textarea:focus-visible {
+  outline: none;
+  border-color: var(--btc);
+  box-shadow: 0 0 0 3px rgba(247, 147, 26, .16);
+}
+
+/* ── Weltkarte als Grund ───────────────────────────────────────────────────
+   Nicht mehr eine Kachel unter Kacheln: die Karte liegt HINTER allem und
+   traegt die Seite. In der Netz-Ansicht tritt sie hervor und wird bedienbar,
+   sonst bleibt sie gedaempft. Das war der Wunsch aus dem Betrieb -- und es loest
+   zugleich das Problem, dass zehn gleich schwere Kaesten untereinander lagen. */
+#karte-hintergrund {
+  position: fixed; inset: 0; z-index: 0;
+  pointer-events: none;                 /* nur in der Netz-Ansicht bedienbar */
+  overflow: hidden;
+}
+.karte-flaeche { width: 100%; height: 100%; }
+#karte-hintergrund { transition: left .4s ease; }
+#karte-hintergrund svg {
+  display: block; width: 100%; height: 100%;
+  /* contain statt cover: die ganze Welt gehoert zu sehen. Mit cover wurde
+     oben und unten abgeschnitten -- und weggeschnittene Weltkarte ist keine. */
+  object-fit: contain;
+  /* Wahrnehmbar, nicht laut. Vorher stand hier .22, und zusammen mit einem
+     Schleier von .55 bis .88 blieb an der HEISSESTEN Stelle der Karte rund
+     rgb(24,17,6) uebrig -- der Grund selbst ist rgb(10,8,5). Rechnerisch da,
+     im Bild nicht. Jetzt traegt die Karte jede Ansicht, auch Lightning.
+     Der Preis dafuer steht darunter: die Flaechen sind deckender geworden,
+     damit der Text seinen Abstand behaelt. */
+  opacity: .5;
+  transition: opacity .6s ease;
+}
+/* Der Schleier haelt den Text lesbar. In der Netz-Ansicht wird er duenner. */
+.karte-schleier {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(10, 8, 5, .30), rgba(10, 8, 5, .66) 70%);
+  transition: opacity .6s ease;
+  /* Der Schleier ist Farbe, kein Bedienelement. Ohne diese Zeile liegt er
+     ueber der Karte und schluckt JEDEN Klick: elementFromPoint mitten in
+     Deutschland lieferte "karte-schleier", nie das Land. Aus dem Betrieb, am
+     06.09.2026: "wenn ich auf ein Land klicke, passiert nix."
+
+     Warum es nicht auffiel: der Pruefstand hat den Klick per
+     dispatchEvent direkt auf den Pfad geschickt. Das umgeht die
+     Trefferpruefung vollstaendig -- die Pruefung war gruen, die Funktion
+     tot. Ein Klick, der nie auf den Bildschirm trifft, prueft nichts. */
+  pointer-events: none;
+}
+body.ansicht-netz #karte-hintergrund { pointer-events: auto; }
+/* Hier stand einmal "left: 712px" -- die Karte rueckte in der Netz-Ansicht
+   neben die Textspalte, damit nicht ausgerechnet Amerika dahinter liegt.
+   Das war richtig, solange die Karte NUR in dieser Ansicht zu sehen war.
+   Seit sie den Grund jeder Ansicht traegt, ist es falsch: der Grund sprang
+   beim Wechsel seitlich weg und klebte am rechten Rand.
+   Die Karte liegt jetzt ueberall gleich. Dass Amerika teilweise hinter der
+   Spalte liegt, faengt der Weg unten auf -- ab genug Breite traegt der
+   rechte Rand mit, und die Mitte bleibt frei. */
+/* Auf hochkanten Schirmen ist "die ganze Welt zeigen" ein Eigentor: eine
+   Karte im Verhaeltnis 2:1 wird in einem Fenster von 0,46:1 zu einem
+   Streifen von rund 190 px Hoehe, den die Kaesten obendrein groesstenteils
+   verdecken. Also darf sie hier ueber den Rand hinausragen.
+
+   Zwei Dinge daran waren im ersten Anlauf falsch:
+
+   1. Die Bedingung hing an der BREITE (max-width: 780px). Gemessen in einem
+      Fenster von 589x797 griff sie -- und schob Amerika vollstaendig aus dem
+      Bild, obwohl auf einem Desktop-Fenster reichlich Platz war. Massgeblich
+      ist nicht die Breite, sondern das Verhaeltnis: eine 2:1-Karte fuellt
+      weniger als die Haelfte der Fensterhoehe, sobald die Breite unter dem
+      0,9-fachen der Hoehe liegt. Genau das steht jetzt da.
+   2. Der Faktor war mit 2,5 zu grob. Bei 1,8 bleiben in demselben Fenster
+      rund 56 % der Weltbreite sichtbar statt 40 % -- Amerika kommt zurueck --,
+      und die Karte fuellt immer noch zwei Drittel der Hoehe. */
+@media (max-aspect-ratio: 9/10) {
+  #karte-hintergrund { left: -40%; right: -40%; }
+}
+
+body.ansicht-netz #karte-hintergrund svg { opacity: .95; }
+body.ansicht-netz .karte-schleier { opacity: .55; }
+
+.weltkarte .laender path {
+  fill: rgba(168, 150, 126, .09);
+  stroke: rgba(168, 150, 126, .16);
+  stroke-width: .6;
+  vector-effect: non-scaling-stroke;
+  transition: fill .5s ease;
+}
+.weltkarte .laender path[style*="--hitze"] {
+  fill: rgb(247 147 26 / calc(.12 + var(--hitze) * .8));
+  stroke: rgb(255 180 90 / calc(.1 + var(--hitze) * .22));
+}
+.weltkarte .laender path.nachbar {
+  stroke: #fff3d0; stroke-width: 2;
+  filter: drop-shadow(0 0 7px rgba(255, 220, 130, .85));
+}
+.weltkarte .kleine circle { fill: transparent; stroke: none; transition: fill .5s ease; }
+.weltkarte .kleine circle[style*="--hitze"] {
+  fill: rgb(247 147 26 / calc(.35 + var(--hitze) * .6));
+  stroke: rgb(255 180 90 / .5); stroke-width: .8;
+  vector-effect: non-scaling-stroke;
+}
+.weltkarte .kleine circle.nachbar {
+  stroke: #fff3d0; stroke-width: 2;
+  filter: drop-shadow(0 0 7px rgba(255, 220, 130, .85));
+}
+
+/* ── Die Verbindungen ───────────────────────────────────────────────────────
+   Die Linien liegen zwischen den Laendern und den Kleinstaaten-Punkten, also
+   ueber den Flaechen und unter den Marken. Sie sind kraeftiger als die
+   Einfaerbung, weil sie durch dieselbe gedaempfte Grundflaeche muessen und
+   das Interessantere von beidem sind. */
+.weltkarte .linien { pointer-events: none; }
+.weltkarte .linie {
+  fill: none;
+  stroke: rgb(255 190 105 / calc(.24 + var(--staerke, 1) * .48));
+  stroke-width: calc(.7 + var(--staerke, 1) * 1.1);
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+/* Wir selbst. Ohne diesen Punkt haetten die Linien keinen sichtbaren
+   Ausgangspunkt, und ein Netz ohne Mitte ist ein Knaeuel. */
+.weltkarte .quelle {
+  fill: #fff3d0;
+  filter: drop-shadow(0 0 7px rgba(255, 205, 120, .95));
+}
+.weltkarte .laender path.heimat {
+  stroke: var(--btc); stroke-width: 1.6;
+}
+
+/* Das Einblenden laeuft genau einmal -- beim ersten Zeichnen. Es sagt etwas,
+   naemlich die Richtung: von hier nach draussen. Alles Weitere waere Zierat
+   auf einer Flaeche, die dauerhaft im Blick liegt, und die bewegt sich
+   nicht. Wer Bewegung abbestellt hat, sieht die Linien fertig. */
+@keyframes linie-ein {
+  from { stroke-dashoffset: var(--len); }
+  to   { stroke-dashoffset: 0; }
+}
+.weltkarte .linie.ein {
+  stroke-dasharray: var(--len);
+  animation: linie-ein 1.1s cubic-bezier(.16, 1, .3, 1) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+
+.karte-marke {
+  position: fixed; z-index: 3; pointer-events: none;
+  transform: translate(-50%, calc(-100% - 12px));
+  padding: 7px 11px; border-radius: 9px;
+  background: rgba(14, 11, 7, .95); border: 1px solid var(--border-hi);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .55);
+  font-size: 12px; line-height: 1.45; white-space: nowrap;
+}
+.karte-marke.drunter { transform: translate(-50%, 0); }
+.karte-marke b { color: var(--btc-2); font-weight: 700; }
+.karte-marke .zahlen { display: block; color: var(--dim); font-family: var(--mono); }
+.karte-marke .verbunden { color: var(--gold); }
+
+.karte-fuss { display: flex; flex-wrap: wrap; gap: 18px 32px; margin-top: 14px; }
+.karte-zahlen { flex: 1 1 260px; min-width: 0; }
+.karte-zahlen .zeile {
+  display: flex; justify-content: space-between; gap: 16px;
+  padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 13px;
+}
+.karte-zahlen .zeile:last-child { border-bottom: 0; }
+.karte-zahlen .zeile.unter { padding-left: 14px; border-bottom: 0; padding-block: 3px; }
+.karte-zahlen .zeile.unter .k,
+.karte-zahlen .zeile.unter .v { opacity: .72; font-size: 12px; }
+.karte-zahlen .zeile.gruppe { border-bottom: 1px solid var(--border); }
+.karte-zahlen .k { color: var(--dim); }
+.karte-zahlen .v { font-family: var(--mono); color: var(--text); }
+.karte-zahlen .fussnote {
+  margin: 8px 0 0; font-size: 11px; line-height: 1.5; color: var(--dim); opacity: .8;
+}
+
+.karte-rang { flex: 1 1 200px; min-width: 0; list-style: none; margin: 0; padding: 0; font-size: 13px; }
+.karte-rang li {
+  display: grid; grid-template-columns: 2.4em 1fr 4.5em;
+  align-items: center; gap: 10px; padding: 4px 0;
+}
+.karte-rang .kuerzel { font-family: var(--mono); color: var(--btc-2); font-weight: 700; }
+.karte-rang .balken { height: 5px; border-radius: 3px; background: var(--border); overflow: hidden; }
+.karte-rang .balken span { display: block; height: 100%; background: var(--grad); }
+.karte-rang .anzahl { font-family: var(--mono); color: var(--dim); text-align: right; }
+.karte-rang li.nachbar .kuerzel { color: var(--gold); }
+.karte-rang li.nachbar .kuerzel::before {
+  content: "\25CF"; font-size: 8px; vertical-align: 2px; margin-right: 4px;
+}
+.karte-rang li.nachbar .anzahl { color: var(--text); }
+.karte-quelle { margin: 14px 0 0; font-size: 11px; line-height: 1.5; opacity: .75; }
+
+/* ── Auswertung ─────────────────────────────────────────────────────────── */
+.ausw-warnung { color: var(--warn); }
+
+/* Das Feerate-Diagramm ist der Kopf der Ansicht, keine Kachel unter Kacheln:
+   es ist die Kurve, gegen die Miner optimieren, und kein Explorer zeigt sie. */
+.ausw-diagramm {
+  margin-bottom: 16px; padding: 14px 16px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background:
+    linear-gradient(180deg, rgba(247, 147, 26, .06), transparent 60%),
+    var(--surface);
+}
+.ausw-dia-kopf {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: 12px; margin-bottom: 10px;
+  font-size: 12px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--btc-2); font-weight: 700;
+}
+.ausw-dia-kopf .dim {
+  text-transform: none; letter-spacing: 0; font-weight: 400;
+  font-family: var(--mono);
+}
+#a-diagramm { position: relative; }
+/* Hoehe fest, Breite voll -- und das viewBox wird aus genau dieser
+   gemessenen Groesse gebaut. Ein festes viewBox mit
+   preserveAspectRatio="none" streckte hier bis zum 07.09.2026 auch die
+   Schrift (gemessen 2,23-fach auf 1850 px). */
+#a-diagramm svg { display: block; width: 100%; height: 250px; }
+/* Die Kante des naechsten Blocks -- was links davon liegt, kommt hinein. */
+.dia-blockkante {
+  stroke: var(--btc-2); stroke-width: 1; stroke-dasharray: 2 5;
+  opacity: .7; vector-effect: non-scaling-stroke;
+}
+.dia-block { color: var(--btc-2); font-weight: 600; }
+.dia-flaeche { fill: url(#dia-verlauf); }
+.dia-linie { fill: none; stroke: var(--btc); stroke-width: 1.6; vector-effect: non-scaling-stroke; }
+.dia-gitter { stroke: var(--border); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.dia-grenze { stroke: var(--warn); stroke-width: 1.2; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
+.dia-text { fill: var(--dim); font-size: 10px; font-family: var(--mono); }
+
+/* Die Kachelflaeche. Canvas statt Elemente: bei zwoelftausend Kacheln waeren
+   das zwoelftausend divs. */
+.kachelflaeche {
+  position: relative; overflow-x: auto;
+  scrollbar-width: thin; scrollbar-color: var(--border-hi) transparent;
+}
+.kachelflaeche canvas { display: block; border-radius: 8px; cursor: pointer; }
+.kachelflaeche canvas:focus-visible { outline: 2px solid var(--btc); outline-offset: 2px; }
+#a-kachel-detail { margin-top: 16px; }
+/* Die Botschaft eines nachgeschlagenen Blocks. Gross gesetzt, weil sie der
+   Grund ist, warum jemand einen alten Block heraussucht -- und weil ein
+   Satz, den ein Mensch geschrieben hat, nicht in eine Zahlenkolonne
+   gehoert. */
+.botschaft-gross {
+  margin: 12px 0 16px; padding: 14px 16px; border-radius: 10px;
+  border-left: 3px solid var(--btc);
+  background: rgb(247 147 26 / .07);
+  font-family: var(--mono); font-size: 14px; line-height: 1.6;
+  color: var(--text); overflow-wrap: anywhere;
+}
+#a-kachel-detail h4 { margin: 0 0 4px; }
+.kachelblase {
+  position: absolute; z-index: 4; pointer-events: none;
+  min-width: 210px; padding: 8px 10px; border-radius: 8px;
+  border: 1px solid var(--border-hi);
+  background: rgba(10, 8, 5, .94);
+  font-size: 12px; line-height: 1.55;
+  box-shadow: 0 6px 22px rgb(0 0 0 / .5);
+}
+.kachelblase > div { display: flex; justify-content: space-between; gap: 14px; }
+.kachelblase .k { color: var(--dim); }
+.kachelblase .v { font-family: var(--mono); }
+
+/* ── Blockkaesten ─────────────────────────────────────────────────────────
+   Zwei Streifen, eine Form: links die Bloecke, die noch kommen, rechts die,
+   die es schon gibt. Bewusst KEINE Nachbauten der 3D-Wuerfel von anderswo --
+   flache Kaesten in unserer Bildsprache, mit Ziffern in Schreibmaschine, weil
+   hier Zahlen verglichen werden. Der Streifen rollt seitlich; auf dem Handy
+   ist das die einzige Form, die nicht auseinanderfaellt. */
+.blockstreifen {
+  display: flex; gap: 10px; margin: 14px 0 6px;
+  overflow-x: auto; padding-bottom: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-hi) transparent;
+}
+.blockkasten {
+  flex: 0 0 auto; width: 176px; min-height: 92px;
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 10px 12px; border-radius: 10px; text-align: left;
+  border: 1px solid rgb(255 190 105 / .16);
+  background:
+    linear-gradient(180deg, rgb(247 147 26 / .10), rgb(247 147 26 / .02)),
+    var(--surface-2);
+  color: var(--text); font: inherit;
+}
+.blockkasten .bk-kopf {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .04em;
+  color: var(--btc-2); font-weight: 700;
+  /* Eine Zeile. Bricht die Gebuehrenspanne um, stehen die Kaesten
+     unterschiedlich hoch nebeneinander -- und ein Streifen, dessen Kaesten
+     nicht auf einer Linie sitzen, sieht kaputt aus. */
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.blockkasten .bk-gross {
+  font-family: var(--mono); font-size: 14px; font-weight: 700;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.blockkasten .bk-gross.unbekannt { color: var(--dim); font-style: italic; font-weight: 400; }
+.blockkasten .bk-zeile {
+  font-size: 11px; color: var(--dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.blockkasten .bk-fuss {
+  font-size: 11px; color: var(--dim); opacity: .8; margin-top: auto;
+  font-variant-numeric: tabular-nums;
+}
+/* Die kommenden sind Ausblick, nicht Tatsache -- gestrichelt statt fest. */
+.blockkasten.kommend { border-style: dashed; }
+.blockkasten.rest { opacity: .6; }
+/* Die geschuerften sind Knoepfe: ein Klick zeigt, was DIESER Knoten von dem
+   Block vorher gesehen hat. */
+button.blockkasten { cursor: pointer; transition: border-color .12s, transform .12s; }
+button.blockkasten:hover { border-color: var(--border-hi); transform: translateY(-1px); }
+button.blockkasten:focus-visible { outline: 2px solid var(--btc); outline-offset: 2px; }
+button.blockkasten.offen {
+  border-color: var(--btc); background:
+    linear-gradient(180deg, rgb(247 147 26 / .22), rgb(247 147 26 / .05)),
+    var(--surface-2);
+}
+#a-blockdetail { margin: 6px 0 18px; }
+#a-blockdetail h4 { margin: 0 0 4px; }
+.ausw-tabelle .txid {
+  font-family: var(--mono); font-size: 12px; color: var(--dim);
+  max-width: 30rem; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* Der Balken muss SICHTBAR sein. macOS blendet Rollbalken standardmaessig
+   aus, solange man nicht rollt -- und genau daran ist die Laenderansicht am
+   06.09.2026 gescheitert: die Zahlen waren abgeschnitten, der Weg dorthin
+   unsichtbar. scrollbar-color erzwingt einen dauerhaften Balken. */
+.ausw-tabelle {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-hi) transparent;
+}
+.ausw-tabelle table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ausw-tabelle th {
+  text-align: left; padding: 6px 10px 8px 0; font-weight: 600;
+  color: var(--dim); font-size: 11px; letter-spacing: .05em;
+  text-transform: uppercase; white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+}
+.ausw-tabelle td {
+  padding: 7px 10px 7px 0; border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.ausw-tabelle tr:last-child td { border-bottom: 0; }
+/* Rechtsbuendige Zahlenspalten brauchen Luft NACH LINKS, sonst kleben sie
+   bei knapper Breite an der Spalte davor: "5 min0.0364 BTC". Auf 1850 Pixel
+   faellt das nicht auf, auf 1000 sofort. */
+.ausw-tabelle .zahl {
+  font-family: var(--mono); text-align: right;
+  padding-right: 0; padding-left: 16px;
+}
+.ausw-tabelle .hoehe { font-family: var(--mono); color: var(--btc-2); font-weight: 700; }
+.ausw-tabelle .pool { color: var(--text); }
+.ausw-tabelle .pool.unbekannt { color: var(--dim); font-style: italic; }
+/* Was der Miner selbst hineingeschrieben hat. Schreibmaschine, weil es roher
+   Text aus dem Block ist -- und gekuerzt, damit eine ungewoehnlich lange
+   Botschaft nicht die ganze Tabelle auseinanderzieht. Der volle Text steht
+   im title. */
+.ausw-tabelle .botschaft {
+  font-family: var(--mono); font-size: 12px; color: var(--dim);
+  max-width: 14rem; overflow: hidden; text-overflow: ellipsis;
+}
+
+.ausw-suche { display: flex; gap: 10px; margin: 12px 0; flex-wrap: wrap; }
+.ausw-suche input {
+  flex: 1 1 320px; min-width: 0;
+  padding: 10px 12px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--surface-2);
+  color: var(--text); font-family: var(--mono); font-size: 13px;
+}
+.ausw-suche input:focus { outline: none; border-color: var(--border-hi); }
+
+.treffer-zeile {
+  display: flex; justify-content: space-between; gap: 16px;
+  padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px;
+}
+.treffer-zeile:last-child { border-bottom: 0; }
+.treffer-zeile .k { color: var(--dim); }
+.treffer-zeile .v { font-family: var(--mono); }
+.treffer-zeile .v.hervor { color: var(--btc-2); font-weight: 700; }
+
+/* ── Beitrag: wofuer die gesendeten Bytes draufgingen ───────────────────── */
+.beitrag {
+  margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border);
+}
+.beitrag-balken {
+  display: flex; height: 10px; border-radius: 5px; overflow: hidden;
+  background: var(--border); margin-bottom: 10px;
+}
+.beitrag-balken span { display: block; height: 100%; }
+
+/* Eine Quelle fuer die Farben, nicht zwei: Balkenstueck und Punkt daneben
+   holen sie aus derselben Regel. Der erste Anlauf las die Farbe im JS aus dem
+   Balken aus -- und griff ins Leere, sobald es keinen Balken gab. */
+.beitrag-balken .bloecke,       .beitrag-liste .punkt.bloecke       { background: var(--btc); }
+.beitrag-balken .transaktionen, .beitrag-liste .punkt.transaktionen { background: var(--btc-2); }
+.beitrag-balken .filter,        .beitrag-liste .punkt.filter        { background: var(--gold); }
+.beitrag-balken .kopfzeilen,    .beitrag-liste .punkt.kopfzeilen    { background: rgba(251, 191, 36, .5); }
+.beitrag-balken .adressen,      .beitrag-liste .punkt.adressen      { background: rgba(168, 150, 126, .6); }
+.beitrag-balken .rest,          .beitrag-liste .punkt.rest          { background: rgba(168, 150, 126, .25); }
+
+.beitrag-liste { display: grid; gap: 3px; font-size: 13px; }
+.beitrag-liste .zeile { display: flex; align-items: center; gap: 8px; }
+.beitrag-liste .punkt {
+  width: 9px; height: 9px; border-radius: 2px; flex: none;
+}
+.beitrag-liste .k { color: var(--dim); flex: 1 1 auto; }
+.beitrag-liste .v { font-family: var(--mono); }
+.beitrag-liste .zeile.stark .k { color: var(--text); }
+.beitrag-liste .zeile.stark .v { color: var(--btc-2); font-weight: 700; }
+
+/* ── Huelle: Kopf mit Reitern, Seitenleiste, Inhalt ─────────────────────────
+   Vorher lagen zehn gleich schwere Kaesten untereinander -- "dadrunter
+   geklatscht", und das traf zu. Jetzt traegt die Karte den Grund, der Kopf
+   trennt die beiden Netze, und die Seitenleiste fuehrt zu den Abschnitten.
+   Jede Ansicht passt damit auf einen Bildschirm. */
+#app { position: relative; z-index: 1; min-height: 100vh; display: flex; flex-direction: column; }
+
+.kopf {
+  display: flex; align-items: center; gap: 22px;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(10, 8, 5, .72);
+  backdrop-filter: blur(10px);
+  position: sticky; top: 0; z-index: 4;
+}
+.kopf .brand-row { margin: 0; }
+.kopf .lang-switch { margin-left: auto; }
+
+/* Die beiden Netze. Bewusst gross und nebeneinander: das ist die oberste
+   Trennung im Kopf des Nutzers, nicht ein Menuepunkt unter vielen. */
+.rahmen { display: flex; flex: 1 1 auto; align-items: stretch; }
+
+.seitenleiste {
+  flex: 0 0 208px; display: flex; flex-direction: column;
+  padding: 18px 12px; gap: 3px;
+  border-right: 1px solid var(--border);
+  background: rgba(10, 8, 5, .68);
+  backdrop-filter: blur(6px);
+}
+/* Eine Gruppe je Themenbereich -- alle gleichzeitig sichtbar. Die
+   Ueberschrift traegt die Trennung, die vorher ein Reiter im Kopf machte. */
+.abschnitte { display: flex; flex-direction: column; gap: 3px; }
+.abschnitte + .abschnitte { margin-top: 18px; }
+.leiste-titel {
+  margin: 0 0 4px; padding: 0 12px;
+  font-family: var(--sans); font-size: 10px; font-weight: 700;
+  letter-spacing: .13em; text-transform: uppercase; color: var(--dim);
+  opacity: .72;
+}
+
+.seitenleiste button {
+  display: block; width: 100%; text-align: left;
+  background: transparent; border: 0; cursor: pointer;
+  color: var(--dim); font-family: var(--sans); font-size: 14px;
+  padding: 9px 12px; border-radius: 9px;
+  transition: color .15s ease, background .15s ease;
+}
+.seitenleiste button:hover { color: var(--text); background: var(--surface-2); }
+.seitenleiste button.aktiv {
+  color: var(--btc-2); background: var(--surface);
+  box-shadow: inset 2px 0 0 var(--btc);
+}
+.leiste-fuss {
+  margin-top: auto; padding-top: 14px; border-top: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.leiste-fuss .dim { font-size: 11px; padding-left: 12px; }
+
+.inhalt {
+  flex: 1 1 auto; min-width: 0;
+  padding: 22px; display: flex; flex-direction: column; gap: 16px;
+}
+.inhalt > section { display: flex; flex-direction: column; gap: 16px; }
+.inhalt > section.hidden { display: none; }
+
+/* Zwei nebeneinander statt zwei untereinander, wo es passt. */
+.raster { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.raster > .panel { margin: 0; }
+.inhalt .panel { margin: 0; }
+
+/* In der Netz-Ansicht soll die Karte zu sehen sein -- der Inhalt tritt
+   zurueck und legt sich als schmale Spalte darueber. */
+body.ansicht-netz .inhalt {
+  max-width: 460px;
+}
+
+/* Ab genug Breite an BEIDE Raender statt alles links.
+   Vorher stand die ganze Ansicht in einer Spalte links, waehrend rechts nichts
+   war -- und die Karte musste zur Seite ruecken, um ueberhaupt vorzukommen.
+   Zwei Spalten mit freier Mitte loesen beides: der Inhalt verteilt sich, und
+   die Karte liegt dazwischen, ohne dass am Grund geschoben wird.
+   Die Schwelle ist gerechnet, nicht geraten: Seitenleiste (208) plus
+   Innenabstand (44) plus zwei Spalten (2x440) plus zwei Luecken (2x16) laesst
+   bei 1600 px rund 436 px fuer die Karte -- darunter waere die Mitte ein
+   Streifen, und ein Streifen Weltkarte ist schlechter als eine Karte hinter
+   der Spalte. */
+@media (min-width: 1600px) {
+  body.ansicht-netz .inhalt { max-width: none; }
+  body.ansicht-netz section[data-ansicht="netz"] {
+    display: grid;
+    grid-template-columns: 440px 1fr 440px;
+    align-items: start;
+  }
+  body.ansicht-netz section[data-ansicht="netz"] > .panel:first-child {
+    grid-column: 1;
+  }
+  body.ansicht-netz section[data-ansicht="netz"] > .panel:last-child {
+    grid-column: 3;
+  }
+}
+body.ansicht-netz .inhalt .panel { background: rgba(10, 8, 5, .82); backdrop-filter: blur(8px); }
+
+@media (max-width: 780px) {
+  .kopf { flex-wrap: wrap; gap: 12px; padding: 12px 14px; }
+  .kopf .lang-switch { order: 3; margin-left: 0; }
+  .rahmen { flex-direction: column; }
+  .seitenleiste {
+    flex: none; flex-direction: row; flex-wrap: wrap; gap: 6px;
+    border-right: 0; border-bottom: 1px solid var(--border); padding: 10px 14px;
+  }
+  .abschnitte { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .abschnitte + .abschnitte { margin-top: 4px; }
+  /* Auf schmalen Geraeten liegt die Gruppe waagerecht. Ohne eigene Breite
+     stuende die Ueberschrift mitten zwischen den Knoepfen und die Gruppe
+     waere nicht mehr abzulesen -- sie bekommt deshalb die ganze Zeile. */
+  .leiste-titel { flex-basis: 100%; margin: 0; padding: 0 2px; }
+  .seitenleiste button { width: auto; }
+  .seitenleiste button.aktiv { box-shadow: inset 0 -2px 0 var(--btc); }
+  .leiste-fuss {
+    /* Auf voller Breite unter die Abschnitte, nicht daneben. */
+    flex-basis: 100%; margin-top: 0; padding-top: 8px;
+    border-top: 1px solid var(--border);
+    flex-direction: row; align-items: center; gap: 12px;
+  }
+  .leiste-fuss .dim { padding-left: 0; margin-left: auto; }
+  .inhalt { padding: 14px; }
+  body.ansicht-netz .inhalt { max-width: none; }
+}
+
+/* ── Was der Browser mitbringt ──────────────────────────────────────────────
+   Textauswahl, Schreibmarke, Bildlaufleisten, Fokusringe und die Ziffern in
+   Tabellen kommen mit Vorgaben, die zu keinem Entwurf gehoeren. Sie gehoeren
+   aus der eigenen Palette gesetzt -- das ist der billigste Hinweis darauf,
+   dass eine Seite gebaut und nicht zusammengesteckt wurde, und genau der,
+   den man am zuverlaessigsten vergisst. Uebernommen aus der
+   Qualitaetsuntergrenze von Impeccable (Apache-2.0). */
+
+::selection { background: rgba(247, 147, 26, .3); color: var(--text); }
+
+input, textarea { caret-color: var(--btc); }
+
+/* Ziffern in gleicher Breite. Ohne das springen die Spalten in Tabellen und
+   Kennzahlen bei jeder Aktualisierung, weil die 1 schmaler ist als die 8. */
+.ausw-tabelle, .karte-zahlen, .karte-rang, .beitrag-liste,
+.treffer-zeile, .kennzahl, .sync-pct, .ln-zeile {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Bildlaufleisten in der Palette statt in Systemgrau. */
+* { scrollbar-width: thin; scrollbar-color: var(--border-hi) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(247, 147, 26, .28); border-radius: 6px;
+  border: 2px solid transparent; background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(247, 147, 26, .5); background-clip: content-box; }
+
+/* Ein Fokusring, den man sieht, ohne dass er die Maus stoert. */
+:focus-visible {
+  outline: 2px solid var(--btc);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+a { color: var(--btc-2); text-underline-offset: 3px; text-decoration-thickness: 1px; }
+a:hover { color: var(--btc); }
+
+/* Wer Bewegung abbestellt hat, bekommt keine. Betrifft vor allem die Karte,
+   die ihre Farben ueber eine halbe Sekunde einblendet, und den Wechsel
+   zwischen den Ansichten. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    /* Ohne das bliebe die Staffelung der Kartenlinien stehen: die Bewegung
+       waere weg, das Warten daneben nicht. */
+    animation-delay: .01ms !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Lightning ─────────────────────────────────────────────────────────────
+   Dieselbe Form wie die Kartenzahlen: Schlagwort links, Wert rechts, eine
+   dünne Linie dazwischen. Kein eigener Entwurf für dieselbe Sache. */
+.ln-stand { margin-bottom: 12px; }
+.ln-zeile {
+  display: flex; justify-content: space-between; gap: 16px;
+  padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13.5px;
+}
+.ln-zeile:last-child { border-bottom: 0; }
+.ln-zeile .k { color: var(--dim); }
+.ln-zeile .v { font-family: var(--mono); color: var(--text); text-align: right; }
+
+/* Ein Schalter, der zu dem darueber gehoert -- eingerueckt und mit einer
+   Linie angebunden. Die Pause gehoert zu Tor, das Eingabefeld zur Adresse:
+   ohne diese Zuordnung stuenden fuenf gleichrangige Zeilen da, von denen
+   zwei etwas anderes bedeuten als die drei anderen. */
+.unterschalter {
+  margin-left: 22px;
+  padding-left: 16px;
+  border-left: 2px solid rgb(255 190 105 / .22);
+}
+.unterschalter input[type="text"] { width: 100%; }
+
+/* Der Seed. Vierundzwanzig Woerter, die abgeschrieben werden muessen —
+   also gross genug zum Lesen, nummeriert, und in Spalten, damit man beim
+   Abschreiben die Zeile nicht verliert. Monospace, weil zwei Woerter, die
+   sich nur in einem Buchstaben unterscheiden, hier teuer sind. */
+.seed {
+  list-style: none; counter-reset: seed;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px 18px; margin: 16px 0; padding: 0;
+}
+.seed li {
+  counter-increment: seed;
+  display: flex; align-items: baseline; gap: 10px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 15px; letter-spacing: .02em;
+  padding: 7px 12px; border-radius: 8px;
+  background: rgb(255 190 105 / .06);
+  border: 1px solid rgb(255 190 105 / .14);
+}
+.seed li::before {
+  content: counter(seed);
+  min-width: 1.6em; text-align: right;
+  font-size: 12px; opacity: .55; font-variant-numeric: tabular-nums;
+}
+.probe-feld { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+.probe-feld .nr {
+  min-width: 4.5em; font-size: 13px; opacity: .7;
+  font-variant-numeric: tabular-nums;
+}
+/* Und sie muessen aussehen wie der Rest.
+   Bis zum 09.09.2026 stand hier nur "flex: 1" und die Schriftart -- alles
+   andere kam vom Browser: weisser Grund, schwarze Schrift, grauer
+   Standardrahmen, mitten in einer dunklen Oberflaeche. Ausgerechnet die vier
+   Felder, in die jemand unter Zeitdruck seinen Seed tippt, sahen aus wie aus
+   einem anderen Programm. Aufgefallen bei der Sichtpruefung des umgebauten
+   Ablaufs, nachdem der Betreiber genau hier ins Stolpern geraten war. */
+.probe-feld input,
+.seedeingabe input {
+  flex: 1; min-width: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(10, 8, 5, .55);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 14px;
+}
+.probe-feld input:hover,
+.seedeingabe input:hover { border-color: var(--border-hi); }
+.probe-feld input:focus-visible,
+.seedeingabe input:focus-visible {
+  outline: none;
+  border-color: var(--btc);
+}
+
+/* Vierundzwanzig Woerter eingeben. Dasselbe Raster wie beim Anzeigen (.seed),
+   damit Zettel und Bildschirm gleich aussehen — wer von einer Liste abtippt,
+   verrutscht sonst zwischen den Zeilen. Die Nummer steht VOR dem Feld und
+   nicht als Platzhalter darin: ein Platzhalter verschwindet beim Tippen,
+   und dann weiss man nicht mehr, bei welchem Wort man ist. */
+.seedeingabe {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px 18px; margin: 16px 0;
+}
+.seedeingabe label { display: flex; align-items: center; gap: 10px; }
+.seedeingabe .nr {
+  min-width: 1.8em; text-align: right;
+  font-size: 12px; opacity: .55; font-variant-numeric: tabular-nums;
+}
+/* Die Gestaltung teilt sich .seedeingabe input mit .probe-feld input --
+   siehe dort. Beide waren ungestaltet, und es ist derselbe Fehler. */
+
+/* Ein Wort, das es in der Liste nicht gibt. Am FELD markiert und nicht nur
+   in einer Meldung darunter: bei vierundzwanzig Feldern ist "eines davon
+   stimmt nicht" keine brauchbare Auskunft. */
+.seedeingabe input.unbekannt {
+  border-color: var(--warn);
+  background: rgb(251 191 36 / .08);
+}
+
+/* Ein Kanal in einer Zeile. Der Balken ist die eigentliche Aussage: liegt
+   alles auf einer Seite, leitet der Kanal in eine Richtung nichts mehr
+   weiter — und genau das sieht man an einer Zahlenkolonne nicht. */
+.kanal {
+  padding: 12px 0;
+  border-bottom: 1px solid rgb(255 190 105 / .10);
+}
+.kanal:last-child { border-bottom: 0; }
+.kanal-kopf {
+  display: flex; align-items: baseline; gap: 10px;
+  font-size: 14px; margin-bottom: 8px;
+}
+.kanal-punkt {
+  width: 8px; height: 8px; border-radius: 50%; flex: none;
+  background: rgb(52 211 153 / .85);
+}
+.kanal-punkt.still { background: rgb(248 113 113 / .85); }
+.kanal-name { font-weight: 600; }
+.kanal-kopf .rechts {
+  margin-left: auto; font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace; opacity: .8;
+}
+.kanal-balken {
+  height: 8px; border-radius: 4px; overflow: hidden;
+  background: rgb(255 190 105 / .12); display: flex;
+}
+.kanal-balken span {
+  background: linear-gradient(90deg, rgb(255 190 105 / .75), rgb(255 160 60 / .9));
+}
+.kanal-fuss {
+  display: flex; gap: 14px; margin-top: 6px;
+  font-size: 12px; opacity: .7; font-variant-numeric: tabular-nums;
+}
+.kanal-fuss .drueben { margin-left: auto; }
+/* Ein privater Kanal taucht im Graphen nicht auf — andere routen nicht
+   durch ihn. Das gehoert dazugesagt, nicht versteckt. */
+.kanal-marke {
+  font-size: 11px; padding: 1px 7px; border-radius: 999px;
+  border: 1px solid rgb(255 190 105 / .28); opacity: .75;
+}
+
+/* Eine Einzahladresse ist 62 Zeichen lang und muss VOLLSTAENDIG lesbar sein:
+   wer einzahlt, prueft Anfang und Ende gegen seine Wallet. In ein Eingabefeld
+   passt sie nicht — dort waere sie abgeschnitten, und genau die letzten
+   Zeichen fehlten. */
+.adresse {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 14px; line-height: 1.7; letter-spacing: .04em;
+  word-break: break-all; user-select: all; cursor: text;
+  padding: 12px 14px; margin-top: 10px; border-radius: 10px;
+  background: rgb(255 190 105 / .07);
+  border: 1px solid rgb(255 190 105 / .18);
+}
+/* Auswahlfelder wie Eingabefelder. Ohne das nimmt der Browser seine eigenen
+   Vorgaben: weisser Kasten, schwarze Schrift — in einer dunklen Oberflaeche
+   sieht das nicht nach Gestaltung aus, sondern nach kaputt. appearance:none
+   nimmt den Systemstil weg, der Pfeil kommt als Hintergrundbild zurueck. */
+.feld > select {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 11px 36px 11px 13px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background-color: rgba(10, 8, 5, .55);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 14px;
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, rgba(246, 241, 233, .55) 50%),
+    linear-gradient(135deg, rgba(246, 241, 233, .55) 50%, transparent 50%);
+  background-position: calc(100% - 19px) 50%, calc(100% - 13px) 50%;
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+.feld > select:hover { border-color: var(--border-hi); }
+.feld > select:focus-visible {
+  outline: none;
+  border-color: var(--btc);
+  box-shadow: 0 0 0 3px rgba(247, 147, 26, .16);
+}
+/* Die Klappliste selbst zeichnet das Betriebssystem — Farben lassen sich
+   dort nur ueber die Optionen setzen, und auch das nicht ueberall. */
+.feld > select option { background: #14100a; color: var(--text); }
+
+/* ── Protokolle ─────────────────────────────────────────────────────────────
+   Bewusst nuechtern: hier zaehlt Lesbarkeit, nicht Gestaltung. Feste
+   Zeichenbreite, damit Zeitstempel untereinander stehen, und ein eigener
+   Rollbereich, damit die Seite darunter nicht mitwandert. */
+.log-quellen { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; }
+.log-quellen button {
+  background: transparent; color: var(--dim);
+  border: 1px solid var(--border); border-radius: 9px;
+  padding: 7px 14px; font: inherit; font-size: 13px; cursor: pointer;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.log-quellen button:hover:not(:disabled) {
+  color: var(--text); border-color: var(--border-hi);
+}
+.log-quellen button.aktiv {
+  color: #1a1206; background: var(--grad); border-color: transparent;
+  font-weight: 600;
+}
+/* Eine Quelle ohne Datei bleibt sichtbar statt zu verschwinden: "noch nichts
+   da" ist eine Auskunft, ein fehlender Knopf waere ein Raetsel. */
+.log-quellen button:disabled { opacity: .4; cursor: not-allowed; }
+
+.log-kopf {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; margin: 14px 0 8px;
+}
+.log-text {
+  margin: 0; padding: 14px 16px; max-height: 60vh; overflow: auto;
+  background: rgba(10, 8, 5, .55);   /* tiefer als --surface: der Text soll vorn stehen */
+  border: 1px solid var(--border); border-radius: 12px;
+  font-family: var(--mono); font-size: 12.5px; line-height: 1.55;
+  color: var(--text); white-space: pre; tab-size: 4;
+}
+.log-text:empty::before { content: "—"; color: var(--dim); }
+
+/* ── Welt ───────────────────────────────────────────────────────────────────
+   Die Karte bekommt die volle Flaeche des Inhalts -- aber die Seitenleiste
+   bleibt stehen.
+
+   Bis zum 03.09.2026 wurde sie hier ausgeblendet, mit der Begruendung "hier
+   ist die Karte das Ganze; zurueck geht es ueber die Reiter im Kopf". Seit
+   die Reiter weg sind, gaebe es in dieser Ansicht dann gar keine Bedienung
+   mehr -- eine Sackgasse. Eine Ansicht, aus der man nicht herauskommt, ist
+   kein Entwurf, sondern ein Fehler. */
+body.ansicht-welt .inhalt { max-width: none; padding: 0; }
+/* Der Streifen liegt UEBER der Karte, und die Karte ist am Bildschirmrand
+   festgemacht. Ohne diese Zeile verschluckt er die halbe Suedhalbkugel --
+   Aus dem Betrieb, 04.09.2026: "die ganze Leiste im Bild verschluckt quasi die
+   suedliche Himmelsphaere der Weltkarte."
+   Die Hoehe kommt gemessen aus der Anzeige, nicht geraten: der Streifen
+   bricht auf schmalen Geraeten um und ist dann doppelt so hoch. Bis die
+   erste Messung da ist, gilt ein Naeherungswert. */
+body.ansicht-welt #karte-hintergrund {
+  bottom: var(--streifen-hoehe, 200px);
+  /* Oben und links endet die Karte dort, wo der Inhalt beginnt -- nicht am
+     Fensterrand. Gemessen am 14.09.2026 in einem Fenster von 925x520: die
+     Karte zeichnete 296x148 px, 9 % der Flaeche, und 45 % davon lagen
+     unter dem Kopf. Auf schmalen Geraeten kam die Leiste mit den
+     Abschnitten dazu. Beide Werte misst messeWeltstreifen(). */
+  top: var(--welt-oben, 0px);
+  left: var(--welt-links, 0px);
+}
+/* Auf hochkanten Schirmen darf die Karte seitlich hinausragen (siehe oben) --
+   in der Weltansicht von der Inhaltskante aus, nicht vom Fensterrand. */
+@media (max-aspect-ratio: 9/10) {
+  body.ansicht-welt #karte-hintergrund { left: calc(var(--welt-links, 0px) - 40%); }
+}
+/* Der Schleier geht weiter auf als in der Netz-Ansicht (.55): dort liegen
+   Kaesten darueber, die lesbar bleiben muessen -- hier nur ein Streifen. */
+body.ansicht-welt .karte-schleier { opacity: .34; }
+body.ansicht-welt #karte-hintergrund svg { opacity: 1; }
+body.ansicht-welt #karte-hintergrund { pointer-events: auto; }
+
+/* ... und alles, was DARUEBER liegt, muss die Klicks durchlassen.
+   Gemessen am 06.09.2026, nachdem der Betreiber meldete "wenn ich auf ein Land
+   klicke, passiert nix": von 175 Laendern war KEIN EINZIGES erreichbar.
+   171 lagen unter der Inhaltsflaeche, zwei unter dem Kopf, zwei unter dem
+   Streifen. Der Schleier, den ich zuerst gefunden hatte, war nur eine von
+   mehreren Schichten.
+
+   Angesetzt wird an #app, nicht weiter unten: es liegt mit z-index 1 ueber
+   der Karte, und jede Schicht darin erbt das. Beim Abklappern einzelner
+   Schichten kam nach dem Schleier die Inhaltsflaeche, danach der Rahmen --
+   drei Runden fuer denselben Fehler. In der Weltansicht ist von #app fast
+   alles Luft; Luft nimmt keine Klicks. Die vier echten Bedienflaechen
+   holen sie sich ausdruecklich zurueck.
+
+   Warum es nicht auffiel: der Pruefstand hat den Klick per dispatchEvent
+   direkt auf den Pfad geschickt und damit die Trefferpruefung des Browsers
+   uebersprungen. Gruener Test, tote Funktion. */
+body.ansicht-welt #app { pointer-events: none; }
+body.ansicht-welt .kopf,
+body.ansicht-welt .seitenleiste,
+body.ansicht-welt .welt-streifen,
+body.ansicht-welt #welt-land { pointer-events: auto; }
+
+section[data-ansicht="welt"] {
+  /* Richtung ausdruecklich: die Abschnitte erben anderswo column, und dann
+     schiebt align-items waagerecht statt senkrecht -- der Streifen blieb
+     oben stehen und verdeckte ausgerechnet Europa, wo die Linien
+     zusammenlaufen. */
+  display: flex; flex-direction: column; justify-content: flex-end;
+  min-height: calc(100vh - 132px); padding: 0 20px 22px;
+}
+/* Die Ansicht fuellt den ganzen Inhalt. Ohne das stand der Streifen nur so
+   tief, wie seine Mindesthoehe reichte -- und war die Seite hoeher als das
+   Fenster (die Seitenleiste allein misst ueber 750 px), stand er mitten im
+   Bild, und die Karte bekam nur, was darueber uebrig blieb. */
+body.ansicht-welt section[data-ansicht="welt"] { flex: 1 1 auto; }
+.welt-streifen {
+  display: grid; gap: 26px 40px; width: 100%;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  padding: 16px 22px;
+  background: rgba(10, 8, 5, .78);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  /* Unten im Fenster, gleich wie hoch die Seite ist. Erst damit misst
+     messeWeltstreifen() den Platz, den der Streifen wirklich nimmt. */
+  position: sticky; bottom: 14px; z-index: 2;
+}
+.welt-spalte h4 {
+  margin: 0 0 8px; font-size: 11px; font-weight: 700;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--btc-2);
+}
+/* Beschriftung links, Wert rechts, Ziffern in fester Breite -- damit die
+   Zahlen beim Nachladen nicht springen. */
+.welt-spalte dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; }
+.welt-spalte dt { color: var(--dim); font-size: 13px; }
+/* Die Einheit steht an der Beschriftung, kleiner und leiser: sie sagt, WORIN
+   gemessen wird, und soll die Zahl nicht ueberdecken. */
+.welt-spalte dt .einheit {
+  margin-left: 6px; font-family: var(--mono); font-size: 11px;
+  opacity: .62; letter-spacing: .02em;
+}
+.welt-spalte dd {
+  margin: 0; text-align: right; font-family: var(--mono);
+  font-size: 13px; font-variant-numeric: tabular-nums;
+}
+.welt-spalte dd.stark { color: var(--btc-2); font-weight: 600; }
+.welt-legende p { margin: 0 0 5px; font-size: 12.5px; color: var(--dim); }
+.welt-strich {
+  display: inline-block; width: 22px; height: 2px; border-radius: 2px;
+  margin-right: 8px; vertical-align: middle;
+}
+.welt-strich.btc { background: var(--gold); }
+.welt-strich.ln { background: var(--btc); }
+
+/* Der Knopf zum Einklappen sitzt wie ein Reiter auf der Oberkante -- so
+   nimmt er dem Streifen keine eigene Zeile. */
+.welt-klapp {
+  position: absolute; top: -13px; right: 16px;
+  padding: 3px 11px; border-radius: 999px;
+  font-family: var(--sans); font-size: 11px; color: var(--dim);
+  background: rgba(10, 8, 5, .92); border: 1px solid var(--border);
+  cursor: pointer;
+}
+.welt-klapp:hover { color: var(--text); }
+.welt-klapp:focus-visible { outline: 2px solid var(--btc); outline-offset: 2px; }
+/* Eingeklappt bleibt vom Streifen nur der Reiter. */
+.welt-streifen.zu {
+  min-height: 14px; padding: 0;
+  background: none; border-color: transparent; backdrop-filter: none;
+}
+.welt-streifen.zu > .welt-spalte { display: none; }
+
+/* Die Lightning-Linien liegen auf derselben Ebene wie die gelben und sind
+   bewusst anders: kraeftiger und durchgezogen. Gelb heisst "wir sprechen
+   miteinander", orange heisst "hier liegt Geld fest" -- das ist die
+   staerkere Aussage und darf so aussehen. */
+.weltkarte .linie-ln {
+  fill: none; stroke: var(--btc); stroke-linecap: round;
+  stroke-width: calc(1.1px + var(--staerke, 1) * 1.9px);
+  opacity: calc(.42 + var(--staerke, 1) * .45);
+}
+
+@media (max-width: 720px) {
+  section[data-ansicht="welt"] { padding: 0 12px 14px; min-height: 60vh; }
+  .welt-streifen { gap: 18px; padding: 14px 16px; }
+}
+/* Wenig Platz: der Streifen tritt zurueck, die Karte bekommt die Flaeche.
+   Im selben Fenster von 925x520 nahm er 52 % der Hoehe -- feste Schrift,
+   feste Abstaende, und die Legende rutschte in eine zweite Reihe. Der
+   Klick-Hinweis faellt hier weg; er ist eine Einladung, keine Auskunft. */
+@media (max-height: 760px), (max-width: 1100px) {
+  /* Zwei Spalten, nicht drei. Ein erster Anlauf machte die Spalten schmaler
+     (190 px) -- dann brach JEDE Zeile um, und der Streifen wurde kaum
+     niedriger: gemessen 257 px in 925x520. */
+  .welt-streifen {
+    gap: 6px 24px; padding: 10px 16px;
+    grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  }
+  .welt-spalte h4 { margin-bottom: 3px; font-size: 10px; }
+  .welt-spalte dl { gap: 0 10px; }
+  .welt-spalte dt, .welt-spalte dd { font-size: 12px; line-height: 1.35; }
+  .welt-spalte dt .einheit { font-size: 10px; }
+  /* Die Legende wird eine Zeile ueber die ganze Breite statt einer dritten
+     Spalte. Der Klick-Hinweis faellt weg; er ist eine Einladung, keine
+     Auskunft. */
+  .welt-legende {
+    grid-column: 1 / -1;
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 18px;
+  }
+  .welt-legende h4 { display: none; }
+  .welt-legende p { font-size: 11.5px; margin: 0; line-height: 1.35; }
+  .welt-legende [data-i18n="w_klick"] { display: none; }
+}
+
+
+/* ── Lightning · Kanaele: Hierarchie statt fuenf gleicher Kaesten ──────────
+   Der Einrichtungsstand war ein voller Kasten, so gross wie die Guthaben
+   darunter -- dabei sind es drei Woerter, sobald alles laeuft. Als Kopfzeile
+   sagt er dasselbe und nimmt ein Fuenftel des Platzes. */
+.ln-kopf {
+  display: flex; flex-wrap: wrap; gap: 10px 28px;
+  padding: 12px 16px; border-radius: 12px;
+  background: var(--surface-2); border: 1px solid var(--border);
+}
+.ln-kopf-punkt { display: flex; align-items: baseline; gap: 8px; }
+.ln-kopf-punkt .k {
+  color: var(--dim); font-size: 11px; letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.ln-kopf-punkt .v { font-family: var(--mono); font-size: 13px; color: var(--text); }
+
+/* Die Guthaben sind die Zahl, wegen der man diese Seite oeffnet. Also
+   gross, nebeneinander, mit Ziffern gleicher Breite -- damit sich beim
+   Nachladen nichts verschiebt. */
+#ln-guthaben-inhalt,
+#rn-kurse {
+  display: grid; gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+.kennzahl-gross .wert {
+  font-family: var(--mono); font-size: 24px; font-weight: 600;
+  line-height: 1.15; color: var(--text); font-variant-numeric: tabular-nums;
+}
+.kennzahl-gross .bez {
+  margin-top: 3px; color: var(--dim); font-size: 11px;
+  letter-spacing: .06em; text-transform: uppercase;
+}
+
+
+/* Ein Hinweis, den es nicht gibt, ist kein leerer Kasten. Nachdem die
+   Kopfzeile aus dem Kasten herausgeloest wurde, stand der Hinweis darunter
+   frei -- und mit ihm sein Rahmen, auch wenn nichts drinstand. */
+.note:empty { display: none; }
+
+
+/* ── Eine Wahl aus mehreren, in den Einstellungen ───────────────────────────
+   Kein Auswahlfeld: bei drei Moeglichkeiten, von denen jede eine Folge hat,
+   gehoeren alle drei gleichzeitig lesbar da -- eingeklappt waehlt man das
+   Erstbeste. */
+.wahlgruppe {
+  margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border);
+}
+/* Als erste Entscheidung braucht sie keine Trennlinie ueber sich, sondern
+   eine darunter: was folgt, ist die Feinheit innerhalb der Wahl. */
+.wahlgruppe.oben {
+  margin-top: 4px; padding-top: 0; border-top: 0;
+  padding-bottom: 16px; border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+.wahlgruppe > p { margin: 4px 0 12px; }
+.wahl {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 9px 11px; margin-bottom: 6px; border-radius: 10px;
+  border: 1px solid transparent; cursor: pointer;
+  transition: background .15s ease, border-color .15s ease;
+}
+.wahl:hover { background: var(--surface-2); }
+.wahl:has(input:checked) {
+  background: var(--surface); border-color: var(--btc);
+}
+.wahl input { margin-top: 3px; accent-color: var(--btc); }
+.wahl b { display: block; font-size: 13.5px; }
+.wahl .small { display: block; margin-top: 2px; line-height: 1.45; }
+
+
+/* Ein gesperrter Schalter muss gesperrt AUSSEHEN. Sonst steht ein Haken da,
+   der nach "an" aussieht, waehrend die Betriebsart darueber ihn gerade
+   uebergeht -- und die Anzeige sagt zwei verschiedene Dinge gleichzeitig.
+   Das Haekchen bleibt bewusst stehen: es ist die Voreinstellung des Nutzers
+   fuer den Fall, dass er zurueckschaltet. */
+.switch:has(input:disabled) { opacity: .45; cursor: not-allowed; }
+.switch:has(input:disabled) input { cursor: not-allowed; }
+
+
+/* Erreichbarkeit je Kanal. Drei Stufen, weil die Zahl selbst wenig sagt:
+   99,9 % und 94 % sehen aehnlich aus und bedeuten voellig Verschiedenes --
+   das eine ist ein verlaesslicher Partner, das andere faellt in einem Monat
+   anderthalb Tage aus. */
+.kanal-erreichbar { margin-left: auto; font-size: 11.5px; letter-spacing: .01em; }
+.kanal-erreichbar.gut { color: var(--ok); }
+.kanal-erreichbar.mittel { color: var(--dim); }
+.kanal-erreichbar.schwach { color: var(--warn); }
+
+/* ── Ein Land aus der Naehe ────────────────────────────────────────────────
+   Eine Auflage ueber der Weltansicht, kein Umbau an ihr. Wer sie schliesst,
+   findet die Karte darunter unveraendert vor -- das war die Bedingung. */
+#welt-land {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.wl-kopf {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.wl-kopf h3 { margin: 0; font-size: 1.05rem; }
+.wl-kopf .btn { flex: none; }
+.wl-kopf > span { margin-left: auto; }
+
+.wl-koerper {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+  gap: 28px;
+  /* Nicht ueber die ganze Breite: auf einem 2000 Punkte breiten Bildschirm
+     wurde Singapur riesig und die Tabelle klebte als duenner Streifen am
+     rechten Rand. Aus dem Betrieb, 06.09.2026: "waere auch gut, wenn das ein wenig
+     ansprechender gestaltet wird." */
+  width: min(100%, 1400px);
+  margin: 0 auto;
+  padding: 22px 24px 26px;
+  min-height: 0;
+}
+
+.wl-karte {
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+}
+
+/* Eine Obergrenze fuer die Karte selbst. Ohne sie wuchs ein kleines Land
+   auf jede verfuegbare Flaeche -- und ein bildschirmfuellendes Singapur
+   sagt nicht mehr als ein handgrosses. */
+.wl-karte svg {
+  max-width: min(100%, 820px);
+  max-height: 100%;
+}
+
+/* Der Grundton: ein Gebiet ohne Knoten ist da, aber still. Genau die Werte
+   der Weltkarte -- nur die Linie etwas kraeftiger, weil hier weniger
+   Flaechen auf mehr Platz liegen. */
+.regionskarte .regionen path {
+  fill: rgba(168, 150, 126, .09);
+  stroke: rgba(168, 150, 126, .22);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  transition: fill .35s ease;
+}
+
+/* Und mit Knoten: dieselbe Abstufung wie auf der Weltkarte. Eine zweite
+   Farbe einzufuehren hiesse, dieselbe Aussage zweimal verschieden zu
+   zeigen. */
+.regionskarte .regionen path[style*="--hitze"] {
+  fill: rgb(247 147 26 / calc(.12 + var(--hitze) * .8));
+  stroke: rgb(255 180 90 / calc(.14 + var(--hitze) * .22));
+}
+
+.regionskarte .regionen path.betont {
+  stroke: #fff3d0;
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 7px rgba(255, 220, 130, .85));
+}
+
+/* Die Verbindungslinien im Land -- dieselbe Farbsprache wie auf der
+   Weltkarte: gelb heisst "hier spricht der Knoten gerade miteinander",
+   orange heisst "hier liegt Geld fest". Wer von der Weltkarte hereinkommt,
+   soll dieselben Zeichen wiedererkennen. */
+.wl-linien { pointer-events: none; }
+.wl-linie {
+  fill: none;
+  stroke: rgb(255 190 105 / calc(.3 + var(--staerke, 1) * .5));
+  stroke-width: calc(1 + var(--staerke, 1) * 1.4);
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+.wl-linie.ln {
+  stroke: var(--btc);
+  stroke-width: calc(1.4 + var(--staerke, 1) * 1.8);
+}
+.wl-ziel {
+  fill: #fff3d0;
+  filter: drop-shadow(0 0 6px rgba(255, 205, 120, .9));
+}
+
+.wl-liste {
+  overflow-y: auto;
+  min-height: 0;
+  align-self: start;
+  max-height: 100%;
+  /* Als Tafel, nicht als Text am Rand: dieselbe Flaeche wie ueberall sonst
+     in der Anwendung, damit die Zahlen einen Grund haben, auf dem sie
+     liegen. */
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px 18px;
+}
+
+.wl-liste h4 {
+  margin: 0 0 10px;
+  font-size: .78rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--dim);
+  font-weight: 600;
+}
+
+/* table-layout: fixed, und zwar aus einem gemessenen Grund.
+   Vorher stand hier "td:first-child { width: 100% }" -- der uebliche Kniff,
+   damit die erste Spalte den Rest nimmt. Zusammen mit nicht umbrechenden
+   Zahlenspalten sprengt er aber den Tabellenkasten: am 06.09.2026 bei
+   Suedkorea nachgemessen -- Tabelle 348 Punkte breit, Zellen 374, also 26
+   Punkte Ueberstand. Die letzte Spalte war abgeschnitten, aus "339" wurde
+   "33". Ein waagerechter Rollbalken war zwar da, auf macOS aber unsichtbar.
+
+   Mit fester Aufteilung gelten die angegebenen Breiten, und nichts laeuft
+   mehr hinaus. */
+.wl-tabelle {
+  width: 100%; border-collapse: collapse; font-size: .86rem;
+  table-layout: fixed;
+}
+.wl-tabelle col.spalte-gebiet { width: auto; }
+.wl-tabelle col.spalte-zahl { width: 4.4rem; }
+.wl-tabelle th {
+  padding: 0 6px 6px;
+  text-align: right;
+  font-weight: 500;
+  font-size: .72rem;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--dim);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.wl-tabelle th:first-child { text-align: left; }
+/* Die Ueberschriften duerfen umbrechen, aber NICHT getrennt werden: mit
+   hyphens:auto stand dort "BITCO-IN" und "LIGHT-NING". Lieber zweizeilig
+   als zerhackt. */
+.wl-tabelle th:not(:first-child) { white-space: normal; hyphens: manual; }
+.wl-tabelle td { padding: 5px 6px; border-bottom: 1px solid var(--border); }
+/* Lange Gebietsnamen umbrechen statt hinauszulaufen: "Chungcheongbuk-do"
+   passt in keine Spalte dieser Breite. */
+/* break-word statt anywhere: anywhere trennt mitten im Wort, und aus
+   "Chungcheongnam-do" wurde "Chungche-ongnam-do". break-word bricht erst,
+   wenn es sonst nicht geht -- und Namen wie diese haben ohnehin einen
+   Bindestrich, an dem sich sauber umbrechen laesst. */
+.wl-tabelle td:first-child {
+  overflow-wrap: break-word; line-height: 1.3;
+}
+.wl-tabelle td.zahl {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.wl-tabelle tr.betont td { background: rgb(247 147 26 / .12); }
+
+/* Anklickbar, und zwar in beide Richtungen: ein Gebiet auf der Karte
+   markiert seine Zeile, eine Zeile markiert ihr Gebiet. Aus dem Betrieb, am
+   06.09.2026: "ich klicke in Bild 2 auf ein Bundesland und dann wird mir in
+   der rechten Tabelle die Zeile markiert, in der ich geklickt habe." */
+.wl-tabelle tbody tr { cursor: pointer; transition: background .15s ease; }
+.wl-tabelle tbody tr:hover td { background: rgb(255 201 140 / .07); }
+.wl-tabelle tbody tr.gewaehlt td {
+  background: rgb(247 147 26 / .22);
+  box-shadow: inset 3px 0 0 var(--btc);
+}
+.wl-tabelle tbody tr.gewaehlt td:first-child { color: var(--text); font-weight: 600; }
+
+.regionskarte .regionen path { cursor: pointer; }
+.regionskarte .regionen path.gewaehlt {
+  stroke: #fff3d0;
+  stroke-width: 3;
+  filter: drop-shadow(0 0 9px rgba(255, 220, 130, .95));
+}
+
+/* Anklickbar sind Laender nur dort, wo der Klick auch etwas tut. */
+body.ansicht-welt .weltkarte .laender path { cursor: pointer; }
+body.ansicht-welt .weltkarte .kleine circle { cursor: pointer; }
+
+@media (max-width: 900px) {
+  .wl-koerper { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+  .wl-liste { max-height: 40vh; }
+}
+
+/* ── Nachrichten ────────────────────────────────────────────────────────────
+   Leseflaeche, keine Kachelwand. Der Titel traegt, die Herkunft steht klein
+   darunter, der Anriss noch kleiner -- drei Stufen, damit man eine Liste
+   ueberfliegen kann, statt sie zu lesen.
+
+   Bewusst KEINE Bilder: ein Vorschaubild von einem Verlagsserver waere ein
+   Zaehlpixel und meldete die echte Adresse des Lesers. Der Feed haelt sich
+   deshalb an Schrift -- was der Dichte auch guttut. */
+
+.news-kopf {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  margin: 18px 0 12px; padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.news-kopf .switch { margin-left: auto; }
+
+.news-liste { list-style: none; display: grid; gap: 2px; }
+
+.news-eintrag {
+  padding: 14px 16px; border-radius: 10px;
+  border-left: 2px solid transparent;
+  transition: background .15s ease, border-color .15s ease;
+}
+.news-eintrag:hover { background: var(--surface-2); }
+/* Ungelesenes traegt die Signalfarbe an der Kante -- keine zweite Schriftart,
+   kein Fettdruck-Wechsel, der die Zeile beim Lesen springen liesse. */
+.news-eintrag:not(.gelesen) { border-left-color: var(--btc); }
+.news-eintrag.gelesen .news-titel { color: var(--dim); }
+.news-eintrag.gelesen { opacity: .72; }
+
+.news-titel {
+  display: block; color: var(--text); text-decoration: none;
+  font-size: 15px; line-height: 1.4; font-weight: 550;
+}
+.news-titel:hover { color: var(--btc-2); }
+
+.news-zeile {
+  display: flex; align-items: center; gap: 10px; margin-top: 5px;
+  font-size: 12px; color: var(--dim);
+}
+.news-quelle { color: var(--btc); font-weight: 600; }
+
+.news-anriss {
+  margin-top: 6px; font-size: 13px; line-height: 1.5; color: var(--dim);
+}
+
+.marke {
+  font-size: 10px; letter-spacing: .04em; text-transform: uppercase;
+  padding: 2px 6px; border-radius: 4px;
+  border: 1px solid var(--border); color: var(--dim);
+}
+/* Fachquelle und Leitmedium sind verschiedene Dinge, nicht verschiedene
+   Farbtoene desselben: das eine ist ungefiltert, das andere gefiltert und
+   ab Werk aus. Der Unterschied gehoert sichtbar. */
+.marke.fach { border-color: var(--border-hi); color: var(--btc-2); }
+.marke.leit { border-style: dashed; }
+
+/* Zwei Spalten, sobald Platz ist -- und in jeder Spalte stehen Name, Marken
+   und Zustand BEIEINANDER.
+   Der erste Entwurf hatte eine Spalte mit "auto 1fr auto auto": auf einem
+   34-Zoll-Schirm zog das 1fr den Namen links und die Marken an den rechten
+   Rand, mit anderthalb Metern Nichts dazwischen. Am 06.09.2026 im Bild
+   gesehen. Eine Liste ist keine Tabelle, die sich dehnen muss. */
+.quellenliste {
+  display: grid; gap: 1px 20px; margin: 12px 0 20px;
+  grid-template-columns: repeat(auto-fit, minmax(390px, 1fr));
+  max-width: 1100px;
+}
+
+.quellenzeile {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "haken name marken" ". lage lage";
+  align-items: center; gap: 2px 10px;
+  padding: 8px 10px; border-radius: 8px; cursor: pointer;
+}
+.quellenzeile > input { grid-area: haken; }
+.quellenzeile:hover { background: var(--surface-2); }
+.quellenname {
+  grid-area: name; color: var(--text); font-size: 14px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.quellenmarken { grid-area: marken; display: flex; gap: 4px; }
+/* Der Zustand steht UNTER dem Namen, nicht am anderen Ende der Zeile: dort
+   liest ihn niemand, und bei einem langen Grund wurde er abgeschnitten. */
+.quellenlage {
+  grid-area: lage; font-family: var(--mono); font-size: 10.5px;
+  line-height: 1.35; color: var(--dim);
+}
+.quellenlage.warn { color: var(--warn); }
+
+.news-eigene { padding-top: 16px; border-top: 1px solid var(--border); }
+.news-eigene .zeile { display: flex; gap: 8px; margin-top: 8px; }
+.news-eigene input[type="text"] {
+  flex: 1; padding: 9px 12px; border-radius: 8px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  color: var(--text); font-family: var(--sans); font-size: 14px;
+}
+.news-eigene input[type="text"]:focus {
+  outline: none; border-color: var(--border-hi);
+}
+#news-gefunden { margin-top: 10px; font-size: 12px; }
+#news-gefunden .btn { margin-left: 6px; font-size: 12px; }
+
+/* Der Zaehler an der Seitenleiste.
+   [hidden] MUSS mitgenannt werden: eine Klassenregel mit display schlaegt
+   das Attribut, und dann steht neben "Nachrichten" eine leere orange Pille
+   von zwoelf Pixeln, obwohl nichts ungelesen ist. Im Bild gesehen. */
+.ungelesen[hidden] { display: none; }
+.ungelesen {
+  display: inline-block; margin-left: 8px; padding: 1px 6px;
+  border-radius: 9px; background: var(--btc); color: #1a1206;
+  font-size: 11px; font-weight: 700; font-family: var(--mono);
+}
+
+/* ── Kurs ───────────────────────────────────────────────────────────────────
+   Ueber der Nachrichtenliste, nicht als eigene Ansicht. Die Zahl traegt, das
+   Bild ist Kontext -- deshalb grosse Ziffern und eine ruhige Flaeche darunter
+   statt eines Diagramms mit Achsen, Gitter und Legende. */
+
+.kurs-kasten {
+  margin: 18px 0 8px; padding: 18px 20px 12px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.kurs-kopf {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap; margin-bottom: 10px;
+}
+
+.kurs-zahl { display: flex; align-items: baseline; gap: 12px; }
+#kurs-wert {
+  font-family: var(--mono); font-size: 30px; font-weight: 600;
+  color: var(--text); letter-spacing: -.02em;
+  /* Damit die Ziffern beim Aktualisieren nicht springen. */
+  font-variant-numeric: tabular-nums;
+}
+.kurs-wechsel {
+  font-family: var(--mono); font-size: 14px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.kurs-wechsel.hoch { color: var(--ok); }
+.kurs-wechsel.runter { color: var(--danger); }
+
+.kurs-schalter { display: flex; gap: 8px; flex-wrap: wrap; }
+.kurs-gruppe {
+  display: flex; border: 1px solid var(--border); border-radius: 8px;
+  overflow: hidden;
+}
+.kurs-knopf {
+  background: none; border: 0; cursor: pointer;
+  padding: 5px 11px; font-family: var(--mono); font-size: 11px;
+  color: var(--dim); letter-spacing: .03em;
+}
+.kurs-knopf:hover { color: var(--text); background: var(--surface-2); }
+.kurs-knopf.aktiv { background: var(--btc); color: #1a1206; font-weight: 700; }
+
+.kurs-bild { position: relative; }
+/* Nicht ueber die ganze Breite eines 34-Zoll-Schirms: eine Linie, die
+   1850 Pixel weit laeuft, sagt nicht mehr als eine ueber 900 -- sie wird
+   nur flacher und damit nichtssagender. */
+.kurs-bild svg { display: block; width: 100%; max-width: 1100px; height: 210px; }
+
+.kurs-raster {
+  stroke: var(--border); stroke-width: 1; stroke-dasharray: 2 4;
+}
+.kurs-achse {
+  fill: var(--dim); font-family: var(--mono); font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.kurs-linie {
+  fill: none; stroke: var(--ok); stroke-width: 2;
+  stroke-linejoin: round; stroke-linecap: round;
+}
+.kurs-linie.runter { stroke: var(--danger); }
+
+/* Die Flaeche laeuft nach unten aus, statt als Block gegen den Grund zu
+   stehen -- auf der Weltkarte im Hintergrund sah das sonst schmutzig aus. */
+.kurs-fuell-oben  { stop-color: var(--ok);     stop-opacity: .26; }
+.kurs-fuell-unten { stop-color: var(--ok);     stop-opacity: 0; }
+.kurs-fuell-oben.runter  { stop-color: var(--danger); stop-opacity: .26; }
+.kurs-fuell-unten.runter { stop-color: var(--danger); stop-opacity: 0; }
+
+.kurs-punkt { fill: var(--ok); stroke: var(--bg); stroke-width: 2; }
+.kurs-punkt.runter { fill: var(--danger); }
+
+.kurs-leer { fill: var(--dim); font-family: var(--sans); font-size: 13px; }
+
+#kurs-fuss { margin-top: 4px; }
+
+/* Fuer Vorleseprogramme sichtbar, fuer Augen nicht. Ein Bild ohne Worte ist
+   fuer sie sonst gar nichts. */
+.visuell-versteckt {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
+
+/* Quelle hinter Cloudflare -- ueber Tor haeufig abgewiesen. Warnfarbe, nicht
+   Fehlerfarbe: es ist ein Risiko, kein Defekt. */
+.marke.cf { border-color: var(--warn); color: var(--warn); cursor: help; }
+#news-abgewiesen { margin: 14px 0 0; }
+
+/* ── Ablesen am Chart ───────────────────────────────────────────────────────
+   Aus dem Betrieb, 06.09.2026: "ich will dann wie in einem richtigen chart auf nen
+   punkt gehen koennen mit uhrzeit tag oder so und dann kurs". */
+
+.kurs-bild svg { cursor: crosshair; }
+.kurs-bild svg:focus-visible { outline: 1px solid var(--border-hi); }
+
+.kurs-kreuz-strich {
+  stroke: var(--border-hi); stroke-width: 1; stroke-dasharray: 3 3;
+}
+.kurs-kreuz-punkt { fill: var(--ok); stroke: var(--bg); stroke-width: 2; }
+.kurs-kreuz-punkt.runter { fill: var(--danger); }
+
+/* Das Band zwischen Tages-Hoch und -Tief. Sehr leise: es ist Kontext hinter
+   der Linie, nicht die Aussage. */
+.kurs-band { fill: var(--ok); opacity: .13; stroke: none; }
+.kurs-band.runter { fill: var(--danger); }
+
+.kurs-blase {
+  position: absolute; pointer-events: none; z-index: 2;
+  background: rgba(20, 15, 8, .95);
+  border: 1px solid var(--border-hi); border-radius: 8px;
+  padding: 7px 10px; min-width: 118px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .55);
+  font-family: var(--mono); line-height: 1.45;
+  /* Ohne das springt die Blase beim ersten Zeigen einmal, weil sie ihre
+     Breite noch nicht kennt. */
+  white-space: nowrap;
+}
+.blase-zeit { color: var(--dim); font-size: 10.5px; letter-spacing: .02em; }
+.blase-kurs {
+  color: var(--text); font-size: 16px; font-weight: 600;
+  font-variant-numeric: tabular-nums; margin-top: 1px;
+}
+.blase-spanne { color: var(--dim); font-size: 10.5px; margin-top: 2px; }
+
+/* Wo stehe ich, und ist das schon endgültig?
+   Der Ablauf hatte drei Schritte und sagte nie, der wievielte gerade dran
+   ist. Der Betreiber drückte auf "Wörter erzeugen" und wusste nicht, ob er damit
+   gerade eine Wallet angelegt hat. */
+.schrittzahl {
+  display: inline-block;
+  margin-bottom: 6px;
+  font-size: .78rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+/* Der zweite Weg war eine Fußzeile unter einem Knopf. Wer aus einem
+   Datenverlust kommt, sucht genau ihn -- und findet zuerst den Ablauf, der
+   eine NEUE Wallet anlegt. Jetzt ein eigener Abschnitt mit eigener
+   Überschrift, abgesetzt statt angehängt. */
+.wl-zweiter-weg {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.wl-zweiter-weg h4 { margin: 0 0 4px; }
+
+/* Was jetzt zu tun ist.
+   Steht ueber allen Ansichten, weil es ueberall gilt -- eine gesperrte
+   Wallet haelt den Knoten an, ganz gleich wo man gerade hinsieht. Und sie
+   erscheint nur, wenn wirklich etwas ansteht: kein Dauerbanner. */
+.tunzeile {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  margin-bottom: 18px; padding: 14px 18px;
+  border: 1px solid var(--border-hi);
+  border-left: 3px solid var(--btc);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.tunzeile #tunzeile-text { flex: 1; min-width: 240px; }
+/* Dringend heisst: der Knoten steht gerade still. Das darf anders aussehen
+   als "waere gut, wenn du das noch machst". */
+.tunzeile.dringend { border-color: var(--warn); border-left-color: var(--warn); }
+
+/* Der Farbwaehler erbte von .feld > input die volle Breite und lag als
+   Balken quer im Kasten. Er waehlt einen einzigen Farbwert -- dafuer genuegt
+   ein Feld in Knopfgroesse. */
+.feld > input[type=color] {
+  width: 96px; height: 42px; padding: 4px; cursor: pointer;
+}
+
+/* Ein Knopf, der etwas unwiederbringlich zerstoert, darf nicht aussehen wie
+   "Speichern". Bewusst kein volles Rot-Rechteck: das schreit und wird
+   deshalb schnell weggeklickt. Ein roter Rahmen mit roter Schrift ist
+   deutlich genug und laesst sich nicht mit der Hauptaktion verwechseln --
+   die ist orange und gefuellt. */
+.btn.gefahr {
+  background: transparent;
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.btn.gefahr:hover:not(:disabled) {
+  background: rgba(248, 113, 113, .12);
+  border-color: var(--danger);
+}
+
+
+/* ── Der Umrechner ─────────────────────────────────────────────────────────
+
+   Drei Felder untereinander statt nebeneinander: sie gehoeren zusammen
+   gelesen -- 1.504 sat SIND 0,00001504 BTC SIND 1,00 €. Nebeneinander
+   liest man drei Zahlen, untereinander eine Gleichung.
+
+   Die Ziffern in Festbreite und rechtsbuendig: so stehen Komma unter Komma,
+   und beim Tippen springt nichts. */
+.rechner { display: grid; gap: 16px; margin: 18px 0 20px; }
+.rechner .feld > input {
+  font-family: var(--mono); font-size: 20px; letter-spacing: .01em;
+  text-align: right; padding: 12px 14px;
+  font-variant-numeric: tabular-nums;
+}
+/* Das Feld, in dem gerade getippt wird, traegt die Marke -- die beiden
+   anderen sind Ergebnis. Ohne diesen Unterschied sieht es aus, als koennte
+   man drei Zahlen unabhaengig voneinander eingeben. */
+.rechner .feld > input:focus {
+  border-color: var(--btc); outline: none;
+}
+.rn-waehrungen { margin-bottom: 4px; }
+#rn-kurse { margin-bottom: 14px; }
+
+@media (max-width: 640px) {
+  .rechner .feld > input { font-size: 17px; }
+}
+
+
+/* ── Werte, die man weitergeben koennen muss ────────────────────────────────
+
+   Eine Kennung ist 66 Zeichen lang, eine Verbindungsadresse noch laenger.
+   Gekuerzt sind sie nur noch zum Ansehen gut -- Aus dem Betrieb, 10.09.2026: "solte
+   die volle kennung stehen damit sie mal kopieren kann".
+
+   Also vollstaendig und umbrechend, damit nichts aus dem Kasten laeuft, und
+   in Festbreite, damit man Zeichen fuer Zeichen vergleichen kann. */
+.stat.langstat { align-items: flex-start; }
+.langwert {
+  display: flex; flex-direction: column; align-items: flex-end;
+  gap: 8px; min-width: 0; max-width: 100%;
+}
+.langwert .v {
+  font-family: var(--mono); font-size: 13px; line-height: 1.5;
+  text-align: right; word-break: break-all; white-space: pre-wrap;
+  user-select: all;                 /* ein Klick markiert den ganzen Wert */
+}
+.btn.klein { padding: 5px 12px; font-size: 12.5px; border-radius: 8px; }
+
+@media (max-width: 640px) {
+  .stat.langstat { flex-direction: column; gap: 6px; }
+  .langwert { align-items: flex-start; }
+  .langwert .v { text-align: left; }
+}
+
+/* Der Kanal-Rechner steht unter dem Umrechner, als eigener Kasten: es ist
+   dieselbe Frage in einer anderen Einheit -- was kostet mich das, in Euro. */
+#kkp-zahlen { margin-top: 16px; }
+#kkp-lage { margin-top: 14px; }
+
+/* ── Wer die Bloecke findet: Name, Balken, Zahl ─────────────────────────── */
+.pool-fenster { width: max-content; margin: 10px 0; }
+.pool-anteile { list-style: none; margin: 10px 0 0; padding: 0; font-size: 13px; }
+.pool-anteile li {
+  display: grid; grid-template-columns: minmax(6em, 11em) 1fr 7.5em;
+  align-items: center; gap: 10px; padding: 4px 0;
+}
+.pool-anteile .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pool-anteile .name.unbekannt { color: var(--dim); font-style: italic; }
+.pool-anteile .balken { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+.pool-anteile .balken span { display: block; height: 100%; background: var(--grad); }
+.pool-anteile .anzahl {
+  font-family: var(--mono); color: var(--dim); text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 640px) {
+  .pool-anteile li { grid-template-columns: minmax(5em, 8em) 1fr 6.5em; }
+}
+
+/* Der Cluster einer wartenden Transaktion, unter ihren Eckdaten. */
+.cluster { margin-top: 18px; }
+.cluster h4 { margin: 0 0 6px; }
+
+
+/* ── QR-Code der Einzahladresse (15.09.2026) ─────────────────────────────
+   Immer dunkel auf hell, auch auf dunklem Grund: viele Scanner lesen helle
+   Module auf dunklem Grund nicht. Die Ruhezone ist Teil des Bildes. */
+.ez-qr { width: min(240px, 70vw); margin: 14px 0 6px; }
+.ez-qr:empty { display: none; }
+.ez-qr svg { display: block; width: 100%; height: auto; border-radius: 10px; }
+
+/* ── Bewegungen der On-Chain-Wallet (15.09.2026) ─────────────────────────
+   Die txid steht voll da -- gekuerzt liesse sie sich weder kopieren noch
+   suchen. */
+.bewegung { padding: 12px 0; border-bottom: 1px solid var(--border); }
+.bewegung:last-child { border-bottom: 0; }
+.bewegung-kopf { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; }
+.bewegung-betrag { font-family: var(--mono); font-weight: 700; }
+.bewegung-betrag.ein { color: #9ff0cd; }
+.bewegung-betrag.aus { color: var(--text); }
+.bewegung-txid {
+  font-family: var(--mono); font-size: 12.5px; color: var(--dim);
+  word-break: break-all; user-select: all; margin: 6px 0 8px;
+}
+
+/* ── Empfangen und Ausgaenge (16.09.2026) ────────────────────────────────
+   Die Empfaengeradresse steht unter dem Betrag, in derselben Schrift wie die
+   txid: beides will man vergleichen, nicht ueberfliegen. */
+.bewegung-ziel {
+  font-family: var(--mono); font-size: 12.5px; color: var(--dim);
+  word-break: break-all; margin-top: 6px;
+}
+
+/* Befund einer einzelnen Wachturm-Pruefung, direkt in der Zeile.
+   Eigene Klassen statt der Kasten-Klassen .note.ok/.warn/.bad: hier steht
+   Text in einer Zeile, kein Kasten mit Rahmen. */
+.turm-befund { font-size: 12.5px; line-height: 1.45; }
+.turm-befund.da  { color: var(--ok); }
+.turm-befund.zu  { color: var(--warn); }
+.turm-befund.tot { color: var(--danger); }
+
+/* ── Was das Netz fürs Weiterleiten nimmt ────────────────────────────────
+   Ein eigener Kasten über dem Formular, weil er etwas anderes ist als die
+   Felder darunter: dort stellt man ein, hier steht eine Messung. Bis zum
+   18.09.2026 stand an ihrer Stelle eine Zahl im Fließtext („rund 143 ppm“),
+   die niemand nachprüfen konnte und die still alterte. */
+.netzgebuehren {
+  border: 1px solid var(--border); border-radius: 12px;
+  background: var(--surface-2); padding: 14px 16px; margin: 4px 0 18px;
+}
+.netzgebuehren-kopf,
+.netzgebuehren-fuss {
+  display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+}
+.netzgebuehren-kopf { justify-content: space-between; margin-bottom: 8px; }
+.netzgebuehren-fuss { margin-top: 12px; }
+.btn.schmal { padding: 7px 14px; font-size: 13px; }
+
+/* Der Vier-Wochen-Verlauf. Die Fläche IST die Aussage -- sie zeigt die
+   Spanne, in der die Automatik sich bewegen darf. Deshalb liegt sie hinter
+   der Linie und nicht als Zierrat daneben. */
+.gb-verlauf { margin-top: 10px; }
+/* Die Groesse steht in der Zeichnung selbst -- sie wird beim Zeichnen aus der
+   Kastenbreite gemessen. Hier NICHT auf 100% ziehen: das waere genau das
+   Strecken, gegen das es eine Wache im Pruefstand gibt. */
+.gb-verlauf svg { display: block; max-width: 100%; }
+.gb-verlauf:empty { display: none; }
+.gb-band { fill: var(--ok); opacity: .14; }
+.gb-linie { fill: none; stroke: var(--warn); stroke-width: 1.5;
+            stroke-linejoin: round; vector-effect: non-scaling-stroke; }

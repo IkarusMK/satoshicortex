@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 478.2" class="regionskarte" preserveAspectRatio="xMidYMid meet" data-land="AS" data-minlon="-170.8392" data-maxlon="-170.5593" data-minlat="-14.3784" data-maxlat="-14.2487" data-umbruch="0">
+<!-- Umrisse: Natural Earth (ne_10m_admin_1_states_provinces),
+     gemeinfrei. Erzeugt von tools/regionen_bauen.py, nicht von
+     Hand aendern. -->
+<g class="regionen">
+<path id="r-AS-X05~" data-de="Western" data-en="Western District" data-cx="276" data-cy="307.1" d="M523.6,243.9L419.4,386.3L323.5,464.7L299,436.8L152.6,336.5L58.4,287.9L28.3,260.9L180.5,169L238,157.6L362,160L420.5,149.5L444.3,192.3L447.8,242.4L492.9,235.2L523.6,243.9Z"><title>Western District</title></path>
+<path id="r-AS-X01~" data-de="Ost-Tutuila" data-en="Eastern District" data-cx="696.1" data-cy="128.7" d="M420.5,149.5L502.8,43.5L635.1,13.5L783,21.6L886.8,59.5L939.6,14.1L971.7,36.3L967.3,82L911.2,107.2L703.4,118L642.8,134.8L556,199.6L523.6,243.9L492.9,235.2L447.8,242.4L444.3,192.3L420.5,149.5Z"><title>Eastern District</title></path>
+<path id="r-AS-X02~" data-de="Manus" data-en="Manu'a Islands" data-cx="4816.2" data-cy="-6.3" d="M4914.7,-93.9L4985.5,-66.6L4999.4,-12.6L4974.4,25.5L4927.9,6.3L4899.6,36.9L4870.6,50.5L4839.2,49L4803.9,31.5L4791.4,64L4770.3,80.8L4740.8,85L4704,82L4694.4,37.8L4680.9,0.3L4661.2,-27.9L4633,-44.1L4687.1,-83.7L4762.4,-97.5L4914.7,-93.9ZM4155.8,-272.2L4184.6,-293.5L4220.2,-294.4L4259.6,-282.4L4300.9,-264.4L4213.2,-219.7L4178.9,-224.2L4155.8,-272.2Z"><title>Manu'a Islands</title></path>
+<path id="r-AS-X03~" data-de="Rose-Atoll" data-en="Rose Atoll" data-cx="9549.8" data-cy="1024" d="M9568.4,1048.2L9527.2,1014.3L9561.4,999.8L9572.3,1004L9568.4,1048.2Z"><title>Rose Atoll</title></path>
+<path id="r-AS-X04~" data-de="Swains Island" data-en="Swains Island" data-cx="-859.5" data-cy="-11765.6" d="M-835,-11788.6L-837.3,-11753.2L-866.1,-11738.5L-884,-11759.8L-880.8,-11792.8L-835,-11788.6Z"><title>Swains Island</title></path>
+</g>
+</svg>

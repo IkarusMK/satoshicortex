@@ -1,0 +1,56 @@
+# Was NICHT in den Baukontext gehoert.
+#
+# Ohne diese Datei schickt Docker das ganze Verzeichnis an den Dienst -- samt
+# .git und, falls vorhanden, der lokalen .env mit den echten Werten. In die
+# Images kaeme sie nicht, weil kein COPY sie anfasst; aber sie laege im
+# Baukontext, und ein spaeteres unbedachtes "COPY . ." wuerde sie mitnehmen.
+# Diese Zeilen sind billiger als dieser Fehler.
+
+# Versionsgeschichte
+.git
+.github
+.gitignore
+
+# Echte Werte -- niemals in den Baukontext
+.env
+*.env
+!example.env
+*.geheim.json
+konto.json
+*.macaroon
+*.cert
+tls.*
+channel.backup
+
+# Laufzeitdaten
+data/
+**/data/
+*.log
+
+# ... aber NICHT app/data: dort liegt die Zuordnung der Gebietsnamen, eine
+# Quelldatei, die das Abbild braucht. "**/data/" hat sie am 05.09.2026 aus
+# dem Baukontext geworfen -- derselbe Fehler wie in der .gitignore, nur eine
+# Datei weiter. Der Bau brach mit "/app/data/regionen.json: not found" ab.
+!app/data/
+!app/data/**
+
+# Nur fuer die Entwicklung
+**/tests/
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
+*.md
+!README.md
+# Muss in den Baukontext: die Lizenztexte reisen mit dem Abbild mit. Sobald
+# fertige Abbilder an Fremde gehen, enthalten sie fremde Binaerdateien --
+# Bitcoin Core (MIT), Tor (BSD), dazu die Ortstabelle von DB-IP (CC BY) und
+# die Pool-Liste von mempool/mining-pools (MIT). CC BY verlangt die Nennung
+# ausdruecklich.
+!THIRD-PARTY-LICENSES.md
+
+# macOS-Beifang beim Kopieren ueber SMB
+.DS_Store
+**/.DS_Store
+._*

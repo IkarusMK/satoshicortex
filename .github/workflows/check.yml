@@ -1,0 +1,492 @@
+# Checks on EVERY push whether the images can be built at all --
+# without publishing anything.
+#
+# The reason: without Docker on the development machine, a broken Dockerfile
+# would otherwise only show up when somebody builds it on their NAS. That is
+# the wrong place to find out.
+name: Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+
+  code:
+    name: Code and dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - working-directory: app/backend
+        run: pip install -r requirements-dev.txt
+      - name: Tests with coverage
+        working-directory: app/backend
+        run: pytest --cov=satcortex --cov-report=term-missing --cov-fail-under=80
+      - name: Known vulnerabilities
+        working-directory: app/backend
+        run: pip-audit -r requirements.txt --strict
+      - name: Static analysis
+        working-directory: app/backend
+        run: bandit -r satcortex -ll
+
+  changes:
+    name: What changed?
+    runs-on: ubuntu-latest
+    outputs:
+      # A ready-made matrix instead of four flags. The obvious route -- one flag
+      # per image plus "if: needs.changes.outputs[matrix.name]" on the build
+      # job -- is NOT possible: inside a job's if, only github, needs, vars and
+      # inputs are available, matrix is not. GitHub could then no longer read
+      # the file at all and aborted the run after 0 s.
+      list: ${{ steps.detect.outputs.list }}
+      stack: ${{ steps.detect.outputs.stack }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      # Why at all: every push to main used to build all four images, and the
+      # stack job built three of them a second time. A changed line of text in
+      # the frontend therefore also cost a bitcoind, a tor and an lnd build.
+      # With limited Actions minutes that is the biggest item -- and it buys
+      # nothing: none of those three images contains app/.
+      #
+      # When in doubt, build. If the comparison point cannot be determined
+      # (first push, forced push), everything counts as changed.
+      - name: Map changed paths to images
+        id: detect
+        env:
+          BEFORE: ${{ github.event.before }}
+          NOW: ${{ github.sha }}
+          BASE: ${{ github.base_ref }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -eu
+          if [ "$EVENT" = "pull_request" ]; then
+            git fetch --quiet origin "$BASE"
+            files=$(git diff --name-only "origin/$BASE...HEAD")
+          elif [ -n "${BEFORE:-}" ] && git cat-file -e "$BEFORE" 2>/dev/null; then
+            files=$(git diff --name-only "$BEFORE" "$NOW")
+          else
+            files=""
+          fi
+
+          # Which image comes from which Dockerfile. It lives here rather than
+          # in the build job's matrix, because that matrix is derived from it.
+          ALL='{"name":"satcortex","dockerfile":"app/Dockerfile"},
+                {"name":"satcortex-bitcoind","dockerfile":"images/bitcoind/Dockerfile"},
+                {"name":"satcortex-tor","dockerfile":"images/tor/Dockerfile"},
+                {"name":"satcortex-lnd","dockerfile":"images/lnd/Dockerfile"}'
+          # Images that compile from source take considerably longer. They are
+          # built on publish, not on every push.
+
+          if [ -z "$files" ]; then
+            echo "Comparison point unknown -- everything will be built."
+            echo "list=[$(echo "$ALL" | tr -d ' \n')]" >> "$GITHUB_OUTPUT"
+            echo "stack=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "-- Changed --"; echo "$files"
+
+          # What goes into which image -- read off the COPY lines of the
+          # Dockerfiles, not guessed.
+          matches() { echo "$files" | grep -qE "$1"; }
+          # Only the workflow itself concerns all of them. docker-compose.yml
+          # and example.env are deliberately NOT here: they end up in no image,
+          # only in the stack test -- and that test checks them separately below.
+          COMMON='^\.github/workflows/check\.yml$'
+          APP='^app/(backend|templates|web)/|^app/Dockerfile$|^tools/geo_bauen\.py$|^LICENSE$|^THIRD-PARTY-LICENSES\.md$'
+
+          list=""
+          mark() {   # name, pattern, dockerfile
+            if matches "$2" || matches "$COMMON"; then
+              list="$list{\"name\":\"$1\",\"dockerfile\":\"$3\"},"
+              echo "$1: build"
+            else
+              echo "$1: unchanged"
+            fi
+          }
+          mark satcortex          "$APP"                        app/Dockerfile
+          mark satcortex-bitcoind '^images/(bitcoind|common)/'  images/bitcoind/Dockerfile
+          mark satcortex-tor      '^images/(tor|common)/'       images/tor/Dockerfile
+          mark satcortex-lnd      '^images/(lnd|common)/'       images/lnd/Dockerfile
+          echo "list=[${list%,}]" >> "$GITHUB_OUTPUT"
+
+          # The stack test brings app, bitcoind and tor up together. It is only
+          # worth running if one of those or the Compose file is affected.
+          if matches "$APP|^images/(bitcoind|tor|common)/|^docker-compose\.yml$|^example\.env$|^tools/onion_stapeltest\.sh$" \
+             || matches "$COMMON"; then
+            echo "stack=true" >> "$GITHUB_OUTPUT"; echo "stack: run"
+          else
+            echo "stack=false" >> "$GITHUB_OUTPUT"; echo "stack: not needed"
+          fi
+
+  files:
+    name: Dockerfiles and scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check the Dockerfiles
+        run: |
+          for f in app/Dockerfile images/*/Dockerfile; do
+            echo "-- $f"
+            docker run --rm -i -v "$PWD/.hadolint.yaml:/.hadolint.yaml" \
+              hadolint/hadolint:latest-alpine hadolint --config /.hadolint.yaml - < "$f"
+          done
+      - name: Check the entry-point scripts
+        run: |
+          shellcheck --shell=sh --severity=style images/common/entrypoint.sh
+          shellcheck --shell=sh --severity=style images/common/gesund.sh
+          shellcheck --shell=sh --severity=style tools/onion_stapeltest.sh
+
+      # In JavaScript, when two functions share a name, the last one silently
+      # wins. That is exactly what broke the wizard's save step: a new helper
+      # called "zeile" overrode the identically named one from the wizard, and
+      # the interface reported "the application is not responding" even though
+      # the server answered with 200.
+      - name: Web interface -- syntax and duplicate function names
+        run: |
+          node --check app/web/app.js
+          node --check app/web/qr.js
+          dupes=$(grep -oE '^(async )?function [A-Za-z0-9_$]+' app/web/app.js \
+                     | awk '{print $NF}' | sort | uniq -d)
+          if [ -n "$dupes" ]; then
+            echo "ERROR: duplicate function names:"; echo "$dupes"; exit 1
+          fi
+          echo "No duplicate function names."
+      # Catches what JavaScript silently accepts: two identical keys in the
+      # same language block -- the last one wins. On 2026-08-29 that is how
+      # English texts ended up inside the German block.
+      - name: Web interface -- translations complete and unambiguous
+        run: python3 tools/i18n_pruefen.py
+      - name: Check the Compose file
+        run: |
+          cp example.env .env
+          docker compose config --quiet
+      # Finds exactly the class of error that held up the rollout:
+      # contradictory settings, missing health checks, sloppy mounts.
+      - name: Lint the Compose file
+        run: |
+          docker run --rm -v "$PWD:/app" zavoloklom/dclint /app -f compact
+          echo "Compose file is valid."
+
+  build:
+    name: Image ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    needs: [code, files, changes]
+    # An empty list means nothing changed in any image. Without this condition
+    # the job failed on a matrix without a single entry.
+    if: needs.changes.outputs.list != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.changes.outputs.list) }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - name: Build, but do not publish
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: false
+          load: true
+          tags: check/${{ matrix.name }}:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      # Catches exactly the trap that tipped over the first rollout:
+      # permissions from the build context that only root may read inside the
+      # image. Using a foreign uid is stricter than later operation -- if 9999
+      # can read the code, anyone can.
+      - name: Can an arbitrary uid read the code?
+        if: matrix.name == 'satcortex'
+        run: |
+          docker run --rm --user 9999:9999 --entrypoint python \
+            check/satcortex:test -c "import satcortex; print('readable')"
+
+      - name: Does the image start and report in?
+        if: matrix.name == 'satcortex'
+        run: |
+          mkdir -p /tmp/probe/bulk /tmp/probe/fast
+          docker run -d --name probe -p 8000:8000 \
+            -e DATA_BULK_MOUNT=/bulk -e DATA_FAST_MOUNT=/fast \
+            -v /tmp/probe/bulk:/bulk -v /tmp/probe/fast:/fast \
+            check/satcortex:test
+          for i in $(seq 1 30); do
+            curl -fsS http://localhost:8000/healthz && break || sleep 2
+          done
+          echo
+          echo "-- State --"
+          curl -fsS http://localhost:8000/api/zustand
+          echo
+          echo "-- Without a login it must answer 401 --"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/api/status)" = "401"
+          echo "ok"
+          echo "-- The start page is served --"
+          curl -fsS http://localhost:8000/ | head -c 60
+          echo
+          docker logs probe
+      - name: Can the application read the data it ships with?
+        if: matrix.name == 'satcortex'
+        run: |
+          # Stronger than "the file is there": here it is LOADED, inside the
+          # finished image and as the user the service will later run as. That
+          # is exactly what failed once -- the file was there, the directory
+          # was not traversable.
+          #
+          # The first attempt instead searched the log for "Ortstabelle
+          # geladen". That line is logged at INFO, but the container only logs
+          # from WARNING upwards -- so the check failed without anything being
+          # broken. Searching for something that cannot exist is not a check.
+          docker run --rm --entrypoint python check/satcortex:test -c '
+          from satcortex import geo, pools
+          orte = geo.lade()
+          liste = pools.lade()
+          assert orte is not None, "location table not loadable"
+          assert len(orte) > 100000, f"location table too small: {len(orte)}"
+          assert liste is not None, "pool list not loadable"
+          assert len(liste) > 50, f"pool list too small: {len(liste)}"
+          assert orte.land("8.8.8.8") == "US", "lookup returns nonsense"
+          print(f"ok: {len(orte)} ranges (as of {orte.stand}), {len(liste)} pools")
+          '
+
+      - name: Are the licences inside the image?
+        if: matrix.name == 'satcortex'
+        run: |
+          # As soon as finished images go to other people, they contain other
+          # people's work -- Bitcoin Core and the pool list (MIT), Tor (BSD),
+          # the location table from DB-IP (CC BY, attribution explicitly
+          # required).
+          #
+          # ONE call, and it ALWAYS lists the directory. The first attempt ran
+          # "docker run --entrypoint test" per file and reported "missing from
+          # the image" on every failure -- including when only the call itself
+          # did not get through. The message therefore lied about the cause,
+          # and the build was green at the same time. A check that cannot say
+          # WHY it failed is not one.
+          docker run --rm --entrypoint sh check/satcortex:test -c '
+            echo "-- Contents of /usr/share/licenses/satcortex --"
+            ls -l /usr/share/licenses/satcortex/ || {
+              echo "The directory does not exist at all."; exit 1; }
+            for datei in LICENSE THIRD-PARTY-LICENSES.md; do
+              if [ ! -e "/usr/share/licenses/satcortex/$datei" ]; then
+                echo "MISSING: $datei"; exit 1
+              fi
+              if [ ! -s "/usr/share/licenses/satcortex/$datei" ]; then
+                echo "EMPTY: $datei"; exit 1
+              fi
+            done
+            grep -q DB-IP /usr/share/licenses/satcortex/THIRD-PARTY-LICENSES.md || {
+              echo "DB-IP is not credited -- CC BY requires that."; exit 1; }
+            echo "ok: licence texts complete, DB-IP credited"
+          '
+
+      - name: Is bitcoind really inside and executable?
+        if: matrix.name == 'satcortex-bitcoind'
+        run: docker run --rm --entrypoint bitcoind check/satcortex-bitcoind:test -version | head -1
+
+      - name: Are lnd and lncli inside, and is their licence enclosed?
+        if: matrix.name == 'satcortex-lnd'
+        run: |
+          # That the build went through does not mean the binaries run: they
+          # come from a different stage and could have been built for the
+          # wrong architecture. Touch both, not just one.
+          docker run --rm --entrypoint lnd   check/satcortex-lnd:test --version
+          docker run --rm --entrypoint lncli check/satcortex-lnd:test --version
+          # LND is MIT licensed. Whoever redistributes binaries encloses the
+          # licence text -- and the directory has to be traversable. That is
+          # exactly what the app image failed on once, because COPY --chmod=0644
+          # applies the mode to the directory as well.
+          docker run --rm --entrypoint sh check/satcortex-lnd:test -c '
+            ls -l /usr/share/licenses/lnd/ || {
+              echo "The licence directory does not exist or is not traversable."
+              exit 1; }
+            grep -qi "permission is hereby granted" /usr/share/licenses/lnd/LICENSE || {
+              echo "The licence text does not look like MIT."; exit 1; }
+            echo "ok: LND licence enclosed"
+          '
+
+  stack:
+    name: Stack comes up
+    runs-on: ubuntu-latest
+    needs: [code, files, changes]
+    if: needs.changes.outputs.stack == 'true'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+
+      # Build the images under exactly the names the Compose file expects.
+      # Then "up" finds them locally and does not rebuild -- what is tested is
+      # the project's unmodified Compose file, not a test variant of it.
+      - name: app
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: app/Dockerfile
+          push: false
+          load: true
+          tags: ghcr.io/ikarusmk/satcortex:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: bitcoind
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: images/bitcoind/Dockerfile
+          push: false
+          load: true
+          tags: ghcr.io/ikarusmk/satcortex-bitcoind:31.1
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: tor
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: images/tor/Dockerfile
+          push: false
+          load: true
+          tags: ghcr.io/ikarusmk/satcortex-tor:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # The starting point of a new user: there are EXACTLY the two folders
+      # they name in the .env -- and nothing else. Everything further has to be
+      # created by the application itself. This step used to create the
+      # subfolders too, and thereby tested past reality.
+      - name: Directories and .env
+        run: |
+          BULK="$RUNNER_TEMP/bulk"; FAST="$RUNNER_TEMP/fast"
+          mkdir -p "$BULK" "$FAST"
+          cp example.env .env
+          {
+            echo "DATA_BULK=$BULK"
+            echo "DATA_FAST=$FAST"
+            echo "PUID=$(id -u)"
+            echo "PGID=$(id -g)"
+          } >> .env
+
+      # --wait waits until everything is running or healthy, and fails
+      # otherwise. That is what catches a restart loop which would previously
+      # only have shown up on the user's machine.
+      #
+      # "--pull never", since 2026-09-17. The Compose file sets
+      # "pull_policy: always" for app and tor -- correct for an operator
+      # pulling "latest". Here that made "up" try to fetch the PUBLISHED images
+      # every time. That the freshly built ones ran anyway was only because the
+      # registry rejects anonymous pulls ("unauthorized", read in the log of
+      # the 2026-09-17 run). Were the packages public, the test would check the
+      # state of the last release instead of this commit -- and the onion test
+      # below would run against old code. LND is not built here; it comes from
+      # the registry or, as before, from its Dockerfile.
+      - name: Bring the stack up
+        run: |
+          docker compose pull lnd || docker compose build lnd
+          docker compose up -d --wait --wait-timeout 180 --pull never
+
+      - name: Is everything still running?
+        run: |
+          sleep 10
+          docker compose ps
+          for d in app bitcoind tor; do
+            state=$(docker inspect -f '{{.State.Status}}' "satcortex-$d")
+            echo "$d: $state"
+            [ "$state" = "running" ] || { echo "ERROR: $d is $state"; exit 1; }
+          done
+
+      - name: Are the services waiting for their configuration?
+        run: |
+          for d in bitcoind tor; do
+            docker compose logs "$d" | grep -q "Waiting for setup" \
+              || { echo "ERROR: $d does not report that it is waiting"; docker compose logs "$d"; exit 1; }
+            echo "$d is waiting as intended."
+          done
+
+      # The write path into /config -- the place where a badly created volume
+      # bites. Creating an account writes konto.json.
+      - name: Can the application write to /config?
+        run: |
+          # Read the port from the .env instead of hard-wiring it -- otherwise
+          # this line is wrong again after the next port change. That is
+          # exactly what happened when moving from 4080 to 3333.
+          set -a; . ./.env; set +a
+          echo "Checking on port ${WEBUI_PORT}."
+          curl -fsS "http://localhost:${WEBUI_PORT}/healthz"
+          echo
+          curl -fsS -X POST "http://localhost:${WEBUI_PORT}/api/konto/anlegen" \
+            -H 'Content-Type: application/json' \
+            -d '{"benutzer":"pruefung","passwort":"pruefpasswort123"}'
+          echo
+          test -f "$RUNNER_TEMP/fast/config/konto.json" \
+            || { echo "ERROR: konto.json was not written"; ls -la "$RUNNER_TEMP/fast/config"; exit 1; }
+          echo "konto.json is on disk -- write path is fine."
+
+      - name: Does the application create the subfolders itself?
+        run: |
+          # No account, no setup: the structure has to appear when the
+          # application starts. Tying it to finishing the wizard was the
+          # original mistake -- there it hangs off a disk-space check that
+          # never passes on a test runner.
+          missing=0
+          for d in blocks coreindex; do
+            test -d "$RUNNER_TEMP/bulk/$d" || { echo "MISSING: bulk/$d"; missing=1; }
+          done
+          for d in config bitcoind tor lnd app; do
+            test -d "$RUNNER_TEMP/fast/$d" || { echo "MISSING: fast/$d"; missing=1; }
+          done
+          # The symlink moves the roughly 75 GB of indexes onto the big disk.
+          # It points at the path as the CONTAINERS see it (/bulk/...) -- so
+          # outside it dangles, and what is checked is the target.
+          link="$RUNNER_TEMP/fast/bitcoind/indexes"
+          test -L "$link" || { echo "MISSING: the symlink to the indexes"; missing=1; }
+          target="$(readlink "$link" || true)"
+          [ "$target" = "/bulk/coreindex" ] \
+            || { echo "ERROR: symlink points at '$target' instead of /bulk/coreindex"; missing=1; }
+
+          [ "$missing" = 0 ] || { echo "The structure did not appear on its own."; \
+            find "$RUNNER_TEMP/bulk" "$RUNNER_TEMP/fast" -maxdepth 2; exit 1; }
+          echo "Two paths were enough -- the rest appeared on its own."
+
+      # While waiting, entrypoint.sh is PID 1. Without a signal handler PID 1
+      # ignores a SIGTERM, and Docker waits out the full grace period -- ten
+      # minutes for bitcoind, during which the container cannot be stopped.
+      - name: Can it be stopped promptly while waiting?
+        run: |
+          start=$(date +%s)
+          docker stop --timeout 30 satcortex-bitcoind
+          took=$(( $(date +%s) - start ))
+          echo "bitcoind stopped after ${took}s."
+          [ "$took" -le 20 ] || { echo "ERROR: too slow, the signal was ignored"; exit 1; }
+          docker start satcortex-bitcoind
+
+      # THE FINDING OF 2026-09-17: in an earlier design all three onion services
+      # pointed at 127.0.0.1 inside the Tor container, where nobody listens.
+      # They were announced regardless, and nobody had ever measured it. Here
+      # it is measured -- over the real Tor network, from a second Tor, with a
+      # negative control.
+      #
+      # The Tor network is not always equally fast. The script therefore
+      # retries whatever could not be measured with a fresh Tor; a measured
+      # FAILURE aborts immediately.
+      - name: Are the onion services reachable from outside?
+        timeout-minutes: 30
+        run: |
+          set -a; . ./.env; set +a
+          sh tools/onion_stapeltest.sh "$RUNNER_TEMP/fast"
+
+      - name: On failure, all logs
+        if: failure()
+        run: |
+          docker compose logs --no-color
+          docker logs tor-pruefer 2>&1 | tail -80 || true
+
+      - name: Clean up
+        if: always()
+        run: docker compose down --remove-orphans

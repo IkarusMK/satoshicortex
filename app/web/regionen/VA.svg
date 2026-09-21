@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1182.9" class="regionskarte" preserveAspectRatio="xMidYMid meet" data-land="VA" data-minlon="12.4527" data-maxlon="12.4541" data-minlat="41.9027" data-maxlat="41.9039" data-umbruch="0">
+<!-- Umrisse: Natural Earth (ne_10m_admin_1_states_provinces),
+     gemeinfrei. Erzeugt von tools/regionen_bauen.py, nicht von
+     Hand aendern. -->
+<g class="regionen">
+<path id="r-VA-X01~" data-de="Vatikan" data-en="Vatican City" data-cx="500" data-cy="591.4" d="M254.7,33.5L934.6,84.3L971.7,1149.4L330.4,1149.4L28.3,896.1L66.2,490.2L254.7,33.5Z"><title>Vatican City</title></path>
+</g>
+</svg>

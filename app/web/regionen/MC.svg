@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 879" class="regionskarte" preserveAspectRatio="xMidYMid meet" data-land="MC" data-minlon="7.3636" data-maxlon="7.4396" data-minlat="43.7166" data-maxlat="43.7649" data-umbruch="0">
+<!-- Umrisse: Natural Earth (ne_10m_admin_1_states_provinces),
+     gemeinfrei. Erzeugt von tools/regionen_bauen.py, nicht von
+     Hand aendern. -->
+<g class="regionen">
+<path id="r-MC-X01~" data-de="Monaco-Ville" data-en="Monaco" data-cx="500" data-cy="439.5" d="M570.6,24.9L824.2,171.3L971.7,391.7L911.1,455.6L715.2,618.6L535.7,854.1L225.3,830.4L28.3,767.4L48.2,559.9L119.1,346.7L315,127L570.6,24.9Z"><title>Monaco</title></path>
+</g>
+</svg>

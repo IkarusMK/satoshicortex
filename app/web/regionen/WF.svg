@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 722.4" class="regionskarte" preserveAspectRatio="xMidYMid meet" data-land="WF" data-minlon="-178.1920" data-maxlon="-177.9704" data-minlat="-14.3833" data-maxlat="-14.2282" data-umbruch="0">
+<!-- Umrisse: Natural Earth (ne_10m_admin_1_states_provinces),
+     gemeinfrei. Erzeugt von tools/regionen_bauen.py, nicht von
+     Hand aendern. -->
+<g class="regionen">
+<path id="r-WF-SG" data-de="Sigave" data-en="Sigave" data-cx="161.9" data-cy="208" d="M295.4,395.6L203.5,381.7L159.8,358.2L75.7,227.4L28.3,93.2L63,20.4L224.3,71.6L276.4,127.3L257.6,213.3L247.9,283.2L280.1,343.1L295.4,395.6Z"><title>Sigave</title></path>
+<path id="r-WF-AL" data-de="Alo" data-en="Alo" data-cx="766.4" data-cy="589.6" d="M276.4,127.3L378.5,236.5L392.3,265.7L449.2,283.1L655.6,393L655.6,424.9L415.1,409L375.4,424.9L318.5,399.1L295.4,395.6L280.1,343.1L247.9,283.2L257.6,213.3L276.4,127.3ZM949.7,539L971.7,557.9L937.9,584.8L850.9,623.5L786.9,668.6L757.4,700.4L718.1,702L600.4,649.6L561.1,616.7L568.8,578.8L599.6,548.4L751.3,477.2L798.5,488.6L850.9,515.1L893.1,522.3L911.3,520.4L949.7,539Z"><title>Alo</title></path>
+<path id="r-WF-UV" data-de="Uvea" data-en="Uvea" data-cx="9159.4" data-cy="-4418.3" d="M9191.6,-4747.5L9247.8,-4645.9L9304,-4567.1L9326.4,-4490.5L9281.2,-4394.2L9296.8,-4376.8L9304,-4364.3L9314.8,-4331.3L9241.2,-4319.2L9226.8,-4274.5L9253.1,-4156.2L9229,-4100.8L9173.4,-4089.1L9111.5,-4106.9L9068.2,-4140.3L9063.2,-4212.3L9014.2,-4291.9L8992.5,-4366.9L9068.2,-4426.1L9034.9,-4523.5L9062.7,-4612.6L9124.2,-4689.1L9191.6,-4747.5Z"><title>Uvea</title></path>
+</g>
+</svg>

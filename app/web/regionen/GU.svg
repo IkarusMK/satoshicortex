@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1295.1" class="regionskarte" preserveAspectRatio="xMidYMid meet" data-land="GU" data-minlon="144.6144" data-maxlon="144.9620" data-minlat="13.2286" data-maxlat="13.6665" data-umbruch="0">
+<!-- Umrisse: Natural Earth (ne_10m_admin_1_states_provinces),
+     gemeinfrei. Erzeugt von tools/regionen_bauen.py, nicht von
+     Hand aendern. -->
+<g class="regionen">
+<path id="r-GU-X01~" data-de="Guam" data-en="Guam" data-cx="500" data-cy="647.5" d="M782.6,77.8L812,143.5L862.8,180.7L920.7,197.2L971,200.9L971.7,235.6L930,313.5L841.8,443.2L740.6,536.3L557.8,652.8L486.4,727.7L445.9,850L419.2,1126.5L348.8,1234.4L298.2,1256L239.2,1258.4L190.8,1241.5L161.3,1188L121.9,1137.1L112.8,1122.5L95.3,1010.4L86.1,990.5L72.3,973.2L55.5,959.5L34.4,949.9L63.9,920.1L82.6,889.7L92.4,851.9L95.3,799.4L89.6,775L75.1,744.6L58.7,718.7L28.3,695.9L41.2,673.5L63.6,660.8L75.6,676.4L115.4,672.5L289.1,571L329.1,535.1L486.4,443.2L517.1,412.4L543.3,376.8L566.2,333.9L626.6,135.6L645.1,99.8L679.1,67.3L725.9,39.9L765.9,36.7L782.6,77.8Z"><title>Guam</title></path>
+</g>
+</svg>

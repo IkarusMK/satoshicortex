@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1461.7" class="regionskarte" preserveAspectRatio="xMidYMid meet" data-land="GD" data-minlon="-61.8016" data-maxlon="-61.4106" data-minlat="11.9870" data-maxlat="12.5455" data-umbruch="0">
+<!-- Umrisse: Natural Earth (ne_10m_admin_1_states_provinces),
+     gemeinfrei. Erzeugt von tools/regionen_bauen.py, nicht von
+     Hand aendern. -->
+<g class="regionen">
+<path id="r-GD-03" data-de="Saint George" data-en="Saint George" data-cx="174.1" data-cy="1278.9" d="M303.3,1361.3L287,1376L276.6,1395.6L272.7,1420.3L248.9,1415.9L225.9,1408.7L204.2,1398.8L184,1386.4L157.5,1409.7L114.2,1418.8L66.6,1416.4L28.3,1405.8L117,1348.6L133.2,1332.7L142.2,1294.5L134.9,1263.8L122.3,1233.7L115.5,1197.9L129.2,1139.6L218.9,1139.7L294.6,1137.5L307.2,1189.2L319.8,1206.4L286.2,1217.2L269.4,1275.3L269.4,1320.5L288.3,1350.6L303.3,1361.3Z"><title>Saint George</title></path>
+<path id="r-GD-02" data-de="Saint David" data-en="Saint David" data-cx="361.1" data-cy="1281.8" d="M452.9,1247.1L449.7,1267.5L448.9,1288.9L434.8,1312.3L325.2,1370.1L325.2,1350.6L303.3,1361.3L288.3,1350.6L269.4,1320.5L269.4,1275.3L286.2,1217.2L319.8,1206.4L366.1,1193.5L406.1,1210.7L452.9,1247.1Z"><title>Saint David</title></path>
+<path id="r-GD-01" data-de="Saint Andrew" data-en="Saint Andrew" data-cx="398.8" data-cy="1103" d="M507.3,965.3L499.4,1077.6L493.2,1096L482,1114.1L464.9,1154.1L465.8,1174.5L480.1,1217.4L473.7,1225.5L460.4,1231.6L452.9,1247.1L406.1,1210.7L366.1,1193.5L319.8,1206.4L307.2,1189.2L294.6,1137.5L290.4,1109.5L319.8,1072.9L355.6,1012.7L372.4,958.8L435.5,958.8L507.3,965.3Z"><title>Saint Andrew</title></path>
+<path id="r-GD-06" data-de="Saint Patrick" data-en="Saint Patrick" data-cx="407" data-cy="882.8" d="M305.5,843.3L332.8,809.9L386.4,800.3L444.7,808.2L500.1,843.1L498.4,851.2L482.4,866.6L503.9,911L508.4,949L507.3,965.3L435.5,958.8L372.4,958.8L364,905L338.8,868.4L305.5,843.3Z"><title>Saint Patrick</title></path>
+<path id="r-GD-05" data-de="Saint Mark" data-en="Saint Mark" data-cx="296.7" data-cy="928" d="M221,946.3L305.5,843.3L338.8,868.4L364,905L372.4,958.8L355.6,1012.7L317.7,982.5L269.4,958.8L221,946.3Z"><title>Saint Mark</title></path>
+<path id="r-GD-04" data-de="Saint John" data-en="Saint John" data-cx="242.4" data-cy="1043" d="M129.2,1139.6L182.3,1037L184,991.6L221,946.3L269.4,958.8L317.7,982.5L355.6,1012.7L319.8,1072.9L290.4,1109.5L294.6,1137.5L218.9,1139.7L129.2,1139.6Z"><title>Saint John</title></path>
+<path id="r-GD-10" data-de="Carriacou und Petite Martinique" data-en="Carriacou and Petite Martinique" data-cx="876.3" data-cy="158.3" d="M955.3,237.8L910.2,224.4L867,236.6L824.4,258.6L780.9,275.2L789.7,259.3L806.9,218L815.6,202.1L807.7,200.8L780.9,202.1L784.6,191.6L799.7,166.3L854.9,183.1L888,138L915.8,75.9L955.3,41.4L971.7,84.2L967.3,131.8L956.9,183.5L955.3,237.8Z"><title>Carriacou and Petite Martinique</title></path>
+</g>
+</svg>

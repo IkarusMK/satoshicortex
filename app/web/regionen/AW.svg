@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1183.8" class="regionskarte" preserveAspectRatio="xMidYMid meet" data-land="AW" data-minlon="-70.0680" data-maxlon="-69.8713" data-minlat="12.4112" data-maxlat="12.6386" data-umbruch="0">
+<!-- Umrisse: Natural Earth (ne_10m_admin_1_states_provinces),
+     gemeinfrei. Erzeugt von tools/regionen_bauen.py, nicht von
+     Hand aendern. -->
+<g class="regionen">
+<path id="r-AW-X01~" data-de="Aruba" data-en="Aruba" data-cx="500" data-cy="591.9" d="M361.1,317.6L668.9,556.4L728.5,621.5L773.8,737.1L954.5,963.4L971.7,1099.7L914.4,1150.3L809.1,1149.7L698.7,1107.1L624.4,1032.1L728.5,1032.1L728.5,996.5L556.2,913.2L204.9,602.2L101.1,559.4L50.2,528L28.3,477.8L38.6,425.1L85.8,336.1L97.8,285.6L77.9,200.9L42.4,126.7L34.9,68.7L97.8,33.5L309.2,276.3L361.1,317.6Z"><title>Aruba</title></path>
+</g>
+</svg>

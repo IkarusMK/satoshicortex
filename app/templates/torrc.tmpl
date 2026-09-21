@@ -1,0 +1,62 @@
+# Von SatoshiCortex erzeugt — nicht von Hand aendern.
+# Aenderungen hier werden beim naechsten Speichern in der Weboberflaeche
+# ueberschrieben. Welche Onion-Dienste es gibt, folgt der Sichtbarkeit, die du
+# dort einstellst.
+
+SocksPort 0.0.0.0:9050
+
+# Ein zweiter SOCKS-Port, allein fuer die Erreichbarkeitspruefung der
+# Weboberflaeche. "ExtendedErrors" laesst Tor sagen, WORAN eine .onion
+# scheiterte: Beschreibung nicht gefunden, Einfuehrung oder Treffpunkt
+# fehlgeschlagen (0xF0 bis 0xF7). Ohne die Codes kommt alles als "allgemeiner
+# Fehler" an -- auch der Fall, dass Tor den Dienst erreicht hat und dahinter
+# niemand annimmt. Genau der war bis 0.62.0 der Zustand aller drei Dienste.
+# Getrennt von 9050, damit bitcoind und LND unveraendert die Codes bekommen,
+# die sie kennen.
+SocksPort 0.0.0.0:9052 ExtendedErrors
+
+# Neben SOCKS ein HTTP-Tunnel. Damit kann die Weboberflaeche ihre
+# Versionsabfrage ueber Tor schicken, OHNE eine zusaetzliche Abhaengigkeit:
+# Pythons Standardbibliothek spricht kein SOCKS, aber sehr wohl HTTP-Proxy.
+# Der Port wird nirgends auf dem Host veroeffentlicht.
+HTTPTunnelPort 0.0.0.0:9080
+
+# KEIN Steuerport. Bis 0.62.0 stand hier einer, im ganzen Compose-Netz
+# erreichbar, damit bitcoind und LND ihre Onion-Dienste selbst anlegen
+# konnten. Geschuetzt war er durch eine Cookie-Datei unter /fast/tor -- und
+# /fast sieht jeder Container, die Weboberflaeche eingeschlossen. Wer den
+# Steuerport hat, kann Tor umkonfigurieren.
+#
+# Gebraucht wird er nicht mehr: die Onion-Dienste stehen unten, in Tors
+# eigener Konfiguration. Tor legt sie bei jedem Start von selbst an.
+
+# Tors Daten, darunter die Schluessel der Onion-Dienste. Die Adressen bleiben
+# dieselben, solange dieses Verzeichnis bleibt.
+DataDirectory /fast/tor
+
+# Zweimal dasselbe, mit Absicht: nach stdout, damit es im Container-Protokoll
+# steht, UND in eine Datei, damit die Weboberflaeche es zeigen kann. Ohne die
+# Datei war Tor der einzige Dienst, in den man von innen nicht hineinsehen
+# konnte -- ausgerechnet der, bei dem am haeufigsten unklar ist, was los ist.
+#
+# "notice" ist die richtige Stufe: ein paar Zeilen pro Stunde, darunter der
+# Aufbau-Fortschritt und jeder Fehler. "info" oder "debug" gehoeren hier NICHT
+# hin -- sie protokollieren, wohin Verbindungen gehen, und das ist genau das,
+# was Tor sonst niemandem verraet.
+Log notice stdout
+Log notice file /fast/tor/notice.log
+
+# Wir betreiben KEIN Relay: der Node soll Tor nutzen, nicht Tor-Verkehr fuer
+# Fremde weiterleiten. Das ist eine andere Entscheidung mit anderen Folgen.
+ExitRelay 0
+
+# ============================================================ Onion-Dienste
+# Jeder Dienst zeigt auf die FESTE Adresse seines Containers im Compose-Netz.
+# Nicht auf 127.0.0.1: das waere dieser Container hier, und in dem horcht
+# weder bitcoind noch LND. Genau das war bis 0.62.0 der Fall -- die Adressen
+# standen im Netz, und niemand kam an ihnen an.
+#
+# Und nicht auf einen Namen wie "lnd": Tor loest ihn nur einmal beim Start
+# auf. Bekaeme LND danach eine andere Adresse, zeigte der Dienst ins Leere.
+
+{{ONION_DIENSTE}}

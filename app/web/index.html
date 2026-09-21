@@ -1,0 +1,2176 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SatoshiCortex</title>
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="glow" aria-hidden="true"></div>
+
+<!-- ══ Notfall: gar nichts ging ════════════════════════════════════════════ -->
+<!--
+  Das Netz unter allen anderen Seiten. Jede Sektion hier startet versteckt;
+  blendet das Skript keine davon ein, bleibt nur schwarzer Grund stehen. Genau
+  das ist am 03.09.2026 passiert: ein fehlgeschlagener Aufruf beim Start riss
+  den Ablauf ab, nachdem die Anmeldeseite schon ausgeblendet war -- und die
+  Oberflaeche war leer, ohne ein Wort dazu, warum. Lieber eine schlichte
+  Meldung mit einem Knopf als eine schwarze Flaeche.
+-->
+<section id="notfall" class="wizard hidden">
+  <div class="wizard-top">
+    <div class="brand-row">
+      <img class="logo" src="logo.svg" alt="">
+      <span class="brand">Satoshi<em>Cortex</em></span>
+    </div>
+  </div>
+  <div class="card panel">
+    <h1 id="nf-title"></h1>
+    <p class="lead" id="nf-lead"></p>
+    <p class="dim small" id="nf-detail"></p>
+    <div class="actions">
+      <span class="spacer"></span>
+      <button class="btn" id="nf-erneut" type="button"></button>
+    </div>
+  </div>
+</section>
+
+<!-- ══ Anmeldung / Kontoanlage ═════════════════════════════════════════════ -->
+<section id="gate" class="wizard hidden">
+  <div class="wizard-top">
+    <div class="brand-row">
+      <img class="logo" src="logo.svg" alt="">
+      <span class="brand">Satoshi<em>Cortex</em></span>
+    </div>
+    <div class="lang-switch" role="group" aria-label="Language"
+         data-i18n-attr="aria-label=lang_wahl">
+      <button data-setlang="de">DE</button><button data-setlang="en">EN</button>
+    </div>
+  </div>
+  <div class="card panel">
+    <h1 id="g-title"></h1>
+    <p class="lead" id="g-lead"></p>
+    <!-- Anmeldung ueber den eigenen Ausweisdienst. Erscheint nur, wenn in
+         der .env einer vollstaendig eingetragen ist -- und steht dann OBEN,
+         weil er dann der gewoehnliche Weg ist und das Passwortfeld die
+         Nottuer. -->
+    <div id="g-oidc" class="hidden">
+      <button type="button" class="btn gross" id="g-oidc-knopf"
+              data-i18n="g_oidc_knopf"></button>
+      <p class="dim small" data-i18n="g_oidc_d"></p>
+      <p class="dim small" id="g-oidc-trenner" data-i18n="g_oidc_trenner"></p>
+    </div>
+    <form id="g-form" autocomplete="on">
+      <div class="field">
+        <label for="g-user" data-i18n="g_user"></label>
+        <input id="g-user" name="username" type="text" autocomplete="username" required>
+      </div>
+      <div class="field">
+        <label for="g-pass" data-i18n="g_pass"></label>
+        <input id="g-pass" name="password" type="password" required>
+      </div>
+      <div class="actions">
+        <span class="small" id="g-err" style="color:var(--danger)"></span>
+        <span class="spacer"></span>
+        <button class="btn" id="g-submit" type="submit"></button>
+        <p class="dim small" id="g-tls" style="margin-top:14px;line-height:1.5"></p>
+      </div>
+    </form>
+  </div>
+</section>
+
+<!-- ══ Einrichtungsassistent ═══════════════════════════════════════════════ -->
+<section id="wizard" class="wizard hidden">
+
+  <div class="wizard-top">
+    <div class="brand-row">
+      <img class="logo" src="logo.svg" alt="">
+      <span class="brand">Satoshi<em>Cortex</em></span>
+    </div>
+    <div class="lang-switch" role="group" aria-label="Language"
+         data-i18n-attr="aria-label=lang_wahl">
+      <button data-setlang="de">DE</button><button data-setlang="en">EN</button>
+    </div>
+  </div>
+
+  <div class="stepper" id="stepper" aria-hidden="true"></div>
+
+  <div class="card panel">
+
+    <!-- ── 1 Willkommen ── -->
+    <div class="step-body" data-step="willkommen">
+      <h1 data-i18n="w_title"></h1>
+      <p class="lead" data-i18n="w_lead"></p>
+      <p data-i18n="w_p1"></p>
+      <ul>
+        <li data-i18n-html="w_need_disk"></li>
+        <li data-i18n-html="w_need_ports"></li>
+        <li data-i18n-html="w_need_time"></li>
+        <li data-i18n-html="w_need_band"></li>
+      </ul>
+      <div class="note" data-i18n="w_note"></div>
+    </div>
+
+    <!-- ── 2 Speicher ── -->
+    <div class="step-body hidden" data-step="speicher">
+      <h1 data-i18n="s_title"></h1>
+      <p class="lead" data-i18n="s_lead"></p>
+      <div id="s-result"><p class="dim" data-i18n="s_checking"></p></div>
+    </div>
+
+    <!-- ── 3 Leistung ── -->
+    <div class="step-body hidden" data-step="leistung">
+      <h1 data-i18n="l_title"></h1>
+      <p class="lead" data-i18n="l_lead"></p>
+      <div class="choices" id="l-profiles"></div>
+      <div class="field">
+        <label><span data-i18n="l_upload"></span> — <span class="val" id="l-upload-val"></span></label>
+        <input type="range" id="l-upload" min="0" max="1000" step="50" value="300">
+        <div class="note" id="l-upload-note"></div>
+      </div>
+    </div>
+
+    <!-- ── 4 Netz ── -->
+    <div class="step-body hidden" data-step="netz">
+      <h1 data-i18n="n_title"></h1>
+      <p class="lead" data-i18n="n_lead"></p>
+      <div id="n-ports"></div>
+
+      <!-- Die Hauptentscheidung, und deshalb ganz oben -- genau wie in den
+           Einstellungen. Bis 0.40.0 stand sie dort und hier NICHT: wer neu
+           installierte, traf sie blind ueber drei Haekchen und fand danach
+           eine andere Darstellung vor. Aus dem Betrieb, 05.09.2026: "wenn jemand
+           das so neu installiert, hat er ja noch keine Ahnung." -->
+      <div class="wahlgruppe oben" role="radiogroup" aria-labelledby="n-sicht-titel">
+        <b id="n-sicht-titel" data-i18n="lnsicht_titel"></b>
+        <p class="dim small" data-i18n="lnsicht_lead"></p>
+        <label class="wahl">
+          <input type="radio" name="n-sicht" value="tor">
+          <span><b data-i18n="lnsicht_tor"></b>
+            <span class="dim small" data-i18n="lnsicht_tor_d"></span></span>
+        </label>
+        <label class="wahl">
+          <input type="radio" name="n-sicht" value="hybrid">
+          <span><b data-i18n="lnsicht_hybrid"></b>
+            <span class="dim small" data-i18n="lnsicht_hybrid_d"></span></span>
+        </label>
+        <label class="wahl">
+          <input type="radio" name="n-sicht" value="still">
+          <span><b data-i18n="lnsicht_still"></b>
+            <span class="dim small" data-i18n="lnsicht_still_d"></span></span>
+        </label>
+      </div>
+      <p class="dim small hidden" id="n-sicht-folge"></p>
+
+      <h3 data-i18n="wege_titel"></h3>
+      <p class="dim small" data-i18n="wege_intro"></p>
+      <label class="switch">
+        <input type="checkbox" id="n-tor" checked>
+        <span><b data-i18n="wege_tor"></b><br><span class="dim small" data-i18n="wege_tor_d"></span></span>
+      </label>
+      <label class="switch unterschalter" id="n-pause-zeile">
+        <input type="checkbox" id="n-pause" checked>
+        <span><b data-i18n="wege_pause"></b><br><span class="dim small" data-i18n="wege_pause_d"></span></span>
+      </label>
+      <label class="switch">
+        <input type="checkbox" id="n-ipv4" checked>
+        <span><b data-i18n="wege_ipv4"></b><br><span class="dim small" data-i18n="wege_ipv4_d"></span></span>
+      </label>
+      <label class="switch">
+        <input type="checkbox" id="n-ipv6" checked>
+        <span><b data-i18n="wege_ipv6"></b><br><span class="dim small" data-i18n="wege_ipv6_d"></span></span>
+      </label>
+      <label class="switch">
+        <input type="checkbox" id="n-ankuendigen" checked>
+        <span><b data-i18n="wege_adresse"></b><br><span class="dim small" data-i18n="wege_adresse_d"></span></span>
+      </label>
+      <label class="feld unterschalter">
+        <input type="text" id="n-adresse" autocomplete="off" spellcheck="false">
+      </label>
+      <div class="note" id="n-warnung" data-i18n="n_note"></div>
+    </div>
+
+    <!-- ── 5 Wallet-Software ──
+         Der Schritt sammelt die ENTSCHEIDUNG. Die Zugangsdaten gibt es hier
+         noch nicht: sie entstehen erst, wenn gleich die Konfiguration
+         geschrieben wird. Deshalb steht hier, wo sie danach zu finden sind,
+         statt ein leeres Feld zu zeigen. -->
+    <div class="step-body hidden" data-step="wallet">
+      <h1 data-i18n="wsw_titel"></h1>
+      <p class="lead" data-i18n="wsw_lead"></p>
+      <label class="switch">
+        <input type="checkbox" id="n-rpc-an">
+        <span><b data-i18n="wsw_schalter"></b></span>
+      </label>
+      <details class="erklaerung">
+        <summary data-i18n="mehr_dazu"></summary>
+        <p class="dim small" data-i18n="wsw_erklaerung"></p>
+      </details>
+      <label class="feld unterschalter">
+        <b data-i18n="wsw_netz"></b>
+        <input type="text" id="n-rpc-netz" autocomplete="off"
+               spellcheck="false" placeholder="192.168.178.0/24">
+      </label>
+      <p class="dim small unterschalter" data-i18n="wsw_netz_d"></p>
+      <div class="note warn hidden" id="n-rpc-fehlt" data-i18n="wsw_netz_fehlt"></div>
+      <div class="note warn hidden" id="n-rpc-port" data-i18n="wsw_port"></div>
+      <div class="note hidden" id="n-rpc-danach" data-i18n="wsw_danach"></div>
+      <div class="note" id="n-rpc-aus" data-i18n="wsw_spaeter"></div>
+    </div>
+
+    <!-- ── 6 Konto ── -->
+    <div class="step-body hidden" data-step="konto">
+      <h1 data-i18n="k_title"></h1>
+      <p class="lead" data-i18n="k_lead"></p>
+      <div id="k-body"></div>
+    </div>
+
+    <!-- ── 7 Fertig ── -->
+    <div class="step-body hidden" data-step="fertig">
+      <h1 data-i18n="f_title"></h1>
+      <p class="lead" data-i18n="f_lead"></p>
+      <div id="f-summary"></div>
+    </div>
+
+    <div class="actions">
+      <button class="btn ghost" id="btn-back" data-i18n="back"></button>
+      <span class="spacer"></span>
+      <span class="small dim" id="err"></span>
+      <button class="btn" id="btn-next" data-i18n="next"></button>
+    </div>
+  </div>
+</section>
+
+<!-- ══ Uebersicht ══════════════════════════════════════════════════════════ -->
+<!-- ══ Die Karte liegt HINTER allem ═══════════════════════════════════════
+     Nicht als Kachel unter Kacheln, sondern als Grund, auf dem die Zahlen
+     liegen. In der Netz-Ansicht tritt sie hervor und wird bedienbar; sonst
+     bleibt sie gedaempft im Hintergrund. -->
+<div id="karte-hintergrund" class="hidden">
+  <div class="karte-flaeche" id="d-karte"></div>
+  <div class="karte-marke hidden" id="d-karte-marke" role="status"></div>
+  <div class="karte-schleier"></div>
+</div>
+
+<!-- ══ Die Anwendung nach der Einrichtung ════════════════════════════════ -->
+<div id="app" class="hidden">
+  <header class="kopf">
+    <div class="brand-row">
+      <img class="logo" src="logo.svg" alt="">
+      <span class="brand">Satoshi<em>Cortex</em></span>
+    </div>
+    <div class="lang-switch" role="group" aria-label="Language"
+         data-i18n-attr="aria-label=lang_wahl">
+      <button data-setlang="de">DE</button><button data-setlang="en">EN</button>
+    </div>
+  </header>
+
+  <div class="rahmen">
+    <!-- EINE Ebene. Vorher trug der Kopf die Reiter (Bitcoin | Lightning |
+         Welt) und die Seitenleiste darunter die Abschnitte: fuer zehn
+         Ansichten zwei Ebenen, und der halbe Bestand war jeweils unsichtbar.
+         Wer von "Bloecke" nach "Kanaele" wollte, brauchte zwei Klicks an zwei
+         verschiedenen Bildschirmraendern. Jetzt steht alles untereinander,
+         nach Gruppen beschriftet -- jede Ansicht ist einen Klick weit weg,
+         und man SIEHT, was es gibt. -->
+    <nav class="seitenleiste" aria-label="Abschnitte"
+         data-i18n-attr="aria-label=nav_abschnitte">
+      <div class="abschnitte">
+        <h2 class="leiste-titel">Bitcoin</h2>
+        <button data-ansicht="uebersicht" class="aktiv" data-i18n="nav_uebersicht"></button>
+        <button data-ansicht="netz"      data-i18n="nav_netz"></button>
+        <button data-ansicht="mempool"   data-i18n="nav_mempool"></button>
+        <button data-ansicht="bloecke"   data-i18n="nav_bloecke"></button>
+      </div>
+      <div class="abschnitte">
+        <h2 class="leiste-titel">Lightning</h2>
+        <button data-ansicht="ln-wallet"      data-i18n="nav_wallet"></button>
+        <button data-ansicht="ln-kanaele"     data-i18n="nav_kanaele"></button>
+        <button data-ansicht="ln-knoten"      data-i18n="nav_knoten"></button>
+        <button data-ansicht="ln-einrichtung" data-i18n="nav_einrichtung"></button>
+      </div>
+      <div class="abschnitte">
+        <h2 class="leiste-titel" data-i18n="nav_karte"></h2>
+        <button data-ansicht="welt" data-i18n="nav_welt"></button>
+      </div>
+      <!-- Aus dem Betrieb, 10.09.2026: "der umrechner kann ja auch links nen
+           eigenden reiter bekommen." -->
+      <div class="abschnitte">
+        <h2 class="leiste-titel" data-i18n="nav_werkzeug"></h2>
+        <button data-ansicht="rechner" data-i18n="nav_rechner"></button>
+      </div>
+      <div class="abschnitte">
+        <h2 class="leiste-titel" data-i18n="nav_lesen"></h2>
+        <!-- Die Beschriftung steckt in einem eigenen span, NICHT am
+             Knopf selbst: applyI18n setzt textContent auf jedes
+             [data-i18n]-Element, und das loescht Kindelemente mit. Der
+             Zaehler verschwand dadurch aus dem DOM, ladeNews lief auf
+             null -- und die ganze Seite blieb schwarz. -->
+        <button data-ansicht="news">
+          <span data-i18n="nav_news"></span>
+          <span class="ungelesen" id="news-zaehler" hidden></span>
+        </button>
+      </div>
+      <div class="leiste-fuss">
+        <button data-ansicht="einstellungen" data-i18n="nav_einstellungen"></button>
+        <button data-ansicht="logs" data-i18n="nav_logs"></button>
+        <span class="dim">SatoshiCortex <span id="version">—</span></span>
+      </div>
+    </nav>
+
+    <main class="inhalt">
+      <!-- Was jetzt zu tun ist. Ausserhalb der Ansichten, weil es ueberall
+           gilt: eine gesperrte Wallet haelt den Knoten an, ganz gleich auf
+           welche Seite man gerade schaut.
+
+           Erscheint NUR, wenn wirklich etwas ansteht. Dazu aus dem Betrieb:
+           "wenn alles da, muss man ja nicht mehr sehen was zu tun ist". -->
+      <div class="tunzeile hidden" id="tunzeile" role="status">
+        <span id="tunzeile-text"></span>
+        <button type="button" class="btn" id="tunzeile-knopf"></button>
+        <!-- Nur bei Hinweisen, die eine WAHL beschreiben. Dazu aus dem Betrieb:
+             "das sollten wir dem kunden ueberlassen, es sollte keine
+             pflicht sein!" -->
+        <button type="button" class="btn ghost hidden"
+                id="tunzeile-weg"></button>
+      </div>
+      <!-- ── Bitcoin · Übersicht ── -->
+      <section data-ansicht="uebersicht">
+        <div class="panel sync" id="d-sync">
+          <div class="sync-head">
+            <span class="sync-phase" id="d-phase"></span>
+            <span class="sync-pct" id="d-pct"></span>
+          </div>
+          <div class="bar"><span id="d-bar"></span></div>
+          <div class="sync-sub" id="d-sub"></div>
+          <div class="sync-sub" id="d-sub2" style="margin-top:4px;opacity:.85"></div>
+        </div>
+
+        <!-- Auf einen Blick. Bis zum 16.09.2026 stand auf der Startseite nur
+             der Abgleich, Teilnahme und Dienste -- waehrend des Erstsyncs in
+             Ordnung, danach eine halbe Auskunft. Kurs, Wallet und
+             Lightning-Zustand kommen aus Antworten, die ohnehin geholt
+             werden (/kurs aus dem Zwischenspeicher, /lightning schlank). -->
+        <div class="raster">
+          <div class="panel">
+            <h3 data-i18n="d_kurs"></h3>
+            <div class="kurs-zeile">
+              <span class="kurs-wert" id="d-kurs-wert">—</span>
+              <span class="kurs-wechsel" id="d-kurs-wechsel"></span>
+            </div>
+            <div id="d-kurs-zusatz"></div>
+          </div>
+          <div class="panel">
+            <h3 data-i18n="d_wallet"></h3>
+            <div id="d-wallet"></div>
+            <div class="note" id="d-wallet-hinweis"></div>
+          </div>
+          <div class="panel">
+            <h3 data-i18n="d_lightning"></h3>
+            <div id="d-ln-kurz"></div>
+          </div>
+        </div>
+
+        <div class="raster">
+          <div class="panel">
+            <h3 data-i18n="d_teilnahme"></h3>
+            <div id="d-chain"></div>
+          </div>
+          <div class="panel">
+            <h3 data-i18n="d_services"></h3>
+            <div id="d-services"></div>
+          </div>
+        </div>
+        <div class="note" id="d-note"></div>
+      </section>
+
+      <!-- ── Bitcoin · Netz ── -->
+      <section data-ansicht="netz" class="hidden">
+        <div class="panel">
+          <h3 data-i18n="d_netz"></h3>
+          <div id="d-netz"></div>
+          <div id="d-beitrag"></div>
+        </div>
+        <div class="panel">
+          <h3 data-i18n="karte_titel"></h3>
+          <p class="dim small" data-i18n="karte_lead"></p>
+          <div class="karte-fuss">
+            <div class="karte-zahlen" id="d-karte-zahlen"></div>
+            <ol class="karte-rang" id="d-karte-rang"></ol>
+          </div>
+          <p class="dim small" data-i18n="karte_legende"></p>
+          <p class="karte-quelle dim" id="d-karte-quelle"></p>
+        </div>
+      </section>
+
+      <!-- ── Bitcoin · Mempool ── -->
+      <section data-ansicht="mempool" class="hidden">
+        <!-- Die Bloecke, die als naechstes gefunden werden koennten. Aus
+             demselben Feerate-Diagramm, das ohnehin hereinkommt, alle
+             1 Mio. vByte durchgeschnitten -- kein zusaetzlicher Aufruf. -->
+        <div class="panel hidden" id="a-kommend-panel">
+          <h3 data-i18n="a_kb_titel"></h3>
+          <p class="dim small" data-i18n="a_kb_d"></p>
+          <div class="blockstreifen" id="a-kommend"></div>
+        </div>
+        <!-- Jede wartende Transaktion als Flaeche, eine Spalte je Block.
+             Auf Anforderung: getrawmempool ist der groesste Aufruf, den diese
+             Anwendung kennt, und er gehoert nicht in einen Takt. -->
+        <div class="panel" id="a-kachel-panel">
+          <h3 data-i18n="a_kx_titel"></h3>
+          <p class="dim small" data-i18n="a_kx_d"></p>
+          <div style="display:flex;gap:12px;align-items:center;margin:12px 0">
+            <button type="button" class="btn" id="a-kachel-holen"
+                    data-i18n="a_kx_holen"></button>
+            <span class="dim small" id="a-kachel-meldung"></span>
+          </div>
+          <div class="kachelflaeche" id="a-kachel-flaeche" hidden>
+            <!-- tabindex, damit die Spalten auch mit der Tastatur erreichbar
+                 sind: ein Canvas ist es von sich aus nicht. -->
+            <canvas id="a-kacheln" tabindex="0"></canvas>
+            <div class="kachelblase" id="a-kachel-blase" hidden></div>
+          </div>
+          <p class="dim small" data-i18n="a_kx_bedienung"
+             style="margin:10px 0 0"></p>
+          <div id="a-kachel-detail" hidden></div>
+        </div>
+        <div class="panel hidden" id="d-mempool-panel">
+          <h3 data-i18n="d_mempool"></h3>
+          <div id="d-mempool"></div>
+        </div>
+        <div class="ausw-diagramm">
+          <div class="ausw-dia-kopf">
+            <span data-i18n="a_dia_titel"></span>
+            <!-- Die Auskunft, wegen der man hersieht: was kostet der naechste
+                 Block? Sie stand vorher nirgends -- man musste sie aus der
+                 Kurve schaetzen. -->
+            <span class="dia-block" id="a-dia-block"></span>
+            <span class="dim" id="a-dia-grenze"></span>
+          </div>
+          <div id="a-diagramm"></div>
+          <p class="dim small" data-i18n="a_dia_d" style="margin:8px 0 0"></p>
+        </div>
+        <p class="dim small" id="a-seit"></p>
+      </section>
+
+      <!-- ── Bitcoin · Blöcke ── -->
+      <section data-ansicht="bloecke" class="hidden">
+        <!-- Erst der Streifen, dann die Zeilen. Der Streifen ist der
+             Ueberblick, die Tabelle das Nachschlagewerk -- und ein Klick auf
+             einen Kasten oeffnet, was DIESER Knoten ueber den Block weiss. -->
+        <div class="panel">
+          <h3 data-i18n="a_bloecke"></h3>
+          <div class="blockstreifen" id="a-blockstreifen"></div>
+          <div id="a-blockdetail" hidden></div>
+          <div class="ausw-tabelle"><table id="a-bloecke"></table></div>
+          <p class="dim small" data-i18n="a_bloecke_d" style="margin:10px 0 0"></p>
+        </div>
+        <!-- Wer die Bloecke findet. Nur aus dem, was dieser Knoten selbst
+             aufgezeichnet hat -- die Grundlage steht dabei. -->
+        <div class="panel" id="a-pools-panel">
+          <h3 data-i18n="a_pa_titel"></h3>
+          <p class="dim small" data-i18n="a_pa_d"></p>
+          <div class="kurs-gruppe pool-fenster" id="a-pool-fenster"></div>
+          <div id="a-pools"></div>
+        </div>
+        <!-- Jeden Block nachschlagen, nicht nur die letzten zwoelf. Die
+             Kette ist vollstaendig da -- danach zu fragen ist der halbe Sinn
+             eines Archiv-Knotens. -->
+        <div class="panel">
+          <h3 data-i18n="a_bs_titel"></h3>
+          <p class="dim small" data-i18n="a_bs_d"></p>
+          <div class="ausw-suche">
+            <input type="text" id="a-blockhoehe" inputmode="numeric"
+                   autocomplete="off" spellcheck="false" placeholder="966088">
+            <button type="button" class="btn" id="a-block-suchen"
+                    data-i18n="a_bs_suchen"></button>
+            <button type="button" class="btn ghost" id="a-block-null"
+                    data-i18n="a_bs_null"></button>
+          </div>
+          <div id="a-blocksuche"></div>
+        </div>
+
+        <div class="panel">
+          <h3 data-i18n="a_verfolgen"></h3>
+          <p class="dim small" data-i18n="a_verfolgen_d"></p>
+          <div class="ausw-suche">
+            <input type="text" id="a-txid" autocomplete="off" spellcheck="false"
+                   placeholder="txid">
+            <button type="button" class="btn" id="a-suchen" data-i18n="a_suchen"></button>
+          </div>
+          <div id="a-treffer"></div>
+        </div>
+
+        <!-- Eine Adresse abfragen: der aktuelle Bestand aus dem UTXO-Satz.
+             Keine Historie -- ohne Adressindex gibt es die nicht. -->
+        <div class="panel" id="a-adresse-panel">
+          <h3 data-i18n="a_ad_titel"></h3>
+          <p class="dim small" data-i18n="a_ad_d"></p>
+          <div class="ausw-suche">
+            <input type="text" id="a-adresse" autocomplete="off" spellcheck="false"
+                   placeholder="bc1q…">
+            <button type="button" class="btn" id="a-ad-los" data-i18n="a_ad_knopf"></button>
+            <button type="button" class="btn ghost hidden" id="a-ad-abbrechen"
+                    data-i18n="a_ad_abbrechen"></button>
+          </div>
+          <div id="a-ad-meldung"></div>
+          <div id="a-ad-ergebnis"></div>
+        </div>
+      </section>
+
+      <!-- ── Lightning ──
+           Das LND-Abbild gibt es jetzt, und der Dienst läuft von Anfang an
+           mit — er wartet nur. Deshalb steht hier kein "kommt später"
+           mehr, sondern was tatsächlich los ist: was der Dienst macht, was
+           LND von sich selbst sagt, und ob die Kette weit genug ist.
+           Kanäle und Wallet bleiben leer, solange es sie nicht gibt. -->
+      <!-- Fuenf gleich schwere Kaesten untereinander, von denen vier
+           gleichzeitig sichtbar waren, sobald LND laeuft. Nichts daran sagte,
+           was wichtig ist. Jetzt: eine Kopfzeile fuer den Einrichtungsstand
+           (drei Woerter, sobald es laeuft), die Guthaben als Schlagzeile,
+           darunter die Kanaele in voller Breite, und das Nachschlagewerk --
+           eigener Knoten und Weiterleitungen -- nebeneinander am Fuss. -->
+      <!-- ── WALLET: das Geld ──────────────────────────────────────────
+           Aus dem Betrieb, 10.09.2026: "das wir momentan unter wallet sehen sind
+           alles wallet einstellungen!!! und nicht das wallet .. unter wallet
+           verstehe ich den inhalt den wir im knoten und kanaele haben!!"
+
+           Er hat recht, und die drei etablierten Oberflaechen (RTL,
+           ThunderHub, Zeus) machen es alle gleich: das GELD an einer Stelle,
+           getrennt nach on-chain und Lightning; die Einrichtung woanders.
+           Also steht hier ab jetzt der Inhalt, und die Einrichtung hat einen
+           eigenen Reiter. -->
+      <section data-ansicht="ln-wallet" class="hidden">
+        <div class="ln-kopf">
+          <div class="ln-kopf-punkt">
+            <span class="k" data-i18n="ln_dienst"></span>
+            <span class="v" id="d-ln-dienst">—</span>
+          </div>
+          <div class="ln-kopf-punkt">
+            <span class="k" data-i18n="ln_wallet"></span>
+            <span class="v" id="d-ln-wallet">—</span>
+          </div>
+          <div class="ln-kopf-punkt">
+            <span class="k" data-i18n="ln_kette"></span>
+            <span class="v" id="d-ln-kette">—</span>
+          </div>
+        </div>
+        <p class="note" id="d-ln-hinweis"></p>
+
+        <!-- Erst wenn LND laeuft. Solange nicht, bleibt hier nichts stehen,
+             was so aussieht, als waeren es Daten. -->
+        <div class="panel hidden" id="ln-guthaben">
+          <h3 data-i18n="lk_guthaben_titel"></h3>
+          <p class="dim small" data-i18n="lk_guthaben_d"></p>
+          <div id="ln-guthaben-inhalt"></div>
+          <!-- Unter den Kennzahlen, nicht dazwischen: im Raster wurde der Satz
+               zur schmalen Spalte (im Browser gesehen, 15.09.2026). -->
+          <p class="note" id="ln-guthaben-hinweis"></p>
+        </div>
+
+        <!-- Befund vom 15.09.2026: nach der ersten Einzahlung stand nur eine
+             Zahl da. Hier stehen die Bewegungen mit voller txid. -->
+        <div class="panel hidden" id="w-bewegungen">
+          <h3 data-i18n="bw_titel"></h3>
+          <p class="dim small" data-i18n="bw_lead"></p>
+          <div id="bw-liste"></div>
+        </div>
+
+        <div class="panel hidden" id="w-einzahlen">
+          <h3 data-i18n="ez_titel"></h3>
+          <p class="dim small" data-i18n="ez_lead"></p>
+          <div style="display:flex;gap:12px;align-items:center;margin-top:12px">
+            <button type="button" class="btn" id="ez-holen" data-i18n="ez_holen"></button>
+            <span class="dim small" id="ez-meldung"></span>
+          </div>
+          <!-- Zugeklappt, weil fast niemand daran muss -- aber da, weil
+               manche Boersen bis heute nicht an Taproot senden koennen.
+               Ohne diese Wahl stand man davor und die Anwendung bot keinen
+               Ausweg, obwohl LND beide anderen Formen laengst kann. -->
+          <details id="ez-art" style="margin-top:14px">
+            <summary data-i18n="ez_art_titel"></summary>
+            <p class="dim small" data-i18n="ez_art_hinweis"></p>
+            <div class="wahlgruppe" role="radiogroup"
+                 aria-labelledby="ez-art-titel">
+              <b id="ez-art-titel" class="visuell-versteckt"
+                 data-i18n="ez_art_titel"></b>
+              <label class="wahl">
+                <input type="radio" name="ez-art" value="taproot" checked>
+                <span><b data-i18n="ez_art_taproot"></b><br>
+                  <span class="dim small" data-i18n="ez_art_taproot_d"></span>
+                </span>
+              </label>
+              <label class="wahl">
+                <input type="radio" name="ez-art" value="segwit">
+                <span><b data-i18n="ez_art_segwit"></b><br>
+                  <span class="dim small" data-i18n="ez_art_segwit_d"></span>
+                </span>
+              </label>
+              <label class="wahl">
+                <input type="radio" name="ez-art" value="kompatibel">
+                <span><b data-i18n="ez_art_kompatibel"></b><br>
+                  <span class="dim small" data-i18n="ez_art_kompatibel_d"></span>
+                </span>
+              </label>
+            </div>
+          </details>
+          <div id="ez-adresse" class="hidden">
+            <!-- Kein input: eine Adresse von 62 Zeichen passt dort nicht
+                 hinein, und wer einzahlt, muss Anfang UND Ende gegen seine
+                 Wallet pruefen koennen. Hier steht sie vollstaendig und
+                 laesst sich mit einem Klick ganz markieren. -->
+            <!-- Der QR-Code entsteht in qr.js, hier im Browser. Er enthaelt
+                 denselben Link wie "In Wallet oeffnen". -->
+            <div class="ez-qr" id="ez-qr"></div>
+            <p class="dim small" data-i18n="ez_qr_d"></p>
+            <div class="adresse" id="ez-feld"></div>
+            <div style="display:flex;gap:12px;align-items:center;margin-top:8px">
+              <button type="button" class="btn ghost" id="ez-kopieren" data-i18n="ez_kopieren"></button>
+              <a class="btn ghost" id="ez-oeffnen" data-i18n="ez_oeffnen"></a>
+              <button type="button" class="btn ghost" id="ez-neue"
+                      data-i18n="ez_neue"></button>
+            </div>
+            <div class="note" data-i18n="ez_hinweis"></div>
+          </div>
+        </div>
+
+        <!-- ── Senden ─────────────────────────────────────────────────
+             Die Bedingung des Betreibers vom 30.08.2026: "ich werde nix dahin
+             ueberweisen solange ich es nicht zurueck schicken kann". Eine
+             Wallet, aus der man nicht wieder herauskommt, ist keine.
+
+             Zwei Schritte, und der erste ist nicht ueberspringbar: erst
+             "was kostet das", dann "jetzt senden". Aendert sich danach ein
+             Feld, faellt die Freigabe wieder weg -- sonst schaetzte man das
+             eine und schickte das andere. -->
+        <div class="panel hidden" id="w-senden">
+          <h3 data-i18n="sd_titel"></h3>
+          <p class="dim small" data-i18n="sd_lead"></p>
+          <div class="note warn" data-i18n="sd_warnung"></div>
+
+          <label class="feld">
+            <b data-i18n="sd_adresse"></b>
+            <span class="dim small" data-i18n="sd_adresse_d"></span>
+            <input type="text" id="sd-adresse" autocomplete="off"
+                   spellcheck="false">
+          </label>
+          <label class="feld">
+            <b data-i18n="sd_betrag"></b>
+            <span class="dim small" data-i18n="sd_betrag_d"></span>
+            <input type="number" id="sd-betrag" min="0" step="1">
+          </label>
+          <label class="switch">
+            <input type="checkbox" id="sd-alles">
+            <span><b data-i18n="sd_alles"></b>
+              <span class="dim small" data-i18n="sd_alles_d"></span></span>
+          </label>
+
+          <!-- Das Tempo, und ausdruecklich keine Satoshi-je-vByte-Zahl: die
+               Schaetzung kommt aus dem EIGENEN bitcoind. Wer die Zahl selbst
+               setzen will, sieht sie unten stehen. -->
+          <div class="wahlgruppe" role="radiogroup"
+               aria-labelledby="sd-tempo-titel">
+            <b id="sd-tempo-titel" data-i18n="sd_tempo"></b>
+            <p class="dim small" data-i18n="sd_tempo_d"></p>
+            <label class="wahl">
+              <input type="radio" name="sd-tempo" value="schnell">
+              <span><b data-i18n="sd_tempo_schnell"></b>
+                <span class="dim small" data-i18n="sd_tempo_schnell_d"></span></span>
+            </label>
+            <label class="wahl">
+              <input type="radio" name="sd-tempo" value="normal" checked>
+              <span><b data-i18n="sd_tempo_normal"></b>
+                <span class="dim small" data-i18n="sd_tempo_normal_d"></span></span>
+            </label>
+            <label class="wahl">
+              <input type="radio" name="sd-tempo" value="guenstig">
+              <span><b data-i18n="sd_tempo_guenstig"></b>
+                <span class="dim small" data-i18n="sd_tempo_guenstig_d"></span></span>
+            </label>
+          </div>
+
+          <!-- Nur, wenn eine PIN eingerichtet ist. -->
+          <label class="feld hidden" id="sd-pin-zeile">
+            <b data-i18n="tg_pin"></b>
+            <span class="dim small" data-i18n="sd_pin_d"></span>
+            <input type="password" id="sd-pin" inputmode="numeric"
+                   autocomplete="off" maxlength="12">
+          </label>
+
+          <div style="display:flex;gap:12px;align-items:center;margin-top:14px">
+            <button type="button" class="btn" id="sd-schaetzen"
+                    data-i18n="sd_schaetzen"></button>
+            <button type="button" class="btn gefahr" id="sd-senden" disabled
+                    data-i18n="sd_senden"></button>
+            <span class="dim small" id="sd-meldung"></span>
+          </div>
+          <div class="note hidden" id="sd-kosten"></div>
+          <div class="hidden" id="sd-fertig">
+            <p class="dim small" data-i18n="sd_unterwegs"></p>
+            <div class="adresse" id="sd-txid"></div>
+            <div style="display:flex;gap:12px;align-items:center;margin-top:8px">
+              <button type="button" class="btn ghost" id="sd-kopieren"
+                      data-i18n="ez_kopieren"></button>
+              <span class="dim small" id="sd-kopiert"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Ueber Lightning zahlen. Steht direkt neben dem On-Chain-Senden,
+             weil beides dasselbe tut -- Geld aus der Hand geben -- und sich
+             nur im Weg unterscheidet. Dieselbe PIN, dieselbe Reihenfolge:
+             erst ansehen, dann freigeben. -->
+        <!-- Empfangen ueber Lightning. Gebaut am 16.09.2026: bis dahin
+             konnte die Anwendung zahlen, aber nichts hereinbekommen. -->
+        <div class="panel hidden" id="w-empfangen">
+          <h3 data-i18n="rq_titel"></h3>
+          <p class="dim small" data-i18n="rq_lead"></p>
+          <div class="note warn hidden" id="rq-kein-raum"></div>
+
+          <label class="feld">
+            <b data-i18n="rq_betrag"></b>
+            <span class="dim small" data-i18n="rq_betrag_d"></span>
+            <input type="number" id="rq-betrag" min="0" step="1">
+          </label>
+
+          <label class="feld">
+            <b data-i18n="rq_zweck"></b>
+            <span class="dim small" data-i18n="rq_zweck_d"></span>
+            <input type="text" id="rq-zweck" maxlength="120"
+                   autocomplete="off" spellcheck="false">
+          </label>
+
+          <div style="display:flex;gap:12px;align-items:center;margin-top:14px">
+            <button type="button" class="btn" id="rq-erstellen"
+                    data-i18n="rq_erstellen"></button>
+            <span class="dim small" id="rq-meldung"></span>
+          </div>
+
+          <div id="rq-ergebnis" class="hidden">
+            <!-- Der QR-Code traegt die Rechnung in Grossbuchstaben: so
+                 vorgesehen in BOLT 11, und nur so passt sie hinein. -->
+            <div class="ez-qr" id="rq-qr"></div>
+            <div class="adresse" id="rq-rechnung"></div>
+            <div style="display:flex;gap:12px;align-items:center;margin-top:8px">
+              <button type="button" class="btn ghost" id="rq-kopieren"
+                      data-i18n="ez_kopieren"></button>
+              <span class="dim small" id="rq-gueltig"></span>
+            </div>
+          </div>
+
+          <p class="dim small" style="margin-top:18px" data-i18n="rq_liste"></p>
+          <div id="rq-liste"></div>
+        </div>
+
+        <div class="panel hidden" id="w-zahlen">
+          <h3 data-i18n="zl_titel"></h3>
+          <p class="dim small" data-i18n="zl_lead"></p>
+
+          <label class="feld">
+            <b data-i18n="zl_rechnung"></b>
+            <span class="dim small" data-i18n="zl_rechnung_d"></span>
+            <textarea id="zl-rechnung" rows="3" autocomplete="off"
+                      spellcheck="false"></textarea>
+          </label>
+
+          <!-- Nur bei einer Rechnung OHNE Betrag. Dann bestimmt ihn der
+               Zahlende, und ohne dieses Feld ginge es gar nicht. -->
+          <label class="feld hidden" id="zl-betrag-zeile">
+            <b data-i18n="zl_betrag"></b>
+            <span class="dim small" data-i18n="zl_betrag_d"></span>
+            <input type="number" id="zl-betrag" min="1" step="1">
+          </label>
+
+          <div class="note hidden" id="zl-vorschau"></div>
+
+          <label class="feld hidden" id="zl-pin-zeile">
+            <b data-i18n="tg_pin"></b>
+            <span class="dim small" data-i18n="sd_pin_d"></span>
+            <input type="password" id="zl-pin" inputmode="numeric"
+                   autocomplete="off" maxlength="12">
+          </label>
+
+          <div style="display:flex;gap:12px;align-items:center;margin-top:14px">
+            <button type="button" class="btn" id="zl-lesen"
+                    data-i18n="zl_lesen"></button>
+            <button type="button" class="btn gefahr" id="zl-zahlen" disabled
+                    data-i18n="zl_zahlen"></button>
+            <span class="dim small" id="zl-meldung"></span>
+          </div>
+          <div class="note ok hidden" id="zl-fertig"></div>
+        </div>
+
+        <div class="panel hidden" id="w-kanalkosten">
+          <h3 data-i18n="kk_titel"></h3>
+          <p class="dim small" data-i18n="kk_lead"></p>
+          <div id="kk-zahlen"></div>
+          <!-- Die Einordnung an der eigenen letzten Woche. Sie steht VOR dem
+               Anteil am Guthaben, weil sie auch dann etwas sagt, wenn noch
+               gar kein Guthaben da ist -- also genau beim Planen. -->
+          <div id="kk-lage"></div>
+          <div id="kk-urteil"></div>
+          <p class="dim small" id="kk-erzwungen" data-i18n="kk_erzwungen"></p>
+          <!-- Der Rechner dazu ("was muss ich einzahlen?") steht unter
+               "Rechner", nicht hier. Aus dem Betrieb, 11.09.2026: "wir haben ja
+               schon ein rechner reiter kann das da nicht mit rein?" -- und
+               dort liegt der Kurs, also steht dort neben den Satoshi auch
+               der Betrag in Euro. Genau der ist die Zahl, in der man plant. -->
+        </div>
+      </section>
+
+      <section data-ansicht="ln-kanaele" class="hidden">
+        <!-- Solange LND nicht laeuft, verschwinden hier alle Kaesten -- die
+             Kopfzeile mit Dienst/Wallet/Kette steht seit dem 10.09.2026
+             unter "Wallet". Ohne diesen Satz waere die Ansicht dann einfach
+             leer, und leer sieht aus wie kaputt. -->
+        <p class="note hidden" id="ln-kanaele-leer" data-i18n="lk_leer"></p>
+
+        <div class="panel hidden" id="ln-kanalliste">
+          <h3 data-i18n="lk_kanaele_titel"></h3>
+          <p class="dim small" data-i18n="lk_kanaele_d"></p>
+          <div id="ln-kanaele-inhalt"></div>
+        </div>
+
+        <!-- Einen Kanal oeffnen. Bis zum 12.09.2026 gab es das hier nicht,
+             und in der README stand: "When one appears, it belongs behind
+             the same PIN." Genau so ist es gekommen. -->
+        <div class="panel hidden" id="ln-oeffnen">
+          <h3 data-i18n="ko_titel"></h3>
+          <p class="dim small" data-i18n="ko_lead"></p>
+          <div class="note warn" data-i18n="ko_warnung"></div>
+
+          <label class="feld">
+            <b data-i18n="ko_gegenstelle"></b>
+            <span class="dim small" data-i18n="ko_gegenstelle_d"></span>
+            <!-- Der Platzhalter zeigt die KURZE Form. Bis zum 19.09.2026
+                 stand hier "02abc…@host:9735" -- und damit las jeder, die
+                 Adresse sei Pflicht, obwohl der Beschreibungstext darunter
+                 seit dem Umbau das Gegenteil sagt. Man liest, was IM Feld
+                 steht, nicht den grauen Satz daneben. -->
+            <input type="text" id="ko-gegenstelle" autocomplete="off"
+                   spellcheck="false"
+                   placeholder="02abc…">
+          </label>
+          <!-- EIN Feld, drei Dinge, die man damit tun kann. Bis zum
+               19.09.2026 stand "Verbinden" in einem anderen Reiter, mit
+               einem Feld, das genauso aussah -- der Betreiber: "ich wuesste
+               jetzt nicht wie ich mich mit einem anderen knoten verbinden
+               sollte ... da habe ich ja hier 2 moeglichkeiten". -->
+          <div style="display:flex;gap:12px;align-items:center;margin-top:8px;flex-wrap:wrap">
+            <button type="button" class="btn ghost" id="ko-ansehen"
+                    data-i18n="ko_ansehen"></button>
+            <button type="button" class="btn ghost" id="ko-verbinden"
+                    data-i18n="vb_knopf"></button>
+            <span class="dim small" id="ko-verbindmeldung"></span>
+          </div>
+          <p class="dim small" data-i18n="ko_knoepfe_d"></p>
+          <div class="note hidden" id="ko-befund"></div>
+
+          <label class="feld">
+            <b data-i18n="ko_betrag"></b>
+            <span class="dim small" data-i18n="ko_betrag_d"></span>
+            <input type="number" id="ko-betrag" min="20000" step="10000">
+          </label>
+
+          <div class="wahlgruppe" role="radiogroup"
+               aria-labelledby="ko-tempo-titel">
+            <b id="ko-tempo-titel" data-i18n="sd_tempo"></b>
+            <p class="dim small" data-i18n="ko_tempo_d"></p>
+            <label class="wahl">
+              <input type="radio" name="ko-tempo" value="schnell">
+              <span><b data-i18n="sd_tempo_schnell"></b></span>
+            </label>
+            <label class="wahl">
+              <input type="radio" name="ko-tempo" value="normal" checked>
+              <span><b data-i18n="sd_tempo_normal"></b></span>
+            </label>
+            <label class="wahl">
+              <input type="radio" name="ko-tempo" value="guenstig">
+              <span><b data-i18n="sd_tempo_guenstig"></b></span>
+            </label>
+          </div>
+
+          <label class="switch">
+            <input type="checkbox" id="ko-privat">
+            <span><b data-i18n="ko_privat"></b>
+              <span class="dim small" data-i18n="ko_privat_d"></span></span>
+          </label>
+
+          <div class="note hidden" id="ko-vorschau"></div>
+
+          <label class="feld hidden" id="ko-pin-zeile">
+            <b data-i18n="tg_pin"></b>
+            <span class="dim small" data-i18n="sd_pin_d"></span>
+            <input type="password" id="ko-pin" inputmode="numeric"
+                   autocomplete="off" maxlength="12">
+          </label>
+
+          <div style="display:flex;gap:12px;align-items:center;margin-top:14px">
+            <button type="button" class="btn" id="ko-pruefen"
+                    data-i18n="ko_pruefen"></button>
+            <button type="button" class="btn gefahr" id="ko-oeffnen" disabled
+                    data-i18n="ko_oeffnen"></button>
+            <span class="dim small" id="ko-meldung"></span>
+          </div>
+          <div class="note ok hidden" id="ko-fertig"></div>
+        </div>
+
+
+        <!-- Einen Kanal schliessen. Aus dem Betrieb, 12.09.2026: "kann ich dann
+             auch selber ein kanal kuendigen oder schliessen?" -- und sein
+             eigener Satz vom 30.08.: nichts dahin ueberweisen, solange man es
+             nicht zurueckschicken kann. Fuer Kanaele gilt dasselbe. -->
+        <div class="panel hidden" id="ln-schliessen">
+          <h3 data-i18n="ks_titel"></h3>
+          <p class="dim small" data-i18n="ks_lead"></p>
+
+          <label class="feld">
+            <b data-i18n="ks_kanal"></b>
+            <select id="ks-kanal"></select>
+          </label>
+
+          <label class="switch">
+            <input type="checkbox" id="ks-erzwingen">
+            <span><b data-i18n="ks_erzwingen"></b>
+              <span class="dim small" data-i18n="ks_erzwingen_d"></span></span>
+          </label>
+          <div class="note warn hidden" id="ks-warnung"
+               data-i18n="ks_warnung"></div>
+
+          <label class="feld hidden" id="ks-pin-zeile">
+            <b data-i18n="tg_pin"></b>
+            <span class="dim small" data-i18n="sd_pin_d"></span>
+            <input type="password" id="ks-pin" inputmode="numeric"
+                   autocomplete="off" maxlength="12">
+          </label>
+
+          <div style="display:flex;gap:12px;align-items:center;margin-top:14px">
+            <button type="button" class="btn gefahr" id="ks-los"
+                    data-i18n="ks_los"></button>
+            <span class="dim small" id="ks-meldung"></span>
+          </div>
+          <div class="note ok hidden" id="ks-fertig"></div>
+        </div>
+
+        <!-- Umschichten. Erscheint erst ab zwei Kanaelen -- mit einem gibt
+             es nichts umzuschichten, und ein Kasten, der nie geht, ist
+             schlechter als keiner. -->
+        <div class="panel hidden" id="ln-schichten">
+          <h3 data-i18n="us_titel"></h3>
+          <p class="dim small" data-i18n="us_lead"></p>
+
+          <label class="feld">
+            <b data-i18n="us_von"></b>
+            <span class="dim small" data-i18n="us_von_d"></span>
+            <select id="us-von"></select>
+          </label>
+          <label class="feld">
+            <b data-i18n="us_nach"></b>
+            <span class="dim small" data-i18n="us_nach_d"></span>
+            <select id="us-nach"></select>
+          </label>
+          <label class="feld">
+            <b data-i18n="us_betrag"></b>
+            <span class="dim small" data-i18n="us_betrag_d"></span>
+            <input type="number" id="us-betrag" min="1" step="1000">
+          </label>
+
+          <label class="feld hidden" id="us-pin-zeile">
+            <b data-i18n="tg_pin"></b>
+            <span class="dim small" data-i18n="sd_pin_d"></span>
+            <input type="password" id="us-pin" inputmode="numeric"
+                   autocomplete="off" maxlength="12">
+          </label>
+
+          <div style="display:flex;gap:12px;align-items:center;margin-top:14px">
+            <button type="button" class="btn" id="us-los"
+                    data-i18n="us_los"></button>
+            <span class="dim small" id="us-meldung"></span>
+          </div>
+          <div class="note ok hidden" id="us-fertig"></div>
+        </div>
+
+        <!-- Wachtuerme. Steht hier und nicht in einer Konfigurationsdatei,
+             weil genau das der Befund vom 12.09.2026 war: wtclient.active
+             stand auf true, eingetragen war kein einziger Turm. Der Schutz
+             sah eingeschaltet aus und war es nicht. -->
+        <div class="panel hidden" id="ln-wachturm">
+          <h3 data-i18n="wt_titel"></h3>
+          <p class="dim small" data-i18n="wt_lead"></p>
+          <div id="wt-stand"></div>
+          <p class="dim small" data-i18n="wt_grenze"></p>
+
+          <!-- Der eigene Turm. Aus dem Betrieb, 12.09.2026: "unsere lightning node
+               kann ja schon ein eigender watch tower sein". Kann sie -- und
+               tut es seit Tag eins. Nur stand die Adresse nirgends, und ohne
+               die kann niemand sie eintragen. -->
+          <div id="wt-eigener" class="hidden">
+            <h4 data-i18n="wt_eigen_titel"></h4>
+            <p class="dim small" data-i18n="wt_eigen_d"></p>
+            <div class="adresse" id="wt-eigen-uri"></div>
+            <!-- Laeuft der Turm, hat aber keine Adresse nach aussen, stand
+                 hier bis zum 19.09.2026 NICHTS -- der ganze Kasten wurde
+                 ausgeblendet, samt Ueberschrift. Wer gelesen hatte, dass
+                 sein Knoten fremde Kanaele bewacht, suchte die Adresse und
+                 fand eine leere Stelle ohne ein Wort dazu. Der Turm ist dann
+                 wirklich nicht erreichbar -- aber das gehoert hingeschrieben,
+                 nicht verschwiegen. -->
+            <p class="dim small hidden" id="wt-eigen-ohne"
+               data-i18n="wt_eigen_ohne"></p>
+            <div style="display:flex;gap:12px;align-items:center;margin-top:8px"
+                 id="wt-eigen-knoepfe">
+              <button type="button" class="btn ghost" id="wt-eigen-kopieren"
+                      data-i18n="ez_kopieren"></button>
+              <span class="dim small" id="wt-eigen-kopiert"></span>
+            </div>
+            <p class="dim small" data-i18n="wt_eigen_fuss"></p>
+          </div>
+          <label class="feld">
+            <b data-i18n="wt_adresse"></b>
+            <span class="dim small" data-i18n="wt_adresse_d"></span>
+            <input type="text" id="wt-adresse" autocomplete="off"
+                   spellcheck="false" placeholder="03abc…@host:9911">
+          </label>
+          <div style="display:flex;gap:12px;align-items:center;margin-top:12px">
+            <button type="button" class="btn" id="wt-eintragen"
+                    data-i18n="wt_eintragen"></button>
+            <span class="dim small" id="wt-meldung"></span>
+          </div>
+        </div>
+
+        <div class="raster">
+          <div class="panel hidden" id="ln-ich">
+            <h3 data-i18n="lk_ich_titel"></h3>
+            <div id="ln-ich-inhalt"></div>
+          </div>
+
+          <div class="panel hidden" id="ln-weiter">
+            <h3 data-i18n="lk_weiter_titel"></h3>
+            <p class="dim small" data-i18n="lk_weiter_d"></p>
+            <div id="ln-weiter-inhalt"></div>
+          </div>
+        </div>
+
+        <!-- Der HTLC-Strom. Steht NACH den Nachschlage-Kaesten, aber vor den
+             Gebuehren: es ist die Auskunft, aus der die Gebuehrenentscheidung
+             folgt -- teuer machen, wo ein Kanal leerlaeuft. -->
+        <div class="panel hidden" id="ln-durchgang">
+          <h3 data-i18n="ht_titel"></h3>
+          <p class="dim small" data-i18n="ht_lead"></p>
+          <!-- Die Fehlschlaege ZUERST. Eine Liste, in der Gelungenes und
+               Gescheitertes durcheinanderlaufen, beantwortet die Frage
+               nicht, die man hier hat. -->
+          <div id="ht-gruende"></div>
+          <div id="ht-liste"></div>
+        </div>
+
+        <div class="panel hidden" id="w-gebuehren">
+          <h3 data-i18n="gb_titel"></h3>
+          <p class="dim small" data-i18n="gb_lead"></p>
+
+          <!-- Was das NETZ nimmt -- aus dem eigenen Graphen gemessen, nicht
+               aus einer Zahl im Quelltext. Bis zum 18.09.2026 stand in
+               gb_lead "rund 143 ppm"; so eine Zahl altert still. -->
+          <div class="netzgebuehren" id="gb-netz">
+            <div class="netzgebuehren-kopf">
+              <b data-i18n="gb_netz_titel"></b>
+              <button type="button" class="btn schmal" id="gb-messen"
+                      data-i18n="gb_messen"></button>
+            </div>
+            <div id="gb-netz-zahlen" class="dim small"></div>
+            <div id="gb-netz-band" class="dim small"></div>
+            <div id="gb-verlauf" class="gb-verlauf"></div>
+            <div class="netzgebuehren-fuss">
+              <button type="button" class="btn schmal" id="gb-uebernehmen"
+                      data-i18n="gb_uebernehmen"></button>
+              <span class="dim small" id="gb-netz-meldung"></span>
+            </div>
+          </div>
+
+          <label class="switch">
+            <input type="checkbox" id="gb-automatik">
+            <span><b data-i18n="gb_automatik"></b><br><span class="dim small" data-i18n="gb_automatik_d"></span></span>
+          </label>
+          <p class="dim small" id="gb-automatik-stand"></p>
+
+          <label class="feld">
+            <b data-i18n="gb_kanal"></b>
+            <span class="dim small" data-i18n="gb_kanal_d"></span>
+            <select id="gb-kanal"></select>
+          </label>
+          <label class="feld">
+            <b data-i18n="gb_satz"></b>
+            <span class="dim small" data-i18n="gb_satz_d"></span>
+            <input type="number" id="gb-satz" min="0" max="10000" step="1" value="100">
+          </label>
+          <label class="feld">
+            <b data-i18n="gb_basis"></b>
+            <span class="dim small" data-i18n="gb_basis_d"></span>
+            <input type="number" id="gb-basis" min="0" max="100000" step="100" value="0">
+          </label>
+          <div style="display:flex;gap:12px;align-items:center;margin-top:12px">
+            <button type="button" class="btn" id="gb-setzen" data-i18n="gb_setzen"></button>
+            <span class="dim small" id="gb-meldung"></span>
+          </div>
+        </div>
+      </section>
+      <section data-ansicht="ln-knoten" class="hidden">
+        <!-- Deine eigene Verbindungsadresse, VOLLSTAENDIG. Sie stand bisher
+             nur gekuerzt in der Kanaele-Ansicht -- man konnte sie also gar
+             nicht weitergeben, und genau dafuer ist sie da. -->
+        <div class="panel" id="lg-ich">
+          <h3 data-i18n="lgi_titel"></h3>
+          <p class="dim small" data-i18n="lgi_lead"></p>
+          <div class="adresse" id="lgi-uri"></div>
+          <!-- Warum dort nichts steht. Als Hinweiskasten und nicht als
+               dimmer Halbsatz neben dem Knopf: es ist die wichtigste
+               Auskunft dieser Ansicht, solange keine Adresse da ist. -->
+          <div class="note hidden" id="lgi-warum"></div>
+          <!-- Wenn die Zahlen von vorhin sind, gehoert das dazugesagt. -->
+          <div class="note hidden" id="lgi-veraltet"></div>
+          <!-- Ist das noch derselbe Knoten? Nach einer Wiederherstellung
+               MUSS dieselbe Kennung herauskommen, nach einer neu angelegten
+               Wallet eine andere. Beides gehoert gesagt. -->
+          <div class="note warn hidden" id="lgi-kennung-anders">
+            <span id="lgi-kennung-text"></span>
+            <div style="display:flex;gap:12px;align-items:center;margin-top:10px">
+              <button type="button" class="btn ghost" id="lgi-kennung-ok"
+                      data-i18n="lgi_kennung_uebernehmen"></button>
+              <span class="dim small" id="lgi-kennung-meldung"></span>
+            </div>
+          </div>
+          <!-- Erscheint NUR, wenn unter den angekuendigten Adressen wirklich
+               eine Clearnet-Adresse ist. "Ohnehin oeffentlich" stimmt formal
+               und verharmlost genau das, worauf es ankommt. -->
+          <div class="note warn hidden" id="lgi-klartext"></div>
+          <div style="display:flex;gap:12px;align-items:center;margin-top:8px">
+            <button type="button" class="btn ghost" id="lgi-kopieren"
+                    data-i18n="lgi_kopieren"></button>
+            <span class="dim small" id="lgi-meldung"></span>
+          </div>
+        </div>
+
+        <!-- Wo man Gegenstellen findet. Bewusst KEIN eigenes Verzeichnis:
+             der Lightning-Graph ist bereits ein oeffentliches Verzeichnis,
+             und die genannten Stellen sind etabliert und gehoeren nicht uns.
+             Die Anwendung ruft keine davon auf -- es sind Verweise, die der
+             Mensch im eigenen Browser oeffnet. -->
+        <div class="panel">
+          <h3 data-i18n="lgw_titel"></h3>
+          <p class="dim small" data-i18n="lgw_lead"></p>
+          <div id="lgw-liste"></div>
+          <p class="dim small" data-i18n="lgw_fuss" style="margin-top:12px"></p>
+
+          <!-- Befund 20: peers:write lag seit jeher im Macaroon, und
+               ConnectPeer war nirgends implementiert. Wir trugen ein Recht
+               spazieren, das wir nie benutzten. -->
+          <!-- Die Leitungen selbst. Ohne diese Liste fand sich, wer sich
+               verband, danach nirgends wieder.
+
+               Das EINGABEFELD zum Verbinden stand bis zum 19.09.2026 hier
+               -- ein zweites Feld, das genauso aussah wie das unter
+               "Kanaele", nur in einem anderen Reiter. Es steht jetzt dort,
+               wo man eine Knotenadresse ohnehin eintippt. Die Liste bleibt
+               hier: sie zeigt einen Zustand, sie ist keine Handlung. -->
+          <h4 style="margin-top:22px" data-i18n="lv_titel"></h4>
+          <p class="dim small" data-i18n="lv_lead"></p>
+          <div id="lv-liste"></div>
+          <div class="note" data-i18n="vb_hinweis"></div>
+        </div>
+
+        <!-- Der Ausweis. LightningNetwork+ und Verwandte lassen einen Text
+             unterschreiben, statt nach einem Passwort zu fragen -- damit ist
+             bewiesen, dass einem der Knoten gehoert. Bewegt kein Geld. -->
+        <div class="panel" id="lg-unterschrift">
+          <h3 data-i18n="unt_titel"></h3>
+          <p class="dim small" data-i18n="unt_lead"></p>
+          <label class="feld">
+            <textarea id="unt-text" rows="3" spellcheck="false"
+                      autocomplete="off"></textarea>
+          </label>
+          <div style="display:flex;gap:12px;align-items:center;margin-top:10px">
+            <button type="button" class="btn" id="unt-knopf"
+                    data-i18n="unt_knopf"></button>
+            <span class="dim small" id="unt-meldung"></span>
+          </div>
+          <div id="unt-ergebnis" class="hidden" style="margin-top:12px">
+            <div class="adresse" id="unt-feld"></div>
+            <div style="display:flex;gap:12px;align-items:center;margin-top:8px">
+              <button type="button" class="btn ghost" id="unt-kopieren"
+                      data-i18n="lgi_kopieren"></button>
+              <!-- Vorher kam eine Zeichenkette zurueck, und man sah ihr die
+                   Richtigkeit nicht an -- nur die Form. Jetzt laesst der
+                   Knoten sie selbst nachrechnen. -->
+              <span class="dim small" id="unt-geprueft"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3 data-i18n="lg_titel"></h3>
+          <p class="dim small" data-i18n="lg_lead"></p>
+          <div id="lg-netz"></div>
+        </div>
+        <div class="panel">
+          <h3 data-i18n="lg_gegen_titel"></h3>
+          <p class="dim small" data-i18n="lg_gegen_d"></p>
+          <div id="lg-gegenstellen"></div>
+        </div>
+      </section>
+      <!-- ── EINRICHTUNG: alles, was man EINMAL tut ────────────────────
+           Wallet anlegen oder zurueckholen, Entsperrweg, Kanalsicherung,
+           loeschen. Das stand bis zum 10.09.2026 unter "Wallet" -- und das
+           war der Grund, warum die Lightning-Seite als Chaos empfunden
+           wurde: der Reiter versprach den Inhalt und lieferte den
+           Einstellungskasten. -->
+      <section data-ansicht="ln-einrichtung" class="hidden">
+        <!-- Der Ablauf hat drei Schritte, und sie sind nicht ueberspringbar.
+             Wer den Seed nicht abgeschrieben hat, bekommt hier keine Wallet
+             -- eine Wallet, deren Seed niemand hat, ist keine Bequemlichkeit,
+             sondern eine Falle mit Zeitzuender. -->
+        <div class="panel" id="w-schritt-start">
+          <span class="schrittzahl" data-i18n="wl_schritt1"></span>
+          <h3 data-i18n="wl_titel"></h3>
+          <p class="dim small" data-i18n="wl_lead"></p>
+          <!-- der Betreiber suchte hier nach einem Namensfeld und nach der
+               Moeglichkeit, eine zweite Wallet anzulegen. Dass es genau eine
+               gibt und dass sie die IDENTITAET des Knotens ist, stand
+               nirgends -- die Abwesenheit sah aus wie eine fehlende
+               Funktion. -->
+          <div class="note" data-i18n="wl_eine_einzige"></div>
+          <div class="note" data-i18n="wl_papier"></div>
+          <!-- Und das Wichtigste an diesem Schritt: hier passiert noch
+               nichts. Wer drueckt, weiss sonst nicht, ob er gerade etwas
+               Endgueltiges getan hat. -->
+          <div class="note ok" data-i18n="wl_noch_nichts"></div>
+          <div style="display:flex;gap:12px;align-items:center;margin-top:14px">
+            <button type="button" class="btn" id="w-erzeugen" data-i18n="wl_erzeugen"></button>
+            <span class="dim small" id="w-start-meldung"></span>
+          </div>
+          <!-- Der zweite Weg, und er sah lange aus wie eine Fussnote. Wer aus
+               einem Datenverlust kommt, sucht genau ihn -- und findet unter
+               "Wallet anlegen" als Erstes den Ablauf, der eine NEUE anlegt. -->
+          <div class="wl-zweiter-weg">
+            <h4 data-i18n="wl_holen_titel"></h4>
+            <p class="dim small" data-i18n="wl_oder"></p>
+            <button type="button" class="btn ghost" id="w-zurueckholen"
+                    data-i18n="wl_holen"></button>
+          </div>
+        </div>
+
+        <!-- Wiederherstellen. Derselbe LND-Aufruf wie das Anlegen, nur mit
+             recovery_window und channel_backups. Er braucht KEIN Macaroon --
+             es gibt ja noch keine Wallet. Deshalb kann diese Anwendung
+             wiederherstellen, ohne je ein Recht zu halten, das Geld bewegen
+             koennte. -->
+        <div class="panel hidden" id="w-schritt-wiederherstellen">
+          <h3 data-i18n="wh_titel"></h3>
+          <p class="dim small" data-i18n="wh_lead"></p>
+          <div class="note warn" data-i18n="wh_warnung"></div>
+
+          <h4 data-i18n="wh_woerter_titel"></h4>
+          <p class="dim small" data-i18n="wh_woerter_d"></p>
+          <div id="wh-woerter" class="seedeingabe"></div>
+          <!-- Die Vorschlagsliste des Browsers. Zweitausendachtundvierzig
+               Eintraege, einmal gefuellt -- damit ein Wort gar nicht erst
+               falsch in das Feld kommt. -->
+          <datalist id="bip39-liste"></datalist>
+          <div class="note warn hidden" id="wh-wortfehler"></div>
+
+          <!-- ZUGEKLAPPT heisst LEER. Der Kasten ist ein type="password" in
+               einem Abschnitt, den fast niemand aufmacht -- und genau so
+               etwas fuellen Browser und Passwortverwaltungen gern von
+               allein aus (Safari haelt sich nicht an autocomplete="off").
+               Der Nutzer sieht davon nichts, LND bekommt eine Passphrase,
+               die er nie gesetzt hat, und lehnt den Seed ab.
+               Aus dem Betrieb, 11.09.2026: "bin mir aber zu 100% sicher das dass
+               stimmt". Deshalb zaehlt dieses Feld nur, wenn es jemand
+               ABSICHTLICH aufgeklappt hat. -->
+          <details style="margin-top:14px" id="wh-pass-block">
+            <summary data-i18n="wh_pass_titel"></summary>
+            <p class="dim small" data-i18n="wh_pass_d"></p>
+            <input type="password" id="wh-passphrase"
+                   autocomplete="new-password" data-1p-ignore data-lpignore="true">
+          </details>
+
+          <h4 style="margin-top:26px" data-i18n="wh_sich_titel"></h4>
+          <p class="dim small" data-i18n="wh_sich_d"></p>
+          <div class="wahlgruppe" role="radiogroup" aria-labelledby="wh-q-titel">
+            <b id="wh-q-titel" class="visuell-versteckt" data-i18n="wh_sich_titel"></b>
+            <label class="wahl">
+              <input type="radio" name="wh-quelle" value="keine" checked>
+              <span><b data-i18n="wh_q_keine"></b></span>
+            </label>
+            <label class="wahl">
+              <input type="radio" name="wh-quelle" value="datei">
+              <span><b data-i18n="wh_q_datei"></b></span>
+            </label>
+            <label class="wahl">
+              <input type="radio" name="wh-quelle" value="ziel">
+              <span><b data-i18n="wh_q_ziel"></b></span>
+            </label>
+          </div>
+          <div class="hidden" id="wh-datei-zeile">
+            <label class="visuell-versteckt" for="wh-datei"
+                   data-i18n="wh_q_datei"></label>
+            <input type="file" id="wh-datei" accept=".backup,application/octet-stream">
+            <span class="dim small" id="wh-datei-meldung"></span>
+          </div>
+          <div class="note hidden" id="wh-ungeprueft" data-i18n="wh_ungeprueft"></div>
+
+          <h4 style="margin-top:26px" data-i18n="wh_was_titel"></h4>
+          <p class="dim small" data-i18n="wh_was_d"></p>
+          <p class="dim small" id="wh-dauer"></p>
+
+          <!-- Drei Wege, und die Wahl gehoert dem Nutzer. Aus dem Betrieb, am
+               10.09.2026: "das soll sich jeder nutzer aussuchen koennen ob
+               sich das wallet selbst entsperrt ob ich den tresor will ..
+               oder nicht". -->
+          <div class="wahlgruppe" role="radiogroup"
+               aria-labelledby="wh-weg-titel">
+            <b id="wh-weg-titel" data-i18n="wl_weg_titel"></b>
+            <p class="dim small" data-i18n="wl_weg_lead"></p>
+            <label class="wahl">
+              <input type="radio" name="wh-weg" value="aus">
+              <span><b data-i18n="wl_weg_aus"></b>
+                <span class="dim small" data-i18n="wl_weg_aus_d"></span></span>
+            </label>
+            <label class="wahl">
+              <input type="radio" name="wh-weg" value="merken" checked>
+              <span><b data-i18n="wl_weg_merken"></b>
+                <span class="dim small" data-i18n="wl_weg_merken_d"></span></span>
+            </label>
+            <label class="wahl">
+              <input type="radio" name="wh-weg" value="datei">
+              <span><b data-i18n="wl_weg_datei"></b>
+                <span class="dim small" data-i18n="wl_weg_datei_d"></span></span>
+            </label>
+          </div>
+          <div class="note" id="wh-weg-folge"></div>
+          <label class="feld" id="wh-passwort-zeile">
+            <b data-i18n="wl_passwort_titel"></b>
+            <span class="dim small" data-i18n="wl_passwort_d"></span>
+            <input type="password" id="wh-passwort" autocomplete="new-password">
+          </label>
+
+          <div style="display:flex;gap:12px;align-items:center;margin-top:14px">
+            <button type="button" class="btn" id="wh-starten" data-i18n="wh_starten"></button>
+            <button type="button" class="btn ghost" id="wh-abbrechen" data-i18n="wh_abbrechen"></button>
+            <span class="dim small" id="wh-meldung"></span>
+          </div>
+        </div>
+
+        <div class="panel hidden" id="w-schritt-zurueck">
+          <h3 data-i18n="wh_fertig_titel"></h3>
+          <div class="note ok" data-i18n="wh_fertig_d"></div>
+          <div class="note hidden" id="wh-fertig-kanaele" data-i18n="wh_fertig_kanaele"></div>
+        </div>
+
+        <div class="panel hidden" id="w-schritt-woerter">
+          <span class="schrittzahl" data-i18n="wl_schritt2"></span>
+          <h3 data-i18n="wl_woerter_titel"></h3>
+          <p class="dim small" data-i18n="wl_woerter_d"></p>
+          <ol class="seed" id="w-woerter"></ol>
+          <div class="note warn" data-i18n="wl_woerter_warnung"></div>
+          <label class="switch">
+            <input type="checkbox" id="w-abgeschrieben">
+            <span><b data-i18n="wl_bestaetigen"></b><br>
+              <span class="dim small" data-i18n="wl_bestaetigen_d"></span></span>
+          </label>
+          <button type="button" class="btn" id="w-weiter" disabled
+                  data-i18n="wl_weiter"></button>
+        </div>
+
+        <div class="panel hidden" id="w-schritt-probe">
+          <span class="schrittzahl" data-i18n="wl_schritt3"></span>
+          <h3 data-i18n="wl_probe_titel"></h3>
+          <p class="dim small" data-i18n="wl_probe_d"></p>
+          <div id="w-probe-felder"></div>
+          <!-- Die Meldung zur Wortprobe gehoert AN die Wortprobe. Sie stand
+               unten neben dem Knopf, also unter dem Passwortfeld -- der Betreiber
+               las dort "das stimmt so nicht, noch 3 Versuche" und bezog es
+               auf sein Passwort. Bei fuenf Versuchen und einem Zettel voll
+               Woerter ist das keine Kleinigkeit. -->
+          <div class="note warn hidden" id="w-probe-fehler"></div>
+          <!-- Das Passwortfeld ist jetzt IMMER da. Vorher erschien es nur
+               ohne Auto-Entsperren, und mit Schalter wuerfelte die Anwendung
+               eines, das niemand je zu sehen bekam. -->
+          <label class="feld" id="w-passwort-zeile">
+            <b data-i18n="wl_passwort_titel"></b>
+            <span class="dim small" data-i18n="wl_passwort_d"></span>
+            <input type="password" id="w-passwort" autocomplete="new-password">
+          </label>
+          <!-- Und der Schalter steht jetzt DANEBEN statt zwei Schritte
+               vorher: er entscheidet nur noch, wo genau dieses Passwort
+               liegt. -->
+          <!-- Drei Wege, und die Wahl gehoert dem Nutzer. Aus dem Betrieb, am
+               10.09.2026: "das soll sich jeder nutzer aussuchen koennen ob
+               sich das wallet selbst entsperrt ob ich den tresor will ..
+               oder nicht". -->
+          <div class="wahlgruppe" role="radiogroup"
+               aria-labelledby="w-weg-titel">
+            <b id="w-weg-titel" data-i18n="wl_weg_titel"></b>
+            <p class="dim small" data-i18n="wl_weg_lead"></p>
+            <label class="wahl">
+              <input type="radio" name="w-weg" value="aus">
+              <span><b data-i18n="wl_weg_aus"></b>
+                <span class="dim small" data-i18n="wl_weg_aus_d"></span></span>
+            </label>
+            <label class="wahl">
+              <input type="radio" name="w-weg" value="merken" checked>
+              <span><b data-i18n="wl_weg_merken"></b>
+                <span class="dim small" data-i18n="wl_weg_merken_d"></span></span>
+            </label>
+            <label class="wahl">
+              <input type="radio" name="w-weg" value="datei">
+              <span><b data-i18n="wl_weg_datei"></b>
+                <span class="dim small" data-i18n="wl_weg_datei_d"></span></span>
+            </label>
+          </div>
+          <div class="note" id="w-weg-folge"></div>
+
+          <!-- DIE ANTWORT AUF DES BETREIBERS EINWAND vom 10.09.2026: "das du mir
+               durch die Blume sagst das meine 24 wort phase key und das
+               Wallet passwort unverschluesselt auf der platte liegen??!!"
+               Nein -- und genau an der Stelle, an der die Frage entsteht,
+               steht jetzt, was wirklich dort liegt. -->
+          <details class="note" style="margin-top:14px">
+            <summary data-i18n="wl_platte_titel"></summary>
+            <p class="dim small" data-i18n="wl_platte_d"></p>
+          </details>
+
+          <div style="display:flex;gap:12px;align-items:center;margin-top:14px">
+            <button type="button" class="btn" id="w-anlegen" data-i18n="wl_anlegen"></button>
+            <span class="dim small" id="w-probe-meldung"></span>
+          </div>
+        </div>
+
+        <!-- Der Zustand nach jedem Neustart, wenn nicht automatisch
+             entsperrt wird. Bis hier jemand das Passwort eingibt, leitet der
+             Knoten nichts weiter -- das ist der Preis, und er gehoert
+             sichtbar. -->
+        <div class="panel hidden" id="w-schritt-gesperrt">
+          <h3 data-i18n="wl_gesperrt_titel"></h3>
+          <div class="note warn" data-i18n="wl_gesperrt_d"></div>
+          <label class="feld">
+            <b id="w-entsperren-titel"></b>
+            <span class="dim small" id="w-entsperren-d"></span>
+            <input type="password" id="w-entsperren-passwort"
+                   autocomplete="current-password">
+          </label>
+          <div style="display:flex;gap:12px;align-items:center;margin-top:12px">
+            <button type="button" class="btn" id="w-entsperren" data-i18n="wl_entsperren"></button>
+            <span class="dim small" id="w-entsperren-meldung"></span>
+          </div>
+        </div>
+
+        <!-- Wenn der Zustand nicht abrufbar ist. Bewusst ein eigener
+             Schritt: vorher fiel ein Fehlschlag durch bis zum Anlege-Ablauf,
+             und der legt eine Wallet an. -->
+        <div class="panel hidden" id="w-schritt-unklar">
+          <h3 data-i18n="wl_unklar_titel"></h3>
+          <div class="note" data-i18n="wl_unklar_d"></div>
+        </div>
+
+        <div class="panel hidden" id="w-schritt-fertig">
+          <h3 data-i18n="wl_fertig_titel"></h3>
+          <!-- Hier stand der Kasten mit dem gewuerfelten Wallet-Passwort.
+               Er gehoerte zum Tresor: nur dort wuerfelte die Anwendung es.
+               Seit dem 10.09.2026 tippt der Nutzer es in JEDEM Weg selbst --
+               ein Passwort, das nur die Anwendung kennt, waere nach einem
+               Stromausfall keines mehr. -->
+          <div class="note ok" id="w-fertig-text" data-i18n="wl_fertig_hand"></div>
+        </div>
+
+        <!-- Einzahlen und Gebuehren. Beides braucht Rechte, die KEIN Geld
+             bewegen koennen -- Kanaele oeffnen gehoert bewusst nicht dazu. -->
+        <!-- Was ein Kanal an On-Chain-Gebuehren kostet. Steht bewusst VOR
+             dem Einzahlen: hier faellt die Entscheidung, ob jetzt ein guter
+             Zeitpunkt ist. Aus dem Betrieb, 04.09.2026: "damit es nicht zu boesen
+             Ueberraschungen kommt." -->
+        <!-- Die Kanalsicherung. Steht eigenstaendig, weil sie eigenstaendig
+             zaehlt: die vierundzwanzig Woerter stellen die On-Chain-Wallet
+             wieder her, die Guthaben IN den Kanaelen nicht. -->
+        <div class="panel hidden" id="w-sicherung">
+          <h3 data-i18n="sich_titel"></h3>
+          <p class="dim small" data-i18n="sich_lead"></p>
+          <div id="sich-stand"></div>
+          <div style="display:flex;gap:12px;align-items:center;margin-top:14px">
+            <button type="button" class="btn" id="sich-laden" data-i18n="sich_laden"></button>
+            <span class="dim small" id="sich-lade-meldung"></span>
+          </div>
+
+          <!-- Die Probe aufs Exempel. Eine Sicherung, die nie geprueft wurde,
+               ist eine Hoffnung -- und der einzige Tag, an dem man es nicht
+               mehr herausfinden kann, ist der, an dem man sie braucht. -->
+          <h3 style="margin-top:26px" data-i18n="sipr_titel"></h3>
+          <p class="dim small" data-i18n="sipr_d"></p>
+          <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px">
+            <label class="visuell-versteckt" for="sipr-datei"
+                   data-i18n="sipr_datei"></label>
+            <input type="file" id="sipr-datei" accept=".backup,application/octet-stream">
+            <button type="button" class="btn" id="sipr-pruefen" data-i18n="sipr_pruefen"></button>
+            <button type="button" class="btn ghost" id="sipr-ziel" data-i18n="sipr_ziel"></button>
+          </div>
+          <div id="sipr-meldung" class="note hidden"></div>
+
+          <h3 style="margin-top:26px" data-i18n="sich_ziel_titel"></h3>
+          <p class="dim small" data-i18n="sich_ziel_d"></p>
+          <label class="feld">
+            <b data-i18n="sich_url"></b>
+            <span class="dim small" data-i18n="sich_url_d"></span>
+            <input type="text" id="sich-url" autocomplete="off" spellcheck="false">
+          </label>
+          <label class="feld">
+            <b data-i18n="sich_benutzer"></b>
+            <input type="text" id="sich-benutzer" autocomplete="off" spellcheck="false">
+          </label>
+          <label class="feld">
+            <b data-i18n="sich_passwort"></b>
+            <span class="dim small" data-i18n="sich_passwort_d"></span>
+            <input type="password" id="sich-passwort" autocomplete="new-password">
+          </label>
+          <div style="display:flex;gap:12px;align-items:center;margin-top:12px">
+            <button type="button" class="btn" id="sich-einrichten" data-i18n="sich_einrichten"></button>
+            <button type="button" class="btn ghost" id="sich-entfernen" data-i18n="sich_entfernen"></button>
+            <span class="dim small" id="sich-ziel-meldung"></span>
+          </div>
+        </div>
+
+        <!-- Den Entsperrweg wechseln, ohne die Wallet neu anzulegen.
+             Waehlbar war der Weg bisher nur beim Anlegen -- wer schon
+             eine Wallet hatte, kam nie daran. "Dann leg sie halt neu an"
+             ist keine Antwort, sobald Geld darin liegt. -->
+        <div class="panel hidden" id="w-entsperrweg">
+          <h3 data-i18n="ew_titel"></h3>
+          <p class="dim small" data-i18n="ew_lead"></p>
+          <div class="note" id="ew-jetzt"></div>
+
+          <div class="wahlgruppe" role="radiogroup"
+               aria-labelledby="ew-weg-titel">
+            <b id="ew-weg-titel" data-i18n="wl_weg_titel"></b>
+            <label class="wahl">
+              <input type="radio" name="ew-weg" value="aus">
+              <span><b data-i18n="wl_weg_aus"></b>
+                <span class="dim small" data-i18n="wl_weg_aus_d"></span></span>
+            </label>
+            <label class="wahl">
+              <input type="radio" name="ew-weg" value="merken">
+              <span><b data-i18n="wl_weg_merken"></b>
+                <span class="dim small" data-i18n="wl_weg_merken_d"></span></span>
+            </label>
+            <label class="wahl">
+              <input type="radio" name="ew-weg" value="datei">
+              <span><b data-i18n="wl_weg_datei"></b>
+                <span class="dim small" data-i18n="wl_weg_datei_d"></span></span>
+            </label>
+          </div>
+          <div class="note" id="ew-weg-folge"></div>
+
+          <!-- Nur fuer den Weg "von allein entsperren", und nur wenn das
+               Passwort zurzeit nirgends liegt. Die anderen beiden schreiben
+               nichts auf die Platte -- dort waere die Abfrage eine Huerde
+               ohne Zweck. -->
+          <div class="hidden" id="ew-probe">
+            <label class="feld">
+              <b data-i18n="ew_passwort"></b>
+              <span class="dim small" data-i18n="ew_passwort_d"></span>
+              <input type="password" id="ew-passwort"
+                     autocomplete="current-password">
+            </label>
+            <!-- Der Knopf, auf den die Meldung "sperre sie zuerst mit dem
+                 Knopf darueber" verweist. Bis zum 10.09.2026 gab es ihn nur
+                 im Loesch-Kasten -- die Meldung zeigte also ins Leere. -->
+            <div style="display:flex;gap:12px;align-items:center">
+              <button type="button" class="btn ghost" id="ew-sperren"
+                      data-i18n="tg_sperren_knopf"></button>
+              <span class="dim small" id="ew-sperr-meldung"></span>
+            </div>
+          </div>
+
+          <!-- Was wirklich auf der Platte liegt -- dieselbe Auskunft wie
+               beim Anlegen, denn hier stellt sich die Frage ein zweites
+               Mal. -->
+          <details class="note" style="margin-top:14px">
+            <summary data-i18n="wl_platte_titel"></summary>
+            <p class="dim small" data-i18n="wl_platte_d"></p>
+          </details>
+
+          <div style="display:flex;gap:12px;align-items:center;margin-top:14px">
+            <button type="button" class="btn" id="ew-wechseln"
+                    data-i18n="ew_wechseln"></button>
+            <span class="dim small" id="ew-meldung"></span>
+          </div>
+        </div>
+
+        <!-- Der gefaehrlichste Handgriff der Ansicht, und deshalb ihr
+             letzter. Er stand als erster Kasten ganz oben: wer die Wallet
+             einrichten wollte, las zuerst, wie man sie wegwirft.
+
+             Eingeklappt bleibt er, weil man ihn genau einmal braucht -- und
+             weil ein roter Knopf, der immer offen liegt, irgendwann
+             versehentlich getroffen wird.
+
+             Aus dem Betrieb, 09.09.2026: "mach es dann moeglich ein wallet zu
+             loeschen mit dem wallet passwort zum entsperren ... dann kann
+             ich die ganze initialisierung nochmal machen und testen."
+             Und am 10.09.2026 zur Stelle: "das dass direkt oben als erstes
+             steht find ich auch nicht gut das gehoert ans untere ende". -->
+        <details class="panel hidden" id="w-tilgen">
+          <summary data-i18n="tg_titel"></summary>
+          <p class="dim small" data-i18n="tg_lead"></p>
+          <div class="note warn" data-i18n="tg_warnung"></div>
+          <div class="note" data-i18n="tg_seed"></div>
+
+          <!-- Solange die Wallet laeuft, kann LND das Passwort gar nicht
+               pruefen. Deshalb steht hier zuerst der Weg dorthin. -->
+          <div id="tg-sperren-block">
+            <p class="dim small" data-i18n="tg_erst_sperren"></p>
+            <button type="button" class="btn ghost" id="tg-sperren"
+                    data-i18n="tg_sperren_knopf"></button>
+            <!-- DIREKT UNTER DEM KNOPF, und als Kasten statt als graue
+                 Kleinschrift. Aus dem Betrieb, 11.09.2026, zum zweiten Mal: "also
+                 hier passiert nix wenn ich auf wallet sperren druecke".
+                 Die Rueckmeldung stand in #tg-meldung -- das ist die
+                 LETZTE Zeile des Kastens, hinter dem (versteckten)
+                 Loeschformular, in dim small. Wer den Knopf drueckt, sieht
+                 dorthin nicht. -->
+            <div class="note hidden" id="tg-sperr-meldung"></div>
+          </div>
+
+          <div id="tg-formular" class="hidden">
+            <label class="feld">
+              <b data-i18n="wl_passwort_titel"></b>
+              <span class="dim small" data-i18n="tg_passwort_d"></span>
+              <input type="password" id="tg-passwort"
+                     autocomplete="current-password">
+            </label>
+            <label class="feld">
+              <b data-i18n="tg_alias"></b>
+              <span class="dim small" id="tg-alias-d"></span>
+              <input type="text" id="tg-alias" autocomplete="off"
+                     spellcheck="false">
+            </label>
+            <!-- Nur, wenn eine PIN eingerichtet ist. Wer keine will, soll
+                 nicht ploetzlich vor einer Abfrage stehen, die es fuer ihn
+                 gar nicht gibt. -->
+            <label class="feld hidden" id="tg-pin-zeile">
+              <b data-i18n="tg_pin"></b>
+              <span class="dim small" data-i18n="tg_pin_d"></span>
+              <input type="password" id="tg-pin" inputmode="numeric"
+                     autocomplete="off" maxlength="12">
+            </label>
+            <button type="button" class="btn gefahr" id="tg-loeschen"
+                    data-i18n="tg_loeschen_knopf"></button>
+          </div>
+          <span class="dim small" id="tg-meldung"></span>
+        </details>
+      </section>
+
+      <!-- ── Umrechner ──
+           Vier Unterschiede zum ueblichen Satoshi-Rechner stehen in app.js
+           bei den Rechenfunktionen; der sichtbarste ist die Reihenfolge:
+           Satoshi zuerst. -->
+      <section data-ansicht="rechner" class="hidden">
+        <div class="panel">
+          <h3 data-i18n="rn_titel"></h3>
+          <p class="dim small" data-i18n="rn_lead"></p>
+
+          <div class="kurs-gruppe rn-waehrungen" id="rn-waehrungen"
+               role="group" aria-labelledby="rn-waehrung-titel"></div>
+          <span id="rn-waehrung-titel" class="visuell-versteckt"
+                data-i18n="rn_waehrung"></span>
+
+          <div class="rechner">
+            <label class="feld">
+              <b data-i18n="rn_sat"></b>
+              <span class="dim small" data-i18n="rn_sat_d"></span>
+              <input type="text" id="rn-sat" inputmode="decimal"
+                     autocomplete="off" spellcheck="false">
+            </label>
+            <label class="feld">
+              <b data-i18n="rn_btc"></b>
+              <span class="dim small" data-i18n="rn_btc_d"></span>
+              <input type="text" id="rn-btc" inputmode="decimal"
+                     autocomplete="off" spellcheck="false">
+            </label>
+            <label class="feld">
+              <b id="rn-fiat-titel"></b>
+              <span class="dim small" data-i18n="rn_fiat_d"></span>
+              <input type="text" id="rn-fiat" inputmode="decimal"
+                     autocomplete="off" spellcheck="false">
+            </label>
+          </div>
+
+          <div class="note warn hidden" id="rn-fehler"></div>
+
+          <!-- Die Rueckrichtung gross daneben: "1 € = 1.504 sat" ist die
+               Zahl, an der man Sats zu lesen lernt. -->
+          <div class="kennzahlen" id="rn-kurse">
+            <div class="kennzahl-gross">
+              <div class="wert" id="rn-je-btc">—</div>
+              <div class="bez" data-i18n="rn_je_btc"></div>
+            </div>
+            <div class="kennzahl-gross">
+              <div class="wert" id="rn-je-fiat">—</div>
+              <div class="bez" id="rn-je-fiat-bez"></div>
+            </div>
+          </div>
+
+          <p class="dim small" id="rn-quelle"></p>
+        </div>
+
+        <!-- Was ein Kanal kostet und was dafuer einzuzahlen ist.
+             Hier statt unter "Wallet", weil hier der Kurs liegt: "160.339
+             sat" sagt einem Menschen nichts, "rund 112 Euro" sagt alles. -->
+        <div class="panel" id="kk-plan">
+          <h3 data-i18n="kkp_titel"></h3>
+          <p class="dim small" data-i18n="kkp_lead"></p>
+          <p class="note hidden" id="kkp-ohne" data-i18n="kkp_ohne"></p>
+          <div id="kkp-lage"></div>
+          <label class="feld">
+            <b data-i18n="kkp_groesse"></b>
+            <input type="number" id="kkp-groesse" min="20000" step="10000"
+                   value="150000" inputmode="numeric">
+          </label>
+          <div id="kkp-zahlen"></div>
+          <p class="dim small" id="kkp-fuss" data-i18n="kkp_fuss"></p>
+        </div>
+      </section>
+
+      <!-- ── Einstellungen ── -->
+      <section data-ansicht="einstellungen" class="hidden" id="einstellungen">
+        <!-- Der Name des Knotens.
+             Aus dem Betrieb, 09.09.2026: "ich moechte nicht das alles immer nur
+             satoshicortex heisst!!" Bis dahin gab es dafuer kein einziges
+             Eingabefeld -- alias stand als Vorgabe in einer Datenklasse und
+             wurde beim Einrichten nie uebergeben. Jeder Knoten dieser
+             Software hiess gleich. -->
+        <div class="panel">
+          <h3 data-i18n="kn_titel"></h3>
+          <p class="dim small" data-i18n="kn_lead"></p>
+          <label class="feld">
+            <b data-i18n="kn_alias"></b>
+            <span class="dim small" data-i18n="kn_alias_d"></span>
+            <input type="text" id="kn-alias" autocomplete="off"
+                   spellcheck="false" maxlength="32">
+          </label>
+          <label class="feld">
+            <b data-i18n="kn_farbe"></b>
+            <span class="dim small" data-i18n="kn_farbe_d"></span>
+            <input type="color" id="kn-farbe">
+          </label>
+          <!-- Der eine Wert, der entscheidet, ob ein eingehender Kanal
+               ueberhaupt zustande kommt. Stand bis zum 18.09.2026 fest im
+               Quelltext -- aufgefallen an einem Liquiditaets-Ring ueber
+               genau denselben Betrag, bei dem der Abstand damit null war. -->
+          <label class="feld">
+            <b data-i18n="kn_minchan"></b>
+            <span class="dim small" data-i18n="kn_minchan_d"></span>
+            <input type="number" id="kn-minchan" min="20000" max="16777215"
+                   step="10000" value="100000">
+          </label>
+          <div class="note" data-i18n="kn_neustart"></div>
+          <div style="display:flex;gap:12px;align-items:center;margin-top:12px">
+            <button type="button" class="btn" id="kn-speichern"
+                    data-i18n="e_speichern"></button>
+            <span class="dim small" id="kn-meldung"></span>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3 data-i18n="wege_titel"></h3>
+          <p class="dim small" data-i18n="wege_intro"></p>
+          <!-- Die Erklaerungen stehen eingeklappt. Sie sind gut und sie
+               bleiben -- aber wer hierher kommt, hat den Assistenten hinter
+               sich und sucht einen Schalter, keinen Aufsatz. Ausgeklappt
+               waren es fuenf Absaetze zu je fuenf Zeilen, zwischen denen die
+               Schalter untergingen. -->
+          <!-- Die Hauptentscheidung, und deshalb ganz oben.
+               Aus dem Betrieb, 05.09.2026: "verstehe nicht, warum diese
+               Einstellungen nur fuer LND gelten und nicht generell fuer
+               unsere App?" -- gilt jetzt fuer beide Dienste. Die Haekchen
+               darunter sind die Feinheit INNERHALB der Wahl. -->
+          <div class="wahlgruppe oben" role="radiogroup" aria-labelledby="e-ln-titel">
+            <b id="e-ln-titel" data-i18n="lnsicht_titel"></b>
+            <p class="dim small" data-i18n="lnsicht_lead"></p>
+            <label class="wahl">
+              <input type="radio" name="e-ln-sicht" value="tor">
+              <span><b data-i18n="lnsicht_tor"></b>
+                <span class="dim small" data-i18n="lnsicht_tor_d"></span></span>
+            </label>
+            <label class="wahl">
+              <input type="radio" name="e-ln-sicht" value="hybrid" checked>
+              <span><b data-i18n="lnsicht_hybrid"></b>
+                <span class="dim small" data-i18n="lnsicht_hybrid_d"></span></span>
+            </label>
+            <label class="wahl">
+              <input type="radio" name="e-ln-sicht" value="still">
+              <span><b data-i18n="lnsicht_still"></b>
+                <span class="dim small" data-i18n="lnsicht_still_d"></span></span>
+            </label>
+          </div>
+          <p class="dim small hidden" id="e-sicht-folge"></p>
+
+          <label class="switch">
+            <input type="checkbox" id="e-tor" checked>
+            <span><b data-i18n="wege_tor"></b></span>
+          </label>
+          <details class="erklaerung">
+            <summary data-i18n="mehr_dazu"></summary>
+            <p class="dim small" data-i18n="wege_tor_d"></p>
+          </details>
+          <label class="switch unterschalter">
+            <input type="checkbox" id="e-pause" checked>
+            <span><b data-i18n="wege_pause"></b></span>
+          </label>
+          <p class="dim small unterschalter" id="e-pause-folge"></p>
+          <details class="erklaerung unterschalter">
+            <summary data-i18n="mehr_dazu"></summary>
+            <p class="dim small" data-i18n="wege_pause_d"></p>
+          </details>
+          <label class="switch">
+            <input type="checkbox" id="e-ipv4" checked>
+            <span><b data-i18n="wege_ipv4"></b></span>
+          </label>
+          <details class="erklaerung">
+            <summary data-i18n="mehr_dazu"></summary>
+            <p class="dim small" data-i18n="wege_ipv4_d"></p>
+          </details>
+          <label class="switch">
+            <input type="checkbox" id="e-ipv6" checked>
+            <span><b data-i18n="wege_ipv6"></b></span>
+          </label>
+          <details class="erklaerung">
+            <summary data-i18n="mehr_dazu"></summary>
+            <p class="dim small" data-i18n="wege_ipv6_d"></p>
+          </details>
+          <label class="switch">
+            <input type="checkbox" id="e-ankuendigen" checked>
+            <span><b data-i18n="wege_adresse"></b></span>
+          </label>
+          <details class="erklaerung">
+            <summary data-i18n="mehr_dazu"></summary>
+            <p class="dim small" data-i18n="wege_adresse_d"></p>
+          </details>
+          <label class="feld unterschalter">
+            <input type="text" id="e-adresse" autocomplete="off" spellcheck="false">
+          </label>
+          <p class="dim small" id="e-adresse-aktuell" style="margin-top:8px"></p>
+
+
+          <p class="dim small" id="e-ruft-an" style="margin-top:4px"></p>
+          <div id="e-name-haengt"></div>
+          <!-- Die Schalter oben sehen aus, als wirkten sie sofort. Sie tun es
+               nicht -- jede Aenderung startet bitcoind neu, deshalb bleibt es
+               bei einem bewussten Klick. Nur muss man das SEHEN: bis zum
+               01.09.2026 stand hier ein stiller "Speichern"-Knopf, und
+               Des Betreibers Einstellungen waren nach jedem Neuladen wieder weg. -->
+          <div class="note warn hidden" id="e-ungespeichert" data-i18n="e_ungespeichert"></div>
+          <div style="display:flex;gap:12px;align-items:center;margin-top:12px">
+            <button type="button" class="btn" id="e-adresse-speichern" data-i18n="e_speichern"></button>
+            <span class="dim small" id="e-adresse-meldung"></span>
+          </div>
+        </div>
+        <!-- Wallet-Software im Heimnetz. Eigener Kasten, nicht bei den
+             Netzwegen: dort geht es darum, wie der Knoten nach AUSSEN
+             auftritt -- hier darum, wer ihn von INNEN benutzen darf. -->
+        <div class="panel">
+          <h3 data-i18n="wsw_titel"></h3>
+          <p class="dim small" data-i18n="wsw_lead"></p>
+          <label class="switch">
+            <input type="checkbox" id="e-rpc-an">
+            <span><b data-i18n="wsw_schalter"></b></span>
+          </label>
+          <details class="erklaerung">
+            <summary data-i18n="mehr_dazu"></summary>
+            <p class="dim small" data-i18n="wsw_erklaerung"></p>
+          </details>
+          <label class="feld unterschalter">
+            <b data-i18n="wsw_netz"></b>
+            <input type="text" id="e-rpc-netz" autocomplete="off"
+                   spellcheck="false" placeholder="192.168.178.0/24">
+          </label>
+          <p class="dim small unterschalter" data-i18n="wsw_netz_d"></p>
+
+          <div id="e-rpc-daten" class="hidden" style="margin-top:14px">
+            <b data-i18n="wsw_daten"></b>
+            <div class="adresse" id="e-rpc-feld"></div>
+            <div style="display:flex;gap:12px;align-items:center;margin-top:8px">
+              <button type="button" class="btn ghost" id="e-rpc-kopieren"
+                      data-i18n="lgi_kopieren"></button>
+              <span class="dim small" id="e-rpc-meldung"></span>
+            </div>
+            <p class="dim small" data-i18n="wsw_hinweis" style="margin-top:10px"></p>
+          </div>
+          <div class="note warn hidden" id="e-rpc-port" data-i18n="wsw_port"></div>
+          <div style="display:flex;gap:12px;align-items:center;margin-top:12px">
+            <button type="button" class="btn" id="e-rpc-speichern"
+                    data-i18n="e_speichern"></button>
+            <span class="dim small" id="e-rpc-status"></span>
+          </div>
+        </div>
+
+        <!-- ── Die PIN ────────────────────────────────────────────────
+             Aus dem Betrieb, 08.09.2026: "eine art: PIN. fuer Zahlungen ansich
+             also knoten oeffnen oder schliessen geld transferieren".
+
+             Sie schuetzt gegen etwas anderes als der Entsperrweg: der
+             entscheidet, was jemand mit der PLATTE anfangen kann, die PIN
+             steht gegen eine uebernommene SITZUNG in dieser Oberflaeche.
+             Deshalb steht sie hier bei "wer darf diesen Knoten benutzen"
+             und nicht bei der Wallet. -->
+        <div class="panel" id="e-pin">
+          <h3 data-i18n="pin_titel"></h3>
+          <p class="dim small" data-i18n="pin_lead"></p>
+          <div class="note" id="pin-stand"></div>
+          <details class="erklaerung">
+            <summary data-i18n="mehr_dazu"></summary>
+            <p class="dim small" data-i18n="pin_erklaerung"></p>
+          </details>
+
+          <!-- Einrichten. Verlangt das KONTOpasswort, und das ist kein
+               Zierrat: waere es anders, koennte eine uebernommene Sitzung
+               sich selbst eine PIN geben und damit anschliessend alles
+               freigeben. Ein Schloss, dessen Schluessel der Einbrecher
+               aussucht, ist keines. -->
+          <div id="pin-einrichten-block">
+            <label class="feld">
+              <b data-i18n="pin_kontopasswort"></b>
+              <span class="dim small" data-i18n="pin_kontopasswort_d"></span>
+              <input type="password" id="pin-konto"
+                     autocomplete="current-password">
+            </label>
+            <label class="feld">
+              <b data-i18n="pin_neu"></b>
+              <span class="dim small" data-i18n="pin_neu_d"></span>
+              <input type="password" id="pin-neu" inputmode="numeric"
+                     autocomplete="off" maxlength="12">
+            </label>
+            <label class="feld">
+              <b data-i18n="pin_wdh"></b>
+              <input type="password" id="pin-wdh" inputmode="numeric"
+                     autocomplete="off" maxlength="12">
+            </label>
+            <div style="display:flex;gap:12px;align-items:center;margin-top:12px">
+              <button type="button" class="btn" id="pin-einrichten"
+                      data-i18n="pin_einrichten"></button>
+              <span class="dim small" id="pin-meldung"></span>
+            </div>
+          </div>
+
+          <!-- Aendern und abschaffen. Beides braucht die ALTE PIN -- das
+               Kontopasswort waere hier kein zusaetzlicher Schutz: wer die
+               PIN kennt, kommt ohnehin an alles, was sie bewacht. -->
+          <div id="pin-aendern-block" class="hidden">
+            <label class="feld">
+              <b data-i18n="pin_alt"></b>
+              <input type="password" id="pin-alt" inputmode="numeric"
+                     autocomplete="off" maxlength="12">
+            </label>
+            <label class="feld">
+              <b data-i18n="pin_neu"></b>
+              <span class="dim small" data-i18n="pin_neu_d"></span>
+              <input type="password" id="pin-neu2" inputmode="numeric"
+                     autocomplete="off" maxlength="12">
+            </label>
+            <div style="display:flex;gap:12px;align-items:center;margin-top:12px">
+              <button type="button" class="btn" id="pin-aendern"
+                      data-i18n="pin_aendern"></button>
+              <button type="button" class="btn gefahr" id="pin-entfernen"
+                      data-i18n="pin_entfernen"></button>
+              <span class="dim small" id="pin-meldung2"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3 data-i18n="pr_titel"></h3>
+          <p class="dim small" data-i18n="pr_d"></p>
+          <div style="display:flex;gap:12px;align-items:center;margin-top:12px">
+            <button type="button" class="btn" id="e-pruefen" data-i18n="pr_knopf"></button>
+            <span class="dim small" id="e-pruefen-lauft"></span>
+          </div>
+          <div id="e-pruefen-ergebnis" style="margin-top:12px"></div>
+        </div>
+        <div class="panel">
+          <h3 data-i18n="e_updates"></h3>
+          <div id="e-neuerung"></div>
+        </div>
+      </section>
+
+      <!-- ── Welt ──────────────────────────────────────────────────────
+           Kein Kasten, kein Rahmen: die Karte IST die Ansicht. Was hier
+           steht, ist ein Streifen daruntergelegt -- die vier Zahlen, die man
+           im Vorbeigehen liest, und mit wem Kapital gebunden ist. -->
+      <section data-ansicht="welt" class="hidden">
+        <div class="welt-streifen">
+          <!-- Einklappen: auf kleinen Bildschirmen der Unterschied zwischen
+               einer Karte und einem Streifen Karte. -->
+          <button type="button" class="welt-klapp" id="w-klapp"
+                  aria-expanded="true" data-i18n="w_klapp_zu"></button>
+          <div class="welt-spalte">
+            <h4 data-i18n="w_btc"></h4>
+            <dl id="w-btc"></dl>
+          </div>
+          <div class="welt-spalte">
+            <h4 data-i18n="w_ln"></h4>
+            <dl id="w-ln"></dl>
+          </div>
+          <div class="welt-spalte welt-legende">
+            <h4 data-i18n="w_legende"></h4>
+            <p><span class="welt-strich btc"></span>
+               <span data-i18n="w_legende_btc"></span></p>
+            <p><span class="welt-strich ln"></span>
+               <span data-i18n="w_legende_ln"></span></p>
+            <p class="dim small" id="w-ln-hinweis"></p>
+            <p class="dim small" data-i18n="w_klick"></p>
+          </div>
+        </div>
+
+        <!-- Ein Land aus der Naehe. AUFLAGE, kein Umbau: die Weltansicht
+             darunter bleibt Zeichen fuer Zeichen, wie sie war. Aus dem Betrieb, am
+             05.09.2026: "das darf nur unter dem Reiter Welt als Funktion zur
+             Verfuegung stehen und darf sonst die Ansicht, die wir bis jetzt
+             haben, nicht veraendern." -->
+        <div id="welt-land" class="hidden" role="dialog" aria-modal="true"
+             aria-labelledby="wl-titel">
+          <div class="wl-kopf">
+            <button type="button" class="btn ghost" id="wl-zurueck"
+                    data-i18n="wl_zurueck"></button>
+            <h3 id="wl-titel"></h3>
+            <span class="dim small" id="wl-stand"></span>
+          </div>
+          <div class="wl-koerper">
+            <div class="wl-karte" id="wl-karte"></div>
+            <div class="wl-liste">
+              <h4 data-i18n="wl_uebersicht"></h4>
+              <p class="dim small" id="wl-leer"></p>
+              <table class="wl-tabelle">
+              <colgroup><col class="spalte-gebiet"><col class="spalte-zahl"><col class="spalte-zahl"><col class="spalte-zahl"></colgroup>
+                <thead><tr>
+                  <th data-i18n="wl_gebiet"></th>
+                  <th data-i18n="wl_btc"></th>
+                  <th data-i18n="wl_ln"></th>
+                  <th data-i18n="wl_buch"></th>
+                </tr></thead>
+                <tbody id="wl-zeilen"></tbody>
+              </table>
+              <p class="dim small" id="wl-rest"></p>
+              <p class="dim small" data-i18n="wl_genauigkeit"></p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Protokolle ── -->
+      <!-- ── Nachrichten ──
+           Aus dem Betrieb, 06.09.2026, nachdem er die Chat-Idee selbst verworfen
+           hatte: "gibt ja schon viele chats und foren ... was aber vielleicht
+           meinen Cortex von anderen unterscheiden wuerde waere ein
+           Nachrichten-Feed". Und am Tag darauf der Zuschnitt: "wenn ich in
+           Algerien sitze, bringt mir Blocktrainer nichts."             -->
+      <section data-ansicht="news" class="hidden">
+        <h1 data-i18n="news_titel"></h1>
+        <p class="lead" data-i18n="news_lead"></p>
+
+        <div id="news-aus" class="panel note hidden">
+          <p data-i18n="news_aus_text"></p>
+          <button class="btn" id="news-einschalten" data-i18n="news_einschalten"></button>
+        </div>
+
+        <div id="news-tor" class="panel note warn hidden">
+          <p data-i18n="news_tor_text"></p>
+        </div>
+
+        <!-- Der Kurs. Aus dem Betrieb, 06.09.2026: "könnten wir bei dem News
+             Feed dann noch oben drüber noch ein Bitcoin Chart in USD
+             haben?" — also hier, über der Liste, nicht als eigene
+             Ansicht. Gezeichnet als SVG von Hand: eine Diagramm-
+             bibliothek waere hier eine Abhaengigkeit fuer eine Linie. -->
+        <div id="kurs-kasten" class="kurs-kasten hidden">
+          <div class="kurs-kopf">
+            <div class="kurs-zahl">
+              <span id="kurs-wert">—</span>
+              <span id="kurs-wechsel" class="kurs-wechsel"></span>
+            </div>
+            <div class="kurs-schalter">
+              <div class="kurs-gruppe" id="kurs-waehrungen"></div>
+              <div class="kurs-gruppe" id="kurs-zeitraeume"></div>
+            </div>
+          </div>
+          <div class="kurs-bild">
+            <!-- Ohne preserveAspectRatio="none" und ohne feste viewBox:
+                 die setzt zeichneKurslinie() aus der tatsaechlichen Groesse,
+                 damit eine Einheit ein Bildpunkt ist. Gestreckt wurde sonst
+                 auch die Schrift. -->
+            <svg id="kurs-svg" role="img" aria-labelledby="kurs-titel"></svg>
+            <span id="kurs-titel" class="visuell-versteckt"></span>
+            <!-- Die Sprechblase am Fadenkreuz. Als HTML und nicht im SVG:
+                 Textumbruch und Schattierung sind dort schlicht besser. -->
+            <div id="kurs-blase" class="kurs-blase" hidden></div>
+          </div>
+          <p class="dim small" id="kurs-fuss"></p>
+        </div>
+
+        <p id="news-abgewiesen" class="note warn hidden"></p>
+
+        <div id="news-kopf" class="news-kopf hidden">
+          <span class="dim" id="news-herkunft"></span>
+          <label class="switch">
+            <input type="checkbox" id="news-weit">
+            <span data-i18n="news_weit"></span>
+          </label>
+          <button class="btn ghost" id="news-alle-gelesen" data-i18n="news_alle_gelesen"></button>
+          <button class="btn ghost" id="news-quellen-auf" data-i18n="news_quellen"></button>
+        </div>
+
+        <div id="news-quellen" class="panel hidden">
+          <h2 data-i18n="news_quellen_titel"></h2>
+          <p class="dim" data-i18n="news_quellen_lead"></p>
+          <div id="news-quellenliste" class="quellenliste"></div>
+          <div class="news-eigene">
+            <label for="news-eigene-adresse" data-i18n="news_eigene_titel"></label>
+            <p class="dim" data-i18n="news_eigene_lead"></p>
+            <div class="zeile">
+              <input type="text" id="news-eigene-adresse"
+                     placeholder="https://…" autocomplete="off">
+              <button class="btn ghost" id="news-suchen" data-i18n="news_suchen"></button>
+            </div>
+            <div id="news-gefunden" class="dim"></div>
+          </div>
+        </div>
+
+        <ul id="news-liste" class="news-liste"></ul>
+        <!-- Ohne data-i18n: zeichneNews() setzt den Text je nachdem, ob es
+             eine Datenbank gibt. applyI18n wuerde ihn sonst wieder
+             ueberschreiben. -->
+        <p id="news-leer" class="dim hidden"></p>
+      </section>
+
+      <section data-ansicht="logs" class="hidden">
+        <div class="panel">
+          <h3 data-i18n="log_titel"></h3>
+          <p class="dim small" data-i18n="log_lead"></p>
+          <div class="log-quellen" id="p-quellen" role="tablist"></div>
+          <div class="log-kopf">
+            <span class="dim small" id="p-stand"></span>
+            <button type="button" class="btn ghost" id="p-neu"
+                    data-i18n="log_neu"></button>
+          </div>
+          <pre class="log-text" id="p-text" tabindex="0"></pre>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<!-- Vor app.js: die Wortliste wird beim Bauen der Seed-Felder
+     gebraucht. -->
+<script src="bip39.js"></script>
+<script src="qr.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

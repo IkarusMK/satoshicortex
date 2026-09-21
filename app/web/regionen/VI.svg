@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 230.2" class="regionskarte" preserveAspectRatio="xMidYMid meet" data-land="VI" data-minlon="-65.0529" data-maxlon="-64.6490" data-minlat="18.3008" data-maxlat="18.3891" data-umbruch="0">
+<!-- Umrisse: Natural Earth (ne_10m_admin_1_states_provinces),
+     gemeinfrei. Erzeugt von tools/regionen_bauen.py, nicht von
+     Hand aendern. -->
+<g class="regionen">
+<path id="r-VI-X01~" data-de="Saint Croix" data-en="Saint Croix" data-cx="806.1" data-cy="1698.5" d="M1221.7,1662.2L1157.8,1669.1L1104.7,1686.6L1000.4,1735L946.6,1751.8L437,1825.2L390.5,1841.7L408.6,1797L411.7,1759.2L409,1652.6L416.6,1619.8L436.8,1599L530.3,1627.7L582.9,1603.5L637.3,1568.5L696.3,1555.2L702.5,1562L797.4,1626.5L849.6,1645L876,1659L899,1680L955.6,1632.8L1044.5,1613.4L1141.5,1618.7L1221.7,1644.4L1221.7,1662.2Z"><title>Saint Croix</title></path>
+<path id="r-VI-X03~" data-de="Saint John" data-en="Saint John" data-cx="797.3" data-cy="132.1" d="M871.2,120.3L853.4,127.6L880,163.1L863.7,223.7L784,180.8L659.9,192.6L622.9,158.6L659.9,102.5L701.2,84.8L745.6,71.5L735.2,52.3L757.4,40.4L840.2,62.6L880.1,70L917,86.3L961.4,110L971.7,136.6L937.7,142.5L871.2,120.3Z"><title>Saint John</title></path>
+<path id="r-VI-X02~" data-de="Saint Thomas" data-en="Saint Thomas" data-cx="277.6" data-cy="113.6" d="M448.8,194.2L430.9,220.7L352.6,191.2L324.4,173.5L302.2,129.2L291.9,152.8L268.2,136.6L214.9,147L176.5,139.6L146.8,107.1L68.4,130.8L28.3,92.4L101.6,53.5L164.1,37.2L254.8,40.5L292,67.2L314.2,59.8L274,28.7L254.7,6.5L308,22.8L399.8,76L490,127.7L526.9,186.7L498.8,191.2L476.8,183.8L448.8,194.2Z"><title>Saint Thomas</title></path>
+</g>
+</svg>

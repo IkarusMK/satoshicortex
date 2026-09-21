@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1198.5" class="regionskarte" preserveAspectRatio="xMidYMid meet" data-land="NR" data-minlon="166.9055" data-maxlon="166.9598" data-minlat="-0.5537" data-maxlat="-0.4886" data-umbruch="0">
+<!-- Umrisse: Natural Earth (ne_10m_admin_1_states_provinces),
+     gemeinfrei. Erzeugt von tools/regionen_bauen.py, nicht von
+     Hand aendern. -->
+<g class="regionen">
+<path id="r-NR-03" data-de="Anetan" data-en="Anetan" data-cx="545.3" data-cy="160.6" d="M473.7,87.8L613.8,33.9L617,287.4L473.7,87.8Z"><title>Anetan</title></path>
+<path id="r-NR-09" data-de="Ewa" data-en="Ewa" data-cx="489.5" data-cy="245.9" d="M362,130.8L473.7,87.8L617,287.4L599.7,404L362,130.8Z"><title>Ewa</title></path>
+<path id="r-NR-05" data-de="Baiti" data-en="Baiti" data-cx="415.9" data-cy="322.5" d="M232.1,180.7L362,130.8L599.7,404L591.2,461.8L584.9,514.3L232.1,180.7Z"><title>Baiti</title></path>
+<path id="r-NR-13" data-de="Uaboe" data-en="Uaboe" data-cx="365.7" data-cy="381.4" d="M146.6,213.6L232.1,180.7L584.9,514.3L576.7,582.1L146.6,213.6Z"><title>Uaboe</title></path>
+<path id="r-NR-12" data-de="Nibok" data-en="Nibok" data-cx="333.1" data-cy="443.8" d="M89.4,433.2L146.6,213.6L576.7,582.1L571.8,623.4L564.5,674L423.2,629.8L274.6,591L89.4,433.2Z"><title>Nibok</title></path>
+<path id="r-NR-08" data-de="Denigomodu" data-en="Denigomodu" data-cx="151.4" data-cy="550.3" d="M28.3,667.4L89.4,433.2L274.6,591L210,655.7L28.3,667.4Z"><title>Denigomodu</title></path>
+<path id="r-NR-01" data-de="Aiwo" data-en="Aiwo" data-cx="128.8" data-cy="773.1" d="M120.3,890.6L28.3,667.4L210,655.7L197,746.1L229.3,856L120.3,890.6Z"><title>Aiwo</title></path>
+<path id="r-NR-06" data-de="Boe" data-en="Boe" data-cx="194.8" data-cy="970.6" d="M200.5,1085.2L120.3,890.6L229.3,856L269.4,924.4L235.8,952.9L200.5,1085.2Z"><title>Boe</title></path>
+<path id="r-NR-14" data-de="Yaren" data-en="Yaren" data-cx="350.4" data-cy="992.9" d="M500.2,1142.8L200.5,1085.2L235.8,952.9L269.4,924.4L365,843.1L500.2,1142.8Z"><title>Yaren</title></path>
+<path id="r-NR-11" data-de="Meneng" data-en="Meneng" data-cx="621.8" data-cy="961.8" d="M878.6,824.7L844.4,931L613.8,1164.6L500.2,1142.8L365,843.1L552.4,759.1L733.3,804.3L878.6,824.7Z"><title>Meneng</title></path>
+<path id="r-NR-04" data-de="Anibare" data-en="Anibare" data-cx="762" data-cy="556" d="M955.8,418.9L971.7,535.6L878.6,824.7L733.3,804.3L552.4,759.1L564.5,674L571.8,623.4L576.7,582.1L584.9,514.3L591.2,461.8L599.7,404L617,287.4L759.2,371.4L955.8,418.9Z"><title>Anibare</title></path>
+<path id="r-NR-10" data-de="Ijuw" data-en="Ijuw" data-cx="786.4" data-cy="296" d="M922.3,173.2L955.8,418.9L759.2,371.4L617,287.4L922.3,173.2Z"><title>Ijuw</title></path>
+<path id="r-NR-02" data-de="Anabar" data-en="Anabar" data-cx="768" data-cy="160.6" d="M613.8,33.9L922.3,173.2L617,287.4L613.8,33.9Z"><title>Anabar</title></path>
+<path id="r-NR-07" data-de="Buada" data-en="Buada" data-cx="380.8" data-cy="757.7" d="M564.5,674L552.4,759.1L365,843.1L269.4,924.4L229.3,856L197,746.1L210,655.7L274.6,591L423.2,629.8L564.5,674Z"><title>Buada</title></path>
+</g>
+</svg>

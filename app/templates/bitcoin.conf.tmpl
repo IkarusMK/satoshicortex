@@ -1,0 +1,71 @@
+# Von SatoshiCortex erzeugt — nicht von Hand aendern.
+# Aenderungen hier werden beim naechsten Speichern in der Weboberflaeche
+# ueberschrieben. Was du einstellen kannst, findest du dort.
+#
+# Erzeugt am {{ERZEUGT_AM}}
+
+# ============================================================ Grundlagen
+# Das Netz steht ausdruecklich da, obwohl es Cores Vorgabe ist. Eine
+# Vorgabe, auf die man sich verlaesst, ist eine Annahme -- und ein Knoten,
+# der versehentlich auf testnet4 oder signet laeuft, sieht in jeder Anzeige
+# genauso aus wie einer auf mainnet. Die Zeile kostet nichts und schliesst
+# das aus. (Zur Gegenprobe im Protokoll: mainnet meldet beim Start
+# nMinimumChainWork=...1128750f82f4c366153a3a030 und assumevalid
+# 000...ccebd6d74d9194d8dcdc1d177c478e094bfad51ba5ac -- beide stehen so in
+# v31.1, src/kernel/chainparams.cpp unter CMainParams. testnet4 und signet
+# haben voellig andere Werte.)
+chain=main
+server=1
+daemon=0
+printtoconsole=1
+
+{{INDIZES}}
+
+# prune=0 heisst Archiv-Knoten. Das kostet Platz, ist aber der Punkt: nur ein
+# vollstaendiger Knoten kann Neueinsteigern die ganze Kette ausliefern.
+prune=0
+
+# Bloecke auf die grosse Platte, chainstate und blocks/index bleiben im
+# Datenverzeichnis auf der schnellen.
+blocksdir=/bulk/blocks
+
+# ============================================================ Netz
+listen=1
+discover=1
+{{EXTERNE_ADRESSEN}}
+maxconnections={{MAXCONNECTIONS}}
+
+# Upload-Budget in MiB pro Tag. 0 = unbegrenzt.
+# Ist das Budget erschoepft, liefert der Knoten keine ALTEN Bloecke mehr aus
+# (aelter als eine Woche). Neue Bloecke und Transaktionen reicht er weiterhin
+# ganz normal weiter — die Teilnahme am laufenden Netz bleibt vollstaendig.
+maxuploadtarget={{MAXUPLOADTARGET}}
+
+{{TOR_BLOCK}}
+
+# ============================================================ RPC
+rpcbind=0.0.0.0:8332
+
+{{RPC_FREIGABE}}
+rpcauth={{RPCAUTH}}
+
+# ============================================================ ZMQ
+# Grundlage der Auswertung. "sequence" meldet jede Aufnahme in den Mempool,
+# jedes Entfernen und jeden Block — mit fortlaufender Nummer, sodass verlorene
+# Meldungen auffallen und die Statistik ehrlich bleibt.
+zmqpubrawblock=tcp://0.0.0.0:28332
+zmqpubrawtx=tcp://0.0.0.0:28333
+zmqpubsequence=tcp://0.0.0.0:28334
+
+# ============================================================ Mempool
+# Bewusst der Standardwert. Genau deshalb sieht dieser Knoten die echte
+# Verwerfungsgrenze — anders als grosse Explorer, die ihr Limit hochdrehen und
+# darum nie etwas verwerfen muessen.
+maxmempool=300
+mempoolexpiry=336
+persistmempool=1
+
+# ============================================================ Leistung
+# Wird von SatoshiCortex nachgeregelt: gross waehrend der Ersteinrichtung,
+# sparsam im laufenden Betrieb.
+dbcache={{DBCACHE}}

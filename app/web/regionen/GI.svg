@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1932.8" class="regionskarte" preserveAspectRatio="xMidYMid meet" data-land="GI" data-minlon="-5.3590" data-maxlon="-5.3382" data-minlat="36.1096" data-maxlat="36.1420" data-umbruch="0">
+<!-- Umrisse: Natural Earth (ne_10m_admin_1_states_provinces),
+     gemeinfrei. Erzeugt von tools/regionen_bauen.py, nicht von
+     Hand aendern. -->
+<g class="regionen">
+<path id="r-GI-X01~" data-de="Gibraltar" data-en="Gibraltar" data-cx="500" data-cy="966.4" d="M28.3,55.4L971.7,54.7L916.8,727.1L957.9,1083.3L815,1878.1L419.7,1354.7L28.3,55.4Z"><title>Gibraltar</title></path>
+</g>
+</svg>

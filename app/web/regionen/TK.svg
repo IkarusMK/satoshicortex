@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1887.7" class="regionskarte" preserveAspectRatio="xMidYMid meet" data-land="TK" data-minlon="-172.5032" data-maxlon="-172.4787" data-minlat="-8.5878" data-maxlat="-8.5419" data-umbruch="0">
+<!-- Umrisse: Natural Earth (ne_10m_admin_1_states_provinces),
+     gemeinfrei. Erzeugt von tools/regionen_bauen.py, nicht von
+     Hand aendern. -->
+<g class="regionen">
+<path id="r-TK-X01~" data-de="Tokelau" data-en="Tokelau" data-cx="53184.5" data-cy="33089.7" d="M53390.6,33501.5L53193.7,33267.1L53023.2,33006L52880.8,32731.5L52774.9,32457L53104.3,32678L53362.5,32965.9L53526.3,33310.6L53594.2,33702.3L53486.6,33722.4L53460.1,33668.8L53445.2,33575.1L53390.6,33501.5ZM698.6,963.9L337.8,528.8L28.3,53.4L470.2,408.2L822.7,850.1L971.7,1338.9L797.9,1834.3L789.7,1620L698.6,963.9Z"><title>Tokelau</title></path>
+</g>
+</svg>

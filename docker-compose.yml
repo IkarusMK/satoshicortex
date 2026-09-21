@@ -1,0 +1,331 @@
+# SatoshiCortex — your own Bitcoin and Lightning node.
+#
+#   1. cp example.env .env      and adjust the handful of values in it
+#   2. Create the data folders  — see GUIDE.md; mandatory on NAS systems
+#   3. docker compose up -d     builds on the first run, starts only after that
+#   4. http://<your-server>:3333   (or whatever you set as WEBUI_PORT)
+#
+# Deliberately written without YAML anchors. An anchor saves twenty lines and
+# costs you the ability to see, per service, what applies to it. This file is
+# read by people who are about to attach their machine to the Bitcoin network —
+# being able to read it beats being short.
+#
+# Why there is no start order here: every service starts immediately but waits
+# for its configuration. The setup wizard writes those files and thereby wakes
+# the services in the right order. That way the application needs NO access to
+# the Docker socket — on a machine holding a wallet, that detour is worth it.
+
+name: satcortex
+
+services:
+  app:
+    image: ghcr.io/ikarusmk/satcortex:${SATCORTEX_VERSION:-latest}
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    container_name: satcortex-app
+    volumes:
+      # Only the two roots. Everything below them — config, bitcoind, tor,
+      # blocks, coreindex — is created by the application itself. Whoever sets
+      # the stack up provides two paths and nothing else.
+      - ${DATA_FAST}:/fast
+      - ${DATA_BULK}:/bulk
+    environment:
+      TZ: ${TZ:-UTC}
+      CONFIG_DIR: /fast/config
+      # Encryption is optional. Empty means HTTP — see example.env.
+      TLS_CERT: ${TLS_CERT:-}
+      TLS_KEY: ${TLS_KEY:-}
+      # Is there a reverse proxy in front terminating TLS? Then the
+      # application speaks plain HTTP while the browser speaks https — and
+      # only this switch gives the session cookie its "Secure" flag.
+      TLS_EXTERN: ${TLS_EXTERN:-}
+      # Sign-in through your own identity provider (Pocket ID, Authentik,
+      # Keycloak). All empty means: off, the local account applies.
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_REDIRECT_URL: ${OIDC_REDIRECT_URL:-}
+      # For the startup message only: uvicorn announces port 8000, the one
+      # inside the container. So the line next to it does not mislead, we name
+      # the port you can actually reach ourselves.
+      WEBUI_PORT: ${WEBUI_PORT:-3333}
+      # The same number as the network below. The application needs it for
+      # Tor's forwards and for bitcoind's RPC allow-list.
+      NETWORK_PREFIX: ${NETWORK_PREFIX:-10.83.33}
+    ports:
+      # LAN_BIND controls which interface the web interface listens on.
+      # 0.0.0.0 means: reachable from the whole home network — that is
+      # intended, otherwise you could only reach it from the machine itself.
+      # Put it behind a reverse proxy and you set 127.0.0.1 here.
+      # dclint disable-line require-quotes-in-ports
+      - '${LAN_BIND:-0.0.0.0}:${WEBUI_PORT:-3333}:8000'
+    networks:
+      satcortex:
+        ipv4_address: ${NETWORK_PREFIX:-10.83.33}.10
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "curl", "-fsS", "http://localhost:8000/healthz" ]
+      # /healthz answers in milliseconds — the application is ready less than
+      # a second after start. With a 20 s grace period and a 30 s interval it
+      # still showed up as "starting" in the NAS interface for up to a minute,
+      # and the impression was a slow service.
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    user: "${PUID:-1000}:${PGID:-1000}"
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          cpus: "${APP_CPUS:-1.0}"
+          memory: ${APP_MEM:-400M}
+          pids: 512
+    # "latest" is a moving pointer: without this, deploying leaves an old
+    # image in place instead of checking for a new one.
+    pull_policy: always
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+
+  bitcoind:
+    image: ghcr.io/ikarusmk/satcortex-bitcoind:${BITCOIN_VERSION:-31.1}
+    build:
+      context: .
+      dockerfile: images/bitcoind/Dockerfile
+      args:
+        # The same source as the image name above: the .env. Two separate
+        # numbers used to drift apart — CI builds by image name, a local
+        # "docker compose build" by this argument, and the image then carried
+        # a version number that was not inside it.
+        BITCOIN_VERSION: ${BITCOIN_VERSION:-31.1}
+    container_name: satcortex-bitcoind
+    volumes:
+      # Two roots, nothing more is needed. Below them live
+      #   /fast/config     configuration written by the setup wizard
+      #   /fast/bitcoind   data directory: chainstate and blocks/index
+      #   /bulk/blocks     the blocks themselves
+      #   /bulk/coreindex  txindex and block filters
+      - ${DATA_FAST}:/fast
+      - ${DATA_BULK}:/bulk
+    environment:
+      TZ: ${TZ:-UTC}
+      CONFIG_DIR: /fast/config
+      # For the waiting message only: the service should be able to name the
+      # right port instead of guessing one.
+      WEBUI_PORT: ${WEBUI_PORT:-3333}
+    ports:
+      # WITHOUT a host address — and that is the point here, not sloppiness:
+      # Docker then publishes the port on ALL interfaces, IPv4 AND IPv6.
+      #
+      # This used to say "0.0.0.0:" explicitly. That sounded like "open to
+      # everyone" and was the opposite: 0.0.0.0 is the IPv4 wildcard, nothing
+      # listened on ::. An IPv6 forward in the router therefore went nowhere
+      # on the NAS — it was set up on 2026-08-31 and could never have worked.
+      #
+      # This port belongs in your router's port forwarding: only then does the
+      # node accept incoming connections instead of merely watching.
+      # dclint disable-line require-quotes-in-ports
+      - '${BITCOIN_P2P_PORT:-8333}:8333'
+      # The RPC interface. By default reachable ONLY on the server itself
+      # (127.0.0.1) — so nothing changes for existing installations. If you
+      # want to attach wallet software on your home network (Sparrow with a
+      # hardware device, say), set RPC_BIND=0.0.0.0 in the .env AND allow your
+      # home network in the settings. Both are needed: the port alone is
+      # useless while rpcallowip does not let it through — and vice versa.
+      - '${RPC_BIND:-127.0.0.1}:${BITCOIN_RPC_PORT:-8332}:8332'
+    networks:
+      satcortex:
+        # FIXED, and that is the point here: Tor forwards connections from the
+        # onion network to exactly this address. Why not a name like
+        # "bitcoind": Tor resolves it only at startup — see netz.py.
+        ipv4_address: ${NETWORK_PREFIX:-10.83.33}.11
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    user: "${PUID:-1000}:${PGID:-1000}"
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          cpus: "${BITCOIND_CPUS:-2.0}"
+          memory: ${BITCOIND_MEM:-2500M}
+          pids: 512
+    security_opt:
+      - no-new-privileges:true
+    # bitcoind must be allowed to flush the chainstate cleanly. Docker's
+    # default of 10 seconds is not enough for that — a container killed
+    # mid-write costs a rebuild that takes days.
+    stop_grace_period: 10m
+
+  # There is no Electrum server here, and none is needed: Sparrow and
+  # relatives connect to Bitcoin Core directly (Preferences -> Server ->
+  # Bitcoin Core), and with txindex they even gain features that would
+  # otherwise require one. Address lookups happen here instead:
+  # scantxoutset for the current balance, and our own index built from the
+  # ZMQ feed from commissioning onwards. What that cannot give you is the
+  # history of an address from BEFORE you set the node up.
+
+  lnd:
+    # The tag carries LND's own release label, including "v" and "-beta".
+    # Mangling it would be more convenient and wrong: that is what the version
+    # is called, and that is how you find it again at the publisher.
+    image: ghcr.io/ikarusmk/satcortex-lnd:${LND_VERSION:-v0.21.3-beta}
+    build:
+      context: .
+      dockerfile: images/lnd/Dockerfile
+      args:
+        # See bitcoind: one source, the .env.
+        LND_VERSION: ${LND_VERSION:-v0.21.3-beta}
+    container_name: satcortex-lnd
+    # THE ORDER, and it matters most on SHUTDOWN.
+    #
+    # Reported on 2026-09-11: "I cannot stop the docker stack at all .. the lnd
+    # container just keeps running". It was not still running, it was cleaning
+    # up — for up to three minutes, as stop_grace_period below says. The log
+    # showed:
+    #
+    #   [ERR] GetInfo: lookup bitcoind on 127.0.0.11:53: no such host
+    #
+    # bitcoind was already gone, LND was not. Without depends_on, Compose knows
+    # no order and stops both at once; LND then loses its node mid-shutdown and
+    # writes errors that look like damage and are none.
+    #
+    # With depends_on, Compose stops in REVERSE order: LND first, then
+    # bitcoind. On startup it costs nothing — service_started only means
+    # "began earlier", and every service waits for its configuration anyway.
+    depends_on:
+      bitcoind:
+        condition: service_started
+      tor:
+        condition: service_started
+    volumes:
+      # One root is enough. Below it live
+      #   /fast/config  configuration written by the setup wizard
+      #   /fast/lnd     wallet, channel database, macaroons, TLS certificate
+      #
+      # /bulk is absent on purpose: LND needs no blocks. It asks bitcoind over
+      # RPC and ZMQ, and both run inside the Compose network.
+      - ${DATA_FAST}:/fast
+    environment:
+      TZ: ${TZ:-UTC}
+      CONFIG_DIR: /fast/config
+      WEBUI_PORT: ${WEBUI_PORT:-3333}
+    ports:
+      # As with 8333: this port belongs in your router's port forwarding.
+      # Without it the node only opens outgoing channels and is a dead end in
+      # the graph — nobody can open a channel to it.
+      # dclint disable-line require-quotes-in-ports
+      # As with 8333: no host address means IPv4 and IPv6.
+      - '${LIGHTNING_P2P_PORT:-9735}:9735'
+      # The watchtower for OTHER people's channels. With Tor it does not need
+      # this forward: Tor offers it under its own .onion. Forward it in the
+      # router only if you also want to offer it on the clearnet.
+      # dclint disable-line require-quotes-in-ports
+      - '${WATCHTOWER_PORT:-9911}:9911'
+    networks:
+      satcortex:
+        # Fixed, for the same reason as bitcoind: Tor forwards channels and
+        # watchtower to exactly this address.
+        ipv4_address: ${NETWORK_PREFIX:-10.83.33}.12
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    user: "${PUID:-1000}:${PGID:-1000}"
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          cpus: "${LND_CPUS:-1.0}"
+          memory: ${LND_MEM:-512M}
+          pids: 512
+    security_opt:
+      - no-new-privileges:true
+    # LND flushes its channel database on shutdown. Docker's default of ten
+    # seconds is tight for that, and money depends on it here: a damaged
+    # channel database costs, in the worst case, the balances that are not in
+    # the static channel backup.
+    stop_grace_period: 3m
+
+  tor:
+    image: ghcr.io/ikarusmk/satcortex-tor:${TOR_VERSION:-latest}
+    build:
+      context: .
+      dockerfile: images/tor/Dockerfile
+    container_name: satcortex-tor
+    volumes:
+      # Tor's keys live under /fast/tor — including those of the three onion
+      # services. That keeps the .onion addresses the same across restarts and
+      # updates.
+      - ${DATA_FAST}:/fast
+    environment:
+      TZ: ${TZ:-UTC}
+      CONFIG_DIR: /fast/config
+      WEBUI_PORT: ${WEBUI_PORT:-3333}
+    # NO published port, and no control port on the network
+    # either. SOCKS (9050), the probe port used by the reachability check
+    # (9052) and the HTTP tunnel (9080) reach the other containers only.
+    networks:
+      satcortex:
+        ipv4_address: ${NETWORK_PREFIX:-10.83.33}.13
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    user: "${PUID:-1000}:${PGID:-1000}"
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          cpus: "${TOR_CPUS:-0.25}"
+          memory: ${TOR_MEM:-64M}
+          pids: 512
+    # "latest" is a moving pointer: without this, deploying leaves an old
+    # image in place instead of checking for a new one.
+    pull_policy: always
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  satcortex:
+    # The network has fixed addresses,
+    # and the old one has an address range Docker assigned itself. On that one
+    # Docker rejects fixed addresses ("no configured subnet contains IP
+    # address", daemon/container_operations.go), and not every Compose version
+    # rebuilds an existing network on its own. Under a new name, Compose
+    # creates it fresh on the next "up". The old network "satcortex" is left
+    # unused and may be deleted.
+    name: satcortex-netz
+    driver: bridge
+    ipam:
+      config:
+        # Why 10.83.33, and why fixed at all: see
+        # app/backend/satcortex/netz.py. If it collides with a network you
+        # already have ("Pool overlaps with other one on this address space"),
+        # set NETWORK_PREFIX in the .env to a different /24.
+        - subnet: ${NETWORK_PREFIX:-10.83.33}.0/24
+          gateway: ${NETWORK_PREFIX:-10.83.33}.1
+          # The fixed addresses sit below that (.10 to .13). Anything attached
+          # by hand gets an address from .128 upwards — and so cannot take a
+          # service's address away from it.
+          ip_range: ${NETWORK_PREFIX:-10.83.33}.128/25

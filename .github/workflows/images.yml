@@ -1,0 +1,362 @@
+# Builds the images and stores them in the GitHub registry.
+#
+# Deliberately only on a version tag, not on every push: building images from
+# Rust sources takes a long time, and constant builds help nobody.
+name: Build images
+
+on:
+  push:
+    tags: ["v*"]
+  # AND when a third-party version changes on main.
+  #
+  # The trigger, 2026-09-02: Renovate reports "LND 0.21.4 is out", the pull
+  # request is merged -- and nothing happens, because only a version tag built
+  # anything. The image only appeared once somebody cut a release of the whole
+  # project. The operator's ability to update hangs on exactly this.
+  #
+  # Now the merged pull request is enough: example.env is the only place where
+  # third-party versions live, so a change there is precisely the trigger --
+  # and only then does it start.
+    branches: ["main"]
+    paths: ["example.env"]
+  # AND daily on its own: if Bitcoin Core, LND or Tor put out a new version,
+  # the image gets built and stored -- WITHOUT anybody touching the project.
+  #
+  # This is where the operator's ability to update hangs. They pull the images
+  # from the registry; but those are only ever created from the official
+  # release, so only in versions that have gone through here once. If nothing
+  # ran, the image does not exist and the new version stays out of reach --
+  # whatever their .env says.
+  #
+  # The check itself costs seconds. Only what does not exist yet is built:
+  # Core a few times a year, LND roughly monthly.
+  schedule:
+    - cron: "17 4 * * *"
+  # On demand, without having to cut a release.
+  #
+  # The reason: the images are BUILT from the official release, so they only
+  # exist in versions that have gone through here once. Anyone who writes a new
+  # LND version into their .env otherwise gets "manifest unknown" and has to
+  # wait until somebody publishes a release. This button builds exactly one
+  # image in exactly one version -- from the Actions interface, in a few
+  # minutes.
+  workflow_dispatch:
+    inputs:
+      image:
+        description: "Which image"
+        required: true
+        type: choice
+        options:
+          - satcortex
+          - satcortex-bitcoind
+          - satcortex-lnd
+          - satcortex-tor
+      version:
+        description: "Version (empty = the one from example.env or the last tag)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  test:
+    name: Web interface tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - name: Dependencies
+        working-directory: app/backend
+        run: pip install -r requirements-dev.txt
+      - name: Tests with coverage
+        working-directory: app/backend
+        run: pytest --cov=satcortex --cov-report=term-missing --cov-fail-under=80
+
+      # Hard-wired after the review of 2026-08-23: fastapi 0.128.x pulls in a
+      # starlette with five known vulnerabilities. That must never slip back in
+      # unnoticed.
+      - name: Check dependencies for vulnerabilities
+        working-directory: app/backend
+        run: pip-audit -r requirements.txt --strict
+
+      - name: Static analysis of our own code
+        working-directory: app/backend
+        run: bandit -r satcortex -ll
+
+  # What has changed since the PREVIOUS release.
+  #
+  # The trigger, 2026-09-01: "we push fourteen releases that then get changed in
+  # one go, and the fifteenth is the one that actually reaches the NAS". On
+  # 08-31 alone eleven releases were built -- each four images for two
+  # architectures, and the last one was the one deployed.
+  #
+  # Two things follow. One is a way of working and does not belong here but in
+  # the GUIDE: cut a release when you deploy, not on every change. The
+  # other is this job -- so that a release for a small fix does not rebuild
+  # everything.
+  #
+  # A skipped image is not a hole in the registry: its :latest still points at
+  # the previous build, and that one has the same contents.
+  changes:
+    name: What changed since the last release?
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      list: ${{ steps.detect.outputs.list }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - id: detect
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eu
+          # Every image for amd64 AND arm64: the three third-party images are
+          # download-and-verify, ours is pure Python -- the second architecture
+          # costs no meaningful time for any of them, and whoever rebuilds the
+          # project later may well be on an ARM machine.
+          A=linux/amd64,linux/arm64
+          # On demand nothing is compared; what is named gets built.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            case "${{ inputs.image }}" in
+              satcortex)           D=app/Dockerfile ;;
+              satcortex-bitcoind)  D=images/bitcoind/Dockerfile ;;
+              satcortex-lnd)       D=images/lnd/Dockerfile ;;
+              satcortex-tor)       D=images/tor/Dockerfile ;;
+              *) echo "Unknown image"; exit 1 ;;
+            esac
+            echo "On demand: ${{ inputs.image }}"
+            printf 'list=[{"name":"%s","dockerfile":"%s","platforms":"%s"}]\n' \
+              "${{ inputs.image }}" "$D" "$A" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # The daily look upstream.
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "${{ secrets.GITHUB_TOKEN }}" \
+              | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+            owner=$(echo "${{ github.repository_owner }}" | tr "[:upper:]" "[:lower:]")
+            list=""
+
+            # Third-party version: fetch the newest release, skip pre-releases,
+            # and only build what is missing from the registry.
+            # Do NOT take the most recently published release, take the HIGHEST
+            # version. Bitcoin Core maintains several branches in parallel: on
+            # 2026-09-02, v29.4 (July 10) came before v31.1 (July 8) in the
+            # date-sorted list. Whoever takes the first entry "updates" from
+            # 31.1 to 29.4. LND does the same; there 0.21.3-beta and
+            # 0.20.4-beta sit on the same day.
+            newest() {   # repo, image, dockerfile, keep the v?
+              raw=$(gh api "repos/$1/releases?per_page=50" \
+                    --jq ".[] | select(.prerelease == false and .draft == false) | .tag_name" \
+                    | sed "s/^v//" | sort -V | tail -1)
+              [ -n "$raw" ] || { echo "$1: no release found"; return; }
+              if [ "$4" = "no-v" ]; then ver="$raw"; else ver="v$raw"; fi
+              if docker manifest inspect "ghcr.io/$owner/$2:$ver" >/dev/null 2>&1; then
+                echo "$2: $ver is already there"
+              else
+                echo "$2: $ver MISSING -- will be built"
+                list="$list{\"name\":\"$2\",\"dockerfile\":\"$3\",\"platforms\":\"$A\",\"version\":\"$ver\"},"
+              fi
+            }
+            newest bitcoin/bitcoin       satcortex-bitcoind images/bitcoind/Dockerfile no-v
+            newest lightningnetwork/lnd  satcortex-lnd      images/lnd/Dockerfile      with-v
+
+            # Tor has no fixed number on our side: the image takes whichever
+            # Debian package is current. So no comparison, but a rebuild at the
+            # start of the week -- that way "latest" carries the security
+            # updates instead of standing still for months.
+            if [ "$(date -u +%u)" = "1" ]; then
+              echo "satcortex-tor: weekly rebuild"
+              list="$list{\"name\":\"satcortex-tor\",\"dockerfile\":\"images/tor/Dockerfile\",\"platforms\":\"$A\"},"
+            fi
+
+            [ -n "$list" ] || echo "Nothing new -- nothing will be built."
+            echo "list=[${list%,}]" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Push to main: it can only be a third-party version (the workflow
+          # only starts for that when example.env changed). What gets built is
+          # exactly the image whose line moved -- not both, and certainly not
+          # our own.
+          if [ "${{ github.ref_type }}" = "branch" ]; then
+            before=$(git show "${{ github.event.before }}:example.env" 2>/dev/null || echo "")
+            now=$(cat example.env)
+            list=""
+            check() {   # variable, name, dockerfile
+              a=$(printf '%s\n' "$before" | grep -oE "^$1=[^[:space:]]+" || true)
+              b=$(printf '%s\n' "$now"    | grep -oE "^$1=[^[:space:]]+" || true)
+              if [ "$a" != "$b" ]; then
+                echo "$1: $a -> $b"
+                list="$list{\"name\":\"$2\",\"dockerfile\":\"$3\",\"platforms\":\"$A\"},"
+              fi
+            }
+            check BITCOIN_VERSION satcortex-bitcoind images/bitcoind/Dockerfile
+            check LND_VERSION     satcortex-lnd      images/lnd/Dockerfile
+            [ -n "$list" ] || echo "No third-party version changed -- nothing to build."
+            echo "list=[${list%,}]" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          ALL='{"name":"satcortex","dockerfile":"app/Dockerfile","platforms":"'$A'"},
+                {"name":"satcortex-bitcoind","dockerfile":"images/bitcoind/Dockerfile","platforms":"'$A'"},
+                {"name":"satcortex-tor","dockerfile":"images/tor/Dockerfile","platforms":"'$A'"},
+                {"name":"satcortex-lnd","dockerfile":"images/lnd/Dockerfile","platforms":"'$A'"}'
+
+          # The predecessor in the ANCESTRY, not the highest number: whoever
+          # rebuilds an older release would otherwise get a newer one as the
+          # comparison, and with it a difference that never existed.
+          previous=$(git describe --tags --abbrev=0 "$GITHUB_REF_NAME^" 2>/dev/null || true)
+          if [ -z "$previous" ]; then
+            echo "No previous release -- everything will be built."
+            echo "list=[$(echo "$ALL" | tr -d ' \n')]" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          files=$(git diff --name-only "$previous" "$GITHUB_REF_NAME")
+          echo "-- Changed since $previous --"; echo "$files"
+
+          matches() { echo "$files" | grep -qE "$1"; }
+          # The workflow itself concerns all of them: if HOW we build changes,
+          # everything has to be rebuilt too.
+          COMMON='^\.github/workflows/images\.yml$'
+          APP='^app/(backend|templates|web)/|^app/Dockerfile$|^tools/geo_bauen\.py$|^LICENSE$|^THIRD-PARTY-LICENSES\.md$'
+
+          list=""
+          mark() {   # name, pattern, dockerfile
+            if matches "$2" || matches "$COMMON"; then
+              list="$list{\"name\":\"$1\",\"dockerfile\":\"$3\",\"platforms\":\"$A\"},"
+              echo "$1: build"
+            else
+              echo "$1: unchanged since $previous"
+            fi
+          }
+          mark satcortex          "$APP"                        app/Dockerfile
+          # example.env belongs here: the third-party versions live there. A
+          # new number there is precisely the reason to rebuild the image --
+          # without this line the number changes and nothing happens.
+          mark satcortex-bitcoind '^images/(bitcoind|common)/|^example\.env$'  images/bitcoind/Dockerfile
+          mark satcortex-tor      '^images/(tor|common)/'                      images/tor/Dockerfile
+          mark satcortex-lnd      '^images/(lnd|common)/|^example\.env$'       images/lnd/Dockerfile
+          echo "list=[${list%,}]" >> "$GITHUB_OUTPUT"
+
+  images:
+    name: ${{ matrix.name }}
+    needs: [test, changes]
+    if: needs.changes.outputs.list != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.changes.outputs.list) }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # Every image carries the version of ITS software, not the project's: the
+      # Compose file pins satcortex-bitcoind to ${BITCOIN_VERSION}. Name them
+      # all after the git tag and not a single pin finds its image.
+      #
+      # Our own number comes from the git tag, NOT from example.env any more:
+      # since 0.2.9 that file has "latest" as the default for operation. If the
+      # build took that over, every image would be called nothing but "latest"
+      # and there would be no number left to roll back to.
+      - name: Determine the image version
+        id: ver
+        run: |
+          # The single source for the third-party versions is example.env. The
+          # text there always said so ("raise the number here"); until
+          # 2026-09-02 the numbers themselves lived in the Compose file, and
+          # TWICE at that -- in the image name and in the build argument next
+          # to it. CI read only the name, a local "docker compose build" only
+          # the argument. Now both point at this one line.
+          BITCOIN_VERSION="$(grep -oE '^BITCOIN_VERSION=[^[:space:]]+' example.env | head -1 | cut -d= -f2)"
+          # LND is called "v0.21.3-beta" -- with the leading v and with the
+          # suffix; that stays exactly as written there.
+          LND_VERSION="$(grep -oE '^LND_VERSION=[^[:space:]]+' example.env | head -1 | cut -d= -f2)"
+          # On demand, what was typed in applies. Without input it falls back
+          # to the usual source -- for our own images to the last tag, because
+          # "main" is useless as an image number.
+          PROJECT="${GITHUB_REF_NAME#v}"
+          case "$PROJECT" in
+            v[0-9]*|[0-9]*) : ;;
+            *) PROJECT="$(git describe --tags --abbrev=0 2>/dev/null || echo dev)"
+               PROJECT="${PROJECT#v}" ;;
+          esac
+          case "${{ matrix.name }}" in
+            satcortex-bitcoind) TAG="$BITCOIN_VERSION" ;;
+            satcortex-lnd)      TAG="$LND_VERSION" ;;
+            *)                  TAG="$PROJECT" ;;
+          esac
+          if [ -n "${{ inputs.version }}" ]; then
+            TAG="${{ inputs.version }}"
+            echo "Version on demand: $TAG"
+          fi
+          # The daily look upstream carries the version it found in the matrix.
+          if [ -n "${{ matrix.version }}" ]; then
+            TAG="${{ matrix.version }}"
+            echo "New third-party version found: $TAG"
+          fi
+          test -n "$TAG" || { echo "No version for ${{ matrix.name }}"; exit 1; }
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+          # The registry demands lowercase, github.repository_owner returns the
+          # account's spelling (IkarusMK). Without this the build fails with
+          # "repository name must be lowercase" -- and the Compose file, which
+          # points at ghcr.io/ikarusmk/..., would find nothing anyway.
+          OWNER="$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
+          echo "owner=$OWNER" >> "$GITHUB_OUTPUT"
+
+          # Only the build argument this image actually knows. Otherwise
+          # BuildKit warns about unused arguments and you read straight past it.
+          case "${{ matrix.name }}" in
+            satcortex-bitcoind) echo "buildarg=BITCOIN_VERSION=$TAG"   >> "$GITHUB_OUTPUT" ;;
+            satcortex-lnd)      echo "buildarg=LND_VERSION=$TAG"       >> "$GITHUB_OUTPUT" ;;
+            satcortex)          echo "buildarg=SATCORTEX_VERSION=$TAG" >> "$GITHUB_OUTPUT" ;;
+            *)                  echo "buildarg="                       >> "$GITHUB_OUTPUT" ;;
+          esac
+
+          # "latest" only when it really is the newest. A manual run with an
+          # older version would otherwise move the tag backwards -- and whoever
+          # uses it would silently get a downgrade.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] \
+             && [ -n "${{ inputs.version }}" ]; then
+            echo "also_latest=" >> "$GITHUB_OUTPUT"
+            echo "On demand with a fixed version: latest stays where it is."
+          else
+            echo "also_latest=ghcr.io/$OWNER/${{ matrix.name }}:latest" >> "$GITHUB_OUTPUT"
+          fi
+          echo "${{ matrix.name }} becomes ghcr.io/$OWNER/${{ matrix.name }}:$TAG"
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          # The build context is the repository root: the images need
+          # images/common/entrypoint.sh and app/templates respectively.
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: ${{ matrix.platforms }}
+          # Has to be passed, otherwise the Dockerfile uses its own default --
+          # and the image would be called 31.2 while 31.1 is inside it.
+          build-args: ${{ steps.ver.outputs.buildarg }}
+          push: true
+          # Two names for the same image: the fixed number, so you can roll
+          # back and know what is running -- and "latest" for operation, where
+          # you should not have to edit a line for every fix. Whoever wants the
+          # number puts it into the .env; it then wins.
+          tags: |
+            ghcr.io/${{ steps.ver.outputs.owner }}/${{ matrix.name }}:${{ steps.ver.outputs.tag }}
+            ${{ steps.ver.outputs.also_latest }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=Apache-2.0
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

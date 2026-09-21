@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 720" width="100%"
+     font-family='"IBM Plex Sans","Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif'
+     role="img"
+     aria-label="SatoshiCortex — your own Bitcoin and Lightning node, in the middle of the network">
+<defs>
+  <!-- Warmes Fast-Schwarz und Bitcoin-Orange: dieselben Werte wie in
+       app/web/style.css, damit Banner und Oberflaeche dieselbe Sprache
+       sprechen: Grund #0a0805, Bitcoin-Orange #f7931a, Gold #fbbf24. -->
+  <radialGradient id="glowO" cx="27%" cy="42%" r="55%">
+    <stop offset="0" stop-color="#f7931a" stop-opacity=".22"/>
+    <stop offset="1" stop-color="#f7931a" stop-opacity="0"/>
+  </radialGradient>
+  <radialGradient id="glowG" cx="72%" cy="66%" r="52%">
+    <stop offset="0" stop-color="#fbbf24" stop-opacity=".13"/>
+    <stop offset="1" stop-color="#fbbf24" stop-opacity="0"/>
+  </radialGradient>
+  <radialGradient id="vig" cx="50%" cy="48%" r="66%">
+    <stop offset=".5" stop-color="#000" stop-opacity="0"/>
+    <stop offset="1" stop-color="#000" stop-opacity=".62"/>
+  </radialGradient>
+  <!-- Der Verlauf der Wortmarke, Zeichen fuer Zeichen aus .brand
+       uebernommen: hell, orange, cremig, gold. -->
+  <linearGradient id="wort" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#ffd9a0"/>
+    <stop offset=".4" stop-color="#f7931a"/>
+    <stop offset=".62" stop-color="#fff4e2"/>
+    <stop offset="1" stop-color="#ffc978"/>
+  </linearGradient>
+  <linearGradient id="kante" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#f7931a"/><stop offset="1" stop-color="#fbbf24"/>
+  </linearGradient>
+  <radialGradient id="kern" cx="50%" cy="42%" r="60%">
+    <stop offset="0" stop-color="#fff4e2"/>
+    <stop offset=".45" stop-color="#f7931a"/>
+    <stop offset="1" stop-color="#b45309"/>
+  </radialGradient>
+  <radialGradient id="kernschein" cx="50%" cy="50%" r="50%">
+    <stop offset="0" stop-color="#f7931a" stop-opacity=".55"/>
+    <stop offset="1" stop-color="#f7931a" stop-opacity="0"/>
+  </radialGradient>
+</defs>
+
+<rect width="1920" height="720" fill="#0a0805"/>
+<rect width="1920" height="720" fill="url(#glowO)"/>
+<rect width="1920" height="720" fill="url(#glowG)"/>
+
+<!-- Der Erdball, nur angedeutet. Die Weltkarte ist das Erkennungszeichen
+     der Oberflaeche; hier genuegt ihre Ahnung. -->
+<g transform="translate(470 360)" fill="none" stroke="#f7931a" stroke-opacity=".13">
+  <circle r="255" stroke-width="1.5"/>
+  <circle r="255" stroke-width="1.2" transform="scale(.42 1)"/>
+  <circle r="255" stroke-width="1.2" transform="scale(.75 1)"/>
+  <ellipse rx="255" ry="107" stroke-width="1.2"/>
+  <ellipse rx="255" ry="196" stroke-width="1.2"/>
+  <ellipse rx="242" ry="242" stroke-width="1" stroke-dasharray="3 9"/>
+</g>
+
+<!-- Mittendrin statt daneben: die Verbindungen laufen auf EINEN Punkt zu.
+     Das ist der ganze Satz, den dieses Bild zu sagen hat. -->
+<g transform="translate(470 360)">
+  <g stroke="url(#kante)" stroke-width="2" stroke-linecap="round" opacity=".62">
+    <path d="M0 0-232-92"/><path d="M0 0-168 154"/><path d="M0 0 196-146"/>
+    <path d="M0 0 231 78"/><path d="M0 0-52-236"/><path d="M0 0 96 224"/>
+    <path d="M0 0-244 34"/><path d="M0 0 152-212"/>
+  </g>
+  <g stroke="url(#kante)" stroke-width="1.2" stroke-linecap="round" opacity=".24">
+    <path d="M-232-92-52-236"/><path d="M-52-236 152-212"/>
+    <path d="M196-146 231 78"/><path d="M231 78 96 224"/>
+    <path d="M96 224-168 154"/><path d="M-168 154-244 34"/>
+    <path d="M-244 34-232-92"/><path d="M152-212 196-146"/>
+  </g>
+  <g fill="#fbbf24">
+    <circle cx="-232" cy="-92" r="9"/><circle cx="-168" cy="154" r="9"/>
+    <circle cx="196" cy="-146" r="9"/><circle cx="231" cy="78" r="9"/>
+    <circle cx="-52" cy="-236" r="7"/><circle cx="96" cy="224" r="7"/>
+    <circle cx="-244" cy="34" r="7"/><circle cx="152" cy="-212" r="7"/>
+  </g>
+  <!-- Der eigene Knoten. -->
+  <circle r="118" fill="url(#kernschein)"/>
+  <circle r="44" fill="url(#kern)"/>
+  <circle r="44" fill="none" stroke="#fff4e2" stroke-opacity=".35" stroke-width="1.5"/>
+  <circle r="66" fill="none" stroke="url(#kante)" stroke-width="2" stroke-opacity=".65"/>
+  <!-- Das Zeichen fuer Bitcoin, schlicht als Strich gezogen. -->
+  <!-- Um 1,5 nach rechts: das Zeichen reicht von -15 bis +12, seine Mitte
+       liegt also links der Kreismitte. -->
+  <g transform="translate(1.5 0)" stroke="#1a1206" stroke-width="5"
+     stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M-9-25v50M4-25v50"/>
+    <path d="M-15-16h16a8 8 0 0 1 0 16h-16"/>
+    <path d="M-15 0h19a8 8 0 0 1 0 16h-19"/>
+  </g>
+</g>
+
+<!-- Wortmarke und Satz. -->
+<g transform="translate(900 0)">
+  <text x="0" y="330" font-size="108" letter-spacing="-1">
+    <tspan fill="url(#wort)" font-weight="800">Satoshi</tspan><tspan
+           fill="url(#wort)" font-weight="500">Cortex</tspan>
+  </text>
+  <text x="4" y="398" font-size="35" font-weight="600" fill="#f6f1e9"
+        letter-spacing=".2">Your own Bitcoin and Lightning node.</text>
+  <text x="4" y="450" font-size="35" font-weight="600" fill="#f7931a"
+        letter-spacing=".2">In the middle of the network, not beside it.</text>
+  <text x="4" y="524" font-size="26" fill="#a8967e">
+    Reachable · un-pruned · serves block filters · routes Lightning · watches
+  </text>
+  <text x="4" y="562" font-size="26" fill="#a8967e">
+    other people’s channels — and shows you what only your own node can know.
+  </text>
+  <g transform="translate(4 610)" font-size="23" fill="#a8967e">
+    <g fill="none" stroke="#f7931a" stroke-width="2" stroke-linecap="round">
+      <path d="M2 12h14M9 5l7 7-7 7"/>
+      <path d="M262 12h14M269 5l7 7-7 7"/>
+      <path d="M520 12h14M527 5l7 7-7 7"/>
+    </g>
+    <text x="28" y="19">Docker Compose</text>
+    <text x="288" y="19">No Docker socket</text>
+    <text x="546" y="19">Apache-2.0</text>
+  </g>
+</g>
+
+<rect width="1920" height="720" fill="url(#vig)"/>
+</svg>

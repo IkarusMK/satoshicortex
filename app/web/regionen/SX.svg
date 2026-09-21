@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 446.5" class="regionskarte" preserveAspectRatio="xMidYMid meet" data-land="SX" data-minlon="-63.1219" data-maxlon="-63.0145" data-minlat="18.0178" data-maxlat="18.0634" data-umbruch="0">
+<!-- Umrisse: Natural Earth (ne_10m_admin_1_states_provinces),
+     gemeinfrei. Erzeugt von tools/regionen_bauen.py, nicht von
+     Hand aendern. -->
+<g class="regionen">
+<path id="r-NL-SX" data-de="Sint Maarten" data-en="Sint Maarten" data-cx="500" data-cy="223.2" d="M138.9,12.6L335.6,48L971.7,294L850.1,433.9L226.1,268.9L90.8,199.5L28.3,116.6L138.9,38.5L138.9,12.6Z"><title>Sint Maarten</title></path>
+</g>
+</svg>

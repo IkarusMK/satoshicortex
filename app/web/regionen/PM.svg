@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 2259.8" class="regionskarte" preserveAspectRatio="xMidYMid meet" data-land="PM" data-minlon="-56.4042" data-maxlon="-56.1372" data-minlat="46.7411" data-maxlat="47.1529" data-umbruch="0">
+<!-- Umrisse: Natural Earth (ne_10m_admin_1_states_provinces),
+     gemeinfrei. Erzeugt von tools/regionen_bauen.py, nicht von
+     Hand aendern. -->
+<g class="regionen">
+<path id="r-PM-X01~" data-de="Saint-Pierre und Miquelon" data-en="Saint Pierre and Miquelon" data-cx="792.7" data-cy="2034.4" d="M948.5,1971.4L927.8,1995.6L911.6,2022.4L900.4,2052.5L895.2,2087.3L951.3,2118.1L971.7,2124.8L884.4,2171.1L780.6,2195.8L682.7,2185.6L613.8,2124.8L694,2000.9L736.6,1948.4L795.2,1900.2L838.8,1884.1L909.5,1873L961.3,1893.5L948.5,1971.4Z"><title>Saint Pierre and Miquelon</title></path>
+<path id="r-PM-X02~" data-de="Miquelon-Langlade" data-en="Miquelon-Langlade" data-cx="330" data-cy="1053.1" d="M488.3,1412.8L631.8,1541.4L580.3,1704.6L430.3,1860.9L216.9,2026.6L171,2042.2L125.4,2012.3L98.3,1942L108.9,1898.4L108.8,1860L48.9,1804.7L29.2,1737L91,1653.9L230,1522L284.2,1305.8L252.4,1090.2L71.7,643.6L59.9,554.7L48.9,357.1L28.3,268.5L30.9,215.8L61.7,151L100.1,102.4L141.9,69.8L185.5,64L230,94.8L160.5,147.9L121.6,201.7L123.6,258L176.6,319.6L239.1,350.4L372.2,382.8L565,544.5L571.1,598.3L568.8,673.3L555,740.3L505,792.7L488.3,844.1L463.8,895.7L420.7,919.1L399.2,907.5L389.1,881.6L382.7,855.7L370.8,844.1L344.6,848.1L278.9,881.6L226.9,861.5L202.1,868.7L202.2,919.1L218.7,949.3L241.4,954L263.4,951.3L293.1,968.2L315,968.7L338.8,972.7L358,994.1L364.9,1031.2L353.9,1057.8L338.2,1076.8L330.1,1092.6L330.1,1317.7L346.1,1387.1L385.8,1408.1L488.3,1412.8Z"><title>Miquelon-Langlade</title></path>
+</g>
+</svg>

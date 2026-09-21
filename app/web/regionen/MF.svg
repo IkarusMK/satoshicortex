@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 685.9" class="regionskarte" preserveAspectRatio="xMidYMid meet" data-land="MF" data-minlon="-63.1509" data-maxlon="-63.0066" data-minlat="18.0307" data-maxlat="18.1248" data-umbruch="0">
+<!-- Umrisse: Natural Earth (ne_10m_admin_1_states_provinces),
+     gemeinfrei. Erzeugt von tools/regionen_bauen.py, nicht von
+     Hand aendern. -->
+<g class="regionen">
+<path id="r-MF-X00~" data-de="Saint-Martin" data-en="Saint Martin" data-cx="500" data-cy="342.9" d="M924.3,666.5L450.8,483.3L304.4,457L304.4,421.7L246.9,433.3L141.4,470.7L114.9,476.3L48.9,438.3L28.3,397.4L50.6,369.2L257.6,365.6L380,335.4L465.2,268.6L497.9,150.3L554.9,107.8L684.9,58L828.4,21.2L923.8,19.4L921.8,177L969.2,394.1L971.7,612.2L924.3,666.5Z"><title>Saint Martin</title></path>
+</g>
+</svg>

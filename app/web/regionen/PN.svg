@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1632.2" class="regionskarte" preserveAspectRatio="xMidYMid meet" data-land="PN" data-minlon="-128.3521" data-maxlon="-128.2883" data-minlat="-24.4164" data-maxlat="-24.3216" data-umbruch="0">
+<!-- Umrisse: Natural Earth (ne_10m_admin_1_states_provinces),
+     gemeinfrei. Erzeugt von tools/regionen_bauen.py, nicht von
+     Hand aendern. -->
+<g class="regionen">
+<path id="r-PN-X01~" data-de="Pitcairninseln" data-en="Pitcairn Islands" data-cx="500" data-cy="816.1" d="M-27757.6,12866.7L-27602.4,12799.4L-27456.1,12799.4L-27328.4,12861L-27222.4,12984.5L-27374.4,13018.1L-27521.9,13012.5L-27652.9,12962L-27757.6,12866.7ZM55975.1,5909.5L55803.3,5953L55969.3,5899.7L55985.3,5899.7L56062.6,5910.9L56088.8,5958.6L56102.2,6046.9L56090.7,5981L56062.6,5944.6L55987.2,5908.1L55975.1,5909.5ZM343.2,46.2L759,224.3L960.9,758.6L971.7,1322.4L815.2,1586L492.7,1361.6L154.8,863.8L28.3,337.9L343.2,46.2ZM-37567.2,-6845L-37505.9,-6845L-37517.4,-6786.1L-37594,-6700.6L-37654.7,-6668.3L-37689.8,-6755.3L-37654.7,-6797.4L-37610.6,-6794.6L-37567.2,-6845Z"><title>Pitcairn Islands</title></path>
+</g>
+</svg>

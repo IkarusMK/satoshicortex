@@ -1,0 +1,30 @@
+# Die Felder des Netzgraphen, LND v0.21.3-beta -- Nachricht, Feld, Typ.
+# Erzeugt am 18.09.2026 aus lnrpc/lightning.proto des Tags, derselben Quelle
+# wie lnd_rest_routen.tsv. Mit LND neu erzeugen.
+#
+# Sie stehen hier, damit satcortex/gebuehren.py sich nicht auf Erinnerung
+# stuetzt: test_gebuehren.py haelt diese Tabelle und den Quelltext zusammen.
+# Benennt LND ein Feld um, wird der Test rot -- und nicht der Median still
+# leer.
+ChannelGraph	nodes	repeated LightningNode
+ChannelGraph	edges	repeated ChannelEdge
+ChannelEdge	channel_id	uint64
+ChannelEdge	chan_point	string
+ChannelEdge	last_update	uint32
+ChannelEdge	node1_pub	string
+ChannelEdge	node2_pub	string
+ChannelEdge	capacity	int64
+ChannelEdge	node1_policy	RoutingPolicy
+ChannelEdge	node2_policy	RoutingPolicy
+ChannelEdge	custom_records	map<uint64, bytes>
+ChannelEdge	auth_proof	ChannelAuthProof
+RoutingPolicy	time_lock_delta	uint32
+RoutingPolicy	min_htlc	int64
+RoutingPolicy	fee_base_msat	int64
+RoutingPolicy	fee_rate_milli_msat	int64
+RoutingPolicy	disabled	bool
+RoutingPolicy	max_htlc_msat	uint64
+RoutingPolicy	last_update	uint32
+RoutingPolicy	custom_records	map<uint64, bytes>
+RoutingPolicy	inbound_fee_base_msat	int32
+RoutingPolicy	inbound_fee_rate_milli_msat	int32

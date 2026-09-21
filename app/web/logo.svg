@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="g" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f7931a"/><stop offset="1" stop-color="#fbbf24"/>
+    </linearGradient>
+  </defs>
+  <circle cx="24" cy="24" r="21" stroke="url(#g)" stroke-width="2.5" opacity=".55"/>
+  <!-- Knotenpunkte: der eigene Knoten in der Mitte, Verbindungen nach aussen -->
+  <g stroke="url(#g)" stroke-width="1.6" opacity=".8">
+    <path d="M24 24 8 15M24 24l16-9M24 24v18M24 24 9 33M24 24l15 9"/>
+  </g>
+  <g fill="url(#g)">
+    <circle cx="8" cy="15" r="3"/><circle cx="40" cy="15" r="3"/>
+    <circle cx="24" cy="42" r="3"/><circle cx="9" cy="33" r="2.4"/>
+    <circle cx="39" cy="33" r="2.4"/>
+  </g>
+  <circle cx="24" cy="24" r="6.5" fill="url(#g)"/>
+  <path d="M22 20.4v7.2m2.4-7.2v7.2M20.6 22h4.2a1.6 1.6 0 0 1 0 3.2h-4.2m0 0h4.4a1.6 1.6 0 0 1 0 3.2h-4.4m0-6.4v6.4"
+        stroke="#0a0805" stroke-width="1.05" stroke-linecap="round" fill="none"/>
+</svg>

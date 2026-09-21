@@ -1,0 +1,35 @@
+# Laufzeit-Abhaengigkeiten der Weboberflaeche.
+#
+# Fest gepinnt, damit ein Build heute dasselbe ergibt wie in einem halben Jahr.
+# Renovate pflegt die Versionen ueber Pull Requests nach.
+#
+# ACHTUNG bei Herabstufungen: fastapi 0.128.x zieht starlette 0.49.x, und darin
+# stecken fuenf bekannte Schwachstellen — unter anderem ein aus der Ferne und
+# ohne Anmeldung ausloesbarer Ausfall (PYSEC-2026-249) und eine fehlende
+# Host-Header-Pruefung, die pfadbasierte Sicherheitspruefungen aushebelt
+# (PYSEC-2026-161). Genau so etwas serviert diese Anwendung.
+# Verlangt Python >= 3.10; das Image nutzt 3.14 (aktuelle Fassung, Support bis 2030).
+fastapi==0.141.1
+starlette==1.6.0
+uvicorn[standard]==0.52.4
+pydantic==2.13.4
+# Fuer den sequence-Strom von bitcoind. BSD-3-Clause, fertige Raeder fuer
+# amd64 und arm64 -- es wird beim Bauen nichts uebersetzt.
+pyzmq==27.2.0
+# Fuer die Anmeldung ueber einen fremden Ausweisdienst: die Unterschrift des
+# ID-Tokens wird gegen die oeffentlichen Schluessel des Anbieters geprueft
+# (satcortex/oidc.py, RS256 und ES256).
+#
+# Kam urspruenglich fuer den Tresor herein. Den gibt es seit v0.54.0 nicht
+# mehr -- das Wallet-Passwort liegt jetzt im Arbeitsspeicher statt
+# verschluesselt auf der Platte --, und danach hat diese Abhaengigkeit eine
+# Zeit lang niemand mehr benutzt. Am 11.09.2026 ist sie wieder in Gebrauch,
+# und zwar an einer Stelle, an der Selbstbau die falsche Sparsamkeit waere:
+# ein Ausweis, den man zu leicht annimmt, ist die Eingangstuer zu einem Geraet
+# mit einer Wallet darin.
+#
+# cryptography ist die Standardwahl der Python-Welt, wird von pip-audit
+# mitgeprueft und liefert fertige abi3-Raeder fuer amd64 UND arm64 -- am
+# 10.09.2026 nachgesehen, es wird beim Bauen nichts uebersetzt.
+# renovate: datasource=pypi depName=cryptography
+cryptography==50.0.1

@@ -1,0 +1,13 @@
+# Regeln fuer die Dockerfile-Pruefung.
+ignored:
+  # DL3008 — apt-Pakete auf Versionen festnageln.
+  # In Debian bewusst nicht befolgt: Paketversionen verschwinden aus dem Archiv,
+  # sobald eine neue nachrueckt. Ein gepinntes Dockerfile waere binnen Wochen
+  # unbaubar. Die Sicherheit haengt hier ohnehin nicht an apt, sondern an den
+  # signaturgeprueften Bitcoin-Core-Artefakten.
+  - DL3008
+  # DL3025 — JSON-Notation fuer CMD/ENTRYPOINT.
+  # Betrifft bei uns nur die HEALTHCHECK-Zeilen. Die brauchen eine Shell, weil
+  # sie mit "|| exit 1" arbeiten. Alle echten ENTRYPOINTs stehen in JSON.
+  - DL3025
+failure-threshold: warning

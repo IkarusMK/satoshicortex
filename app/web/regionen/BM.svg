@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 697.9" class="regionskarte" preserveAspectRatio="xMidYMid meet" data-land="BM" data-minlon="-64.8931" data-maxlon="-64.6405" data-minlat="32.2439" data-maxlat="32.3929" data-umbruch="0">
+<!-- Umrisse: Natural Earth (ne_10m_admin_1_states_provinces),
+     gemeinfrei. Erzeugt von tools/regionen_bauen.py, nicht von
+     Hand aendern. -->
+<g class="regionen">
+<path id="r-BM-HAM" data-de="Hamilton" data-en="Hamilton" data-cx="692.1" data-cy="247.1" d="M743.1,266.1L712.5,235.2L666.9,253.3L634.2,277L626.9,305.2L608.1,300.6L599.5,280.1L620.4,229.8L677.3,189L732.4,193.5L744.7,233.4L784.6,247.9L743.1,266.1ZM709.4,297L743.1,266.1L770.7,311.5L735.6,335.7L709.4,297ZM595.5,333.1L605.1,322.4L622,327.8L640.8,326.8L607.5,355.5L595.5,333.1Z"><title>Hamilton</title></path>
+<path id="r-BM-SMI" data-de="Smith's" data-en="Smith's Parish" data-cx="654.7" data-cy="360.9" d="M640.8,326.8L691,324.2L709.4,297L735.6,335.7L697.1,362.3L614.3,424.9L573.8,357.6L595.5,333.1L607.5,355.5L640.8,326.8Z"><title>Smith's Parish</title></path>
+<path id="r-BM-DEV" data-de="Devonshire" data-en="Devonshire" data-cx="530.8" data-cy="428.6" d="M447.2,419L519.7,383.7L561.8,371.2L573.8,357.6L614.3,424.9L603.8,432.9L547.3,467.2L523.7,499.7L499.4,452L451.7,476.7L447.2,419Z"><title>Devonshire</title></path>
+<path id="r-BM-PEM" data-de="Pembroke" data-en="Pembroke Parish" data-cx="382.5" data-cy="441.7" d="M390.3,483.9L347.4,465.8L313.4,416.3L325.8,399.6L447.2,419L451.7,476.7L430.3,479.2L430.3,447.4L393.1,452L390.3,483.9Z"><title>Pembroke Parish</title></path>
+<path id="r-BM-HA" data-de="Hamilton" data-en="Hamilton" data-cx="410.3" data-cy="465.7" d="M430.3,479.2L390.3,483.9L393.1,452L430.3,447.4L430.3,479.2Z"><title>Hamilton</title></path>
+<path id="r-BM-PAG" data-de="Paget Parish" data-en="Paget Parish" data-cx="451.9" data-cy="524.8" d="M380.2,532.9L444.2,493.3L451.7,476.7L499.4,452L523.7,499.7L511.5,516.6L434.8,587.4L414.9,597.6L380.2,532.9ZM338.2,498.4L368.8,513L358.1,523.9L324.4,518.4L338.2,498.4Z"><title>Paget Parish</title></path>
+<path id="r-BM-WAR" data-de="Warwick" data-en="Warwick" data-cx="326.7" data-cy="591" d="M238.5,623.7L253.8,591L290.6,587.4L356.6,547.5L380.2,532.9L414.9,597.6L332,640L308.7,649.1L286.8,613.4L238.5,623.7ZM324.4,518.4L287.5,523.9L250.7,520.2L240,494.8L252.3,485.7L286,494.8L307.5,487.5L321.3,482.1L338.2,498.4L324.4,518.4Z"><title>Warwick</title></path>
+<path id="r-BM-SOU" data-de="Southampton" data-en="Southampton" data-cx="180" data-cy="629.1" d="M118.8,580.1L114.2,611L140.3,647.3L183.2,647.3L238.5,623.7L286.8,613.4L308.7,649.1L233.9,678.1L174,676.3L128,674.5L66.7,632.8L51.4,594.5L118.8,580.1Z"><title>Southampton</title></path>
+<path id="r-BM-SAN" data-de="Sandy" data-en="Sandys Parish" data-cx="101.9" data-cy="493.8" d="M51.4,594.5L40.6,567.4L28.3,516.6L65.3,533.7L60,500.2L73.6,455.2L52.8,409.5L82,420.4L95.8,393.2L114.2,420.4L138.7,445.8L103.5,476.7L92.4,529.6L83.5,545.6L103.5,562L175.6,571L175.6,585.6L118.8,580.1L51.4,594.5Z"><title>Sandys Parish</title></path>
+<path id="r-BM-SGE" data-de="Sankt George's" data-en="Saint George" data-cx="824.5" data-cy="109.3" d="M784.6,247.9L852,273.4L770.7,311.5L743.1,266.1L784.6,247.9ZM677.3,189L712.5,133.6L775.3,90.6L859,19.8L971.7,115.4L941,157.2L939.5,198.9L921.1,184.4L893.5,159L840.5,145.9L822.9,166.3L798.4,135.4L732.4,193.5L677.3,189ZM855.5,108.2L889.1,87.2L875,55.8L839.5,78.8L855.5,108.2Z"><title>Saint George</title></path>
+<path id="r-BM-SG" data-de="Saint George's" data-en="St. George" data-cx="864.3" data-cy="82" d="M875,55.8L889.1,87.2L855.5,108.2L839.5,78.8L875,55.8Z"><title>St. George</title></path>
+</g>
+</svg>

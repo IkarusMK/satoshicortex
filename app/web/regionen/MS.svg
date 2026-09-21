@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1677.9" class="regionskarte" preserveAspectRatio="xMidYMid meet" data-land="MS" data-minlon="-62.2328" data-maxlon="-62.1378" data-minlat="16.6710" data-maxlat="16.8236" data-umbruch="0">
+<!-- Umrisse: Natural Earth (ne_10m_admin_1_states_provinces),
+     gemeinfrei. Erzeugt von tools/regionen_bauen.py, nicht von
+     Hand aendern. -->
+<g class="regionen">
+<path id="r-MS-P" data-de="St Peter's" data-en="Saint Peter" data-cx="369.3" data-cy="489.3" d="M77.5,833.8L147,520.4L324.3,47.5L456.7,101.2L525.3,120L612.2,115.5L563.4,320.4L661.1,512.8L582.7,612.2L512.2,759.3L465.3,931L324.3,865.6L77.5,833.8Z"><title>Saint Peter</title></path>
+<path id="r-MS-A" data-de="St.Anthony" data-en="Saint Anthony" data-cx="500" data-cy="1232.1" d="M863.7,1135.6L897.6,1184.8L936.1,1260.9L964.8,1339.1L971.7,1398.2L934.9,1489L874.4,1559.7L789.6,1608.9L683.8,1630.4L147,1483.7L28.3,1055.9L77.5,833.8L324.3,865.6L465.3,931L567,1037.3L676.7,1102.7L863.7,1135.6Z"><title>Saint Anthony</title></path>
+<path id="r-MS-G" data-de="Saint George" data-en="Saint George" data-cx="682.5" data-cy="824.2" d="M661.1,512.8L805.5,696.2L899.7,872.5L896.3,952.1L853.5,1089.9L863.7,1135.6L676.7,1102.7L567,1037.3L465.3,931L512.2,759.3L582.7,612.2L661.1,512.8Z"><title>Saint George</title></path>
+</g>
+</svg>

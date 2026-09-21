@@ -1,0 +1,47 @@
+# Regeln fuer dclint.
+rules:
+  # Beides anzugeben ist hier Absicht, nicht Nachlaessigkeit: "build" sagt, wie
+  # das Abbild entsteht, "image" gibt ihm einen festen Namen mit Version. So
+  # kann derselbe Stapel selbst bauen (ohne Registry, auf jeder Architektur)
+  # ODER fertige Abbilder ziehen -- und ein Versionswechsel in der .env aendert
+  # den Namen mit, sonst wuerde stillschweigend das alte Abbild weiterlaufen.
+  no-build-and-image: 0
+
+  # Die Schnittstelle steht sehr wohl in jeder Portzeile -- aber als Variable
+  # (${LAN_BIND:-0.0.0.0}), und der Linter liest statisch. Zeilenweise
+  # abschalten hilft nicht, diese Regel ignoriert "dclint disable-line".
+  # Sie hart auf 0.0.0.0 umzuschreiben wuerde die Pruefung zufriedenstellen
+  # und die Gefahr behalten -- also lieber ehrlich aus, und die Warnung steht
+  # dort, wo sie wirkt: in der example.env und im GUIDE. Der
+  # Electrum-Port gehoert NIE in eine Portweiterleitung.
+  no-unbound-port-interfaces: 0
+
+  # Unsere beiden eigenen Abbilder tragen "latest". Der Einwand des Linters ist
+  # berechtigt und wurde durchgesprochen: ein beweglicher Zeiger nimmt die
+  # Reproduzierbarkeit und den Rueckweg auf eine bestimmte Fassung.
+  #
+  # Dagegen steht die gelebte Erfahrung vom 25.08.2026: an einem Tag fuenf
+  # Fassungen, und zweimal ging genau an der Versionszeile etwas schief --
+  # einmal wurde die .env nicht nachgezogen, einmal stand die Nummer fest in
+  # der Compose auf dem Geraet und die .env wurde gar nicht gelesen. Jedes Mal
+  # kostete das einen vollstaendigen Neuaufbau. Die Nummer von Hand zu pflegen
+  # war die fehleranfaelligere Seite.
+  #
+  # Abgefedert ist es dreifach: jedes Abbild wird ZUSAETZLICH unter seiner
+  # Nummer veroeffentlicht (der Rueckweg bleibt also offen -- man traegt die
+  # Nummer in die Compose ein), die Anwendung zeigt ihre echte Fassung in der
+  # Fusszeile, und pull_policy: always sorgt dafuer, dass der Zeiger auch
+  # wirklich verfolgt wird.
+  #
+  # bitcoind ist bewusst ausgenommen und steht auf einer festen Nummer: ein
+  # Major-Wechsel bei Bitcoin Core aendert Policy und Datenbankformat. Sobald
+  # LND dazukommt, gilt fuer das dasselbe -- dessen Migrationen laufen nur
+  # vorwaerts.
+  service-image-require-explicit-tag: 0
+
+# Anmerkung zu den Inline-Ausnahmen in der docker-compose.yml:
+# no-unbound-port-interfaces und require-quotes-in-ports schlagen dort auf
+# Zeilen an, in denen die Schnittstelle sehr wohl steht -- nur eben als
+# Variable (${LAN_BIND:-0.0.0.0}). Der Linter liest statisch und loest sie
+# nicht auf. Die Regeln bleiben aktiv, damit sie bei kuenftigen Zeilen greifen;
+# stillgestellt sind einzelne Zeilen, nicht die Pruefung.

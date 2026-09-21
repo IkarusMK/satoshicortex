@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 654.8" class="regionskarte" preserveAspectRatio="xMidYMid meet" data-land="BL" data-minlon="-62.8696" data-maxlon="-62.7894" data-minlat="17.8806" data-maxlat="17.9306" data-umbruch="0">
+<!-- Umrisse: Natural Earth (ne_10m_admin_1_states_provinces),
+     gemeinfrei. Erzeugt von tools/regionen_bauen.py, nicht von
+     Hand aendern. -->
+<g class="regionen">
+<path id="r-BL-X00~" data-de="Saint-Barthélemy" data-en="Saint Barthélemy" data-cx="500" data-cy="327.4" d="M383.3,636.3L232.7,525.4L103.4,329.3L28.3,133.1L43.5,18.5L152.1,72.4L971.7,197.6L880.9,341.5L741.4,501.4L570.5,619.8L383.3,636.3Z"><title>Saint Barthélemy</title></path>
+</g>
+</svg>

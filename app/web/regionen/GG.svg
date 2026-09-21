@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 501.4" class="regionskarte" preserveAspectRatio="xMidYMid meet" data-land="GG" data-minlon="-2.6830" data-maxlon="-2.3448" data-minlat="49.4084" data-maxlat="49.5186" data-umbruch="0">
+<!-- Umrisse: Natural Earth (ne_10m_admin_1_states_provinces),
+     gemeinfrei. Erzeugt von tools/regionen_bauen.py, nicht von
+     Hand aendern. -->
+<g class="regionen">
+<path id="r-GG-X01~" data-de="Sark" data-en="Sark" data-cx="282.2" data-cy="216.3" d="M303.9,114L365.1,87.9L428.2,40.1L487.3,14.2L536.2,54.6L524.1,94L475.8,176L462.2,273.7L443.8,344.8L444.2,362.8L440.4,375L417,399.3L387.2,418.3L367.6,416.1L349.4,405.6L325,399.3L40.5,399.3L28.3,387.4L36.2,363.4L59.3,340.6L92.2,334.1L78.2,269.5L96.9,250.1L133.3,249.3L172.7,240.8L303.9,114ZM944,326.7L965.9,356.1L971.7,413.3L941.4,458.5L915.1,487.2L901.7,481.8L911.3,452.6L916.4,429.4L908.2,401.5L909.4,378.5L917.8,366.7L926,348.4L937,331.7L944,326.7ZM1503.7,-967.9L1516,-955.9L1516,-930.7L1464,-873.5L1425.8,-851.1L1378.4,-838.9L1350.7,-860.7L1373.6,-910.2L1414.3,-934.8L1443.6,-937.9L1491.5,-965.7L1503.7,-967.9Z"><title>Sark</title></path>
+</g>
+</svg>

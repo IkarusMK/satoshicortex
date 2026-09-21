@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1120.6" class="regionskarte" preserveAspectRatio="xMidYMid meet" data-land="NF" data-minlon="167.9096" data-maxlon="167.9989" data-minlat="-29.0825" data-maxlat="-28.9950" data-umbruch="0">
+<!-- Umrisse: Natural Earth (ne_10m_admin_1_states_provinces),
+     gemeinfrei. Erzeugt von tools/regionen_bauen.py, nicht von
+     Hand aendern. -->
+<g class="regionen">
+<path id="r-NF-X01~" data-de="Norfolkinsel" data-en="Norfolk Island" data-cx="500" data-cy="560.3" d="M835,292.4L971.7,392.4L952.6,609.3L845,823L715.6,913.7L677.3,947.1L653.6,986.7L637.2,1034.7L639,1088.9L572.5,904.3L457.6,788.6L337.3,778.2L258,913.7L188.7,913.7L165,776.1L118.5,646.8L97.6,530.1L143.2,432.1L227.9,313.2L234.3,219.4L167.8,175.6L28.3,213.1L189.6,31.7L402.9,79.7L629.9,215.2L835,292.4Z"><title>Norfolk Island</title></path>
+</g>
+</svg>
