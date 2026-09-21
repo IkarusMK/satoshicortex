@@ -2712,3 +2712,52 @@ def test_der_eigene_wachturm_verschwindet_nicht_wortlos(html, js):
         text = re.search(r'\n    wt_eigen_ohne: "([^"]*)"', block).group(1)
         assert wort in text, sprache
         assert len(text) > 120, sprache
+
+
+def test_die_gebuehrenspanne_wird_nicht_mitte_genannt(js):
+    """Der Befund vom 21.09.2026 aus dem Betrieb.
+
+    Angezeigt wurde: "Median 100 ppm · Mitte des Netzes 1-600 ppm". Die
+    Rueckfrage kam prompt und war berechtigt: "das kann ja nicht richtig
+    sein oder" -- denn wer "Mitte" liest, rechnet (1+600)/2 = 300 und findet
+    100 daneben.
+
+    Beides stimmt. 100 ist der MEDIAN (die Haelfte nimmt weniger), die
+    Spanne ist das mittlere Viertelpaar. Weil im Lightning-Netz sehr viele
+    Richtungen bei null oder einem ppm stehen, liegt der Median nicht in
+    der Mitte der Spanne.
+
+    Die Zahl war also nie falsch -- ihre Beschriftung war es. Der Test haelt
+    fest, dass die Spanne sagt, WAS in ihr liegt.
+    """
+    import re
+    for sprache, wort in (("de", "50 %"), ("en", "50 %")):
+        anfang = js.index("\n  %s: {" % sprache)
+        block = js[anfang:anfang + 200000]
+        text = re.search(r'\n    gb_netz_zahlen: "([^"]*)"', block).group(1)
+        assert "Mitte des Netzes" not in text, sprache
+        assert "Middle of the network" not in text, sprache
+        assert wort in text, (sprache, text)
+        # Und der Median muss als solcher benannt sein, nicht als Schnitt.
+        assert "Median" in text, sprache
+        assert "urchschnitt" not in text and "verage" not in text, sprache
+
+
+def test_zur_schiefen_verteilung_gibt_es_eine_erklaerung(js):
+    """Und sie erscheint nur, wenn der Median wirklich aus der Mitte faellt.
+
+    Ein Satz, der immer dasteht, beantwortet auch die Faelle, in denen
+    niemand gefragt haette.
+    """
+    import re
+    stelle = js.index('zahlen.textContent = t("gb_netz_zahlen"')
+    rumpf = js[stelle:stelle + 1600]
+    assert "gb_netz_schief" in rumpf
+    assert "Math.abs(heute.median_ppm - mitte)" in rumpf, \
+        "der Satz muss an einer Bedingung haengen, nicht immer stehen"
+    for sprache in ("de", "en"):
+        anfang = js.index("\n  %s: {" % sprache)
+        block = js[anfang:anfang + 200000]
+        text = re.search(r'\n    gb_netz_schief: "([^"]*)"', block).group(1)
+        assert len(text) > 150, sprache
+        assert ("ppm" in text), sprache

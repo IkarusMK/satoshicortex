@@ -38,7 +38,8 @@ const I18N = {
     gb_netz_titel: "Was das Netz nimmt",
     gb_messen: "Jetzt messen",
     gb_messen_laeuft: "Der Graph wird gelesen …",
-    gb_netz_zahlen: "Median {median} ppm · Mitte des Netzes {p25}–{p75} ppm · Grundgebühr {basis} msat · {linien} Richtungen in {kanaele} Kanälen · gemessen am {tag}",
+    gb_netz_zahlen: "Median {median} ppm — die Hälfte aller Richtungen nimmt weniger. Die mittleren 50 % liegen zwischen {p25} und {p75} ppm · Grundgebühr {basis} msat · {linien} Richtungen in {kanaele} Kanälen · gemessen am {tag}",
+    gb_netz_schief: "Dass der Median nicht in der Mitte dieser Spanne liegt, ist kein Rechenfehler, sondern die Form des Netzes: sehr viele Richtungen stehen bei null oder einem ppm — Kanäle unter Bekannten, unveränderte Vorgaben —, und nach oben gibt es kaum eine Grenze. Der Durchschnitt wäre hier die falsche Zahl; er läge weit über dem, was tatsächlich üblich ist.",
     gb_netz_nie: "Noch nicht gemessen. Dein Knoten liest dafür den gesamten Netzgraphen — das dauert und passiert einmal am Tag von selbst.",
     gb_netz_eigen: "Du nimmst zurzeit {eigen} ppm.",
     gb_netz_eigen_keine: "Was du zurzeit nimmst, steht noch nicht im Graphen — dafür braucht es mindestens einen öffentlichen Kanal.",
@@ -1188,7 +1189,8 @@ const I18N = {
     gb_netz_titel: "What the network charges",
     gb_messen: "Measure now",
     gb_messen_laeuft: "Reading the graph …",
-    gb_netz_zahlen: "Median {median} ppm · middle of the network {p25}–{p75} ppm · base fee {basis} msat · {linien} directions across {kanaele} channels · measured on {tag}",
+    gb_netz_zahlen: "Median {median} ppm — half of all directions charge less. The middle 50 % sit between {p25} and {p75} ppm · base fee {basis} msat · {linien} directions across {kanaele} channels · measured on {tag}",
+    gb_netz_schief: "That the median does not sit in the middle of that range is not an arithmetic error but the shape of the network: a great many directions stand at zero or one ppm — channels between people who know each other, untouched defaults — and there is barely a ceiling at the top. The average would be the wrong number here; it would land far above what is actually usual.",
     gb_netz_nie: "Not measured yet. Your node reads the entire network graph for this — it takes a while and happens once a day by itself.",
     gb_netz_eigen: "You currently charge {eigen} ppm.",
     gb_netz_eigen_keine: "What you currently charge is not in the graph yet — that needs at least one public channel.",
@@ -10212,6 +10214,26 @@ function zeichneNetzgebuehren(d) {
       basis: heute.basis_median_msat, linien: heute.linien,
       kanaele: heute.kanaele, tag: heute.tag,
     });
+    // Der Befund vom 21.09.2026 aus dem Betrieb: "dann sagt er mir das dass
+    // netzwerk zwischen 100 - 600 sat als gebüren nimmt und sagt mir dann
+    // das 100 der durchschnitt ist .. das kann ja nicht richtig sein oder".
+    //
+    // Doch, und die Rechnung war nie das Problem: 100 ist der MEDIAN, die
+    // Spanne ist das mittlere Viertelpaar. Weil die Verteilung schief ist,
+    // liegt der Median nicht in ihrer Mitte -- wer "Mitte des Netzes" liest,
+    // rechnet aber genau das nach und findet einen Widerspruch, den es nicht
+    // gibt. Eine Zahl, die man erklaeren muss, gehoert erklaert.
+    if (heute.p25_ppm !== null && heute.p75_ppm !== null) {
+      const mitte = (heute.p25_ppm + heute.p75_ppm) / 2;
+      // Nur wenn der Median spuerbar aus der Mitte faellt -- sonst waere der
+      // Satz eine Antwort auf eine Frage, die niemand gestellt hat.
+      if (Math.abs(heute.median_ppm - mitte) > (heute.p75_ppm - heute.p25_ppm) * 0.15) {
+        const schief = document.createElement("div");
+        schief.className = "dim small";
+        schief.textContent = t("gb_netz_schief");
+        zahlen.after(schief);
+      }
+    }
   } else {
     zahlen.textContent = d.fehler ? t(d.fehler) : t("gb_netz_nie");
   }
