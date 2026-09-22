@@ -673,13 +673,16 @@ class Ablage:
         return weg
 
     def htlc_aufraeumen(self, tage: int = NACHRICHTEN_TAGE) -> int:
-        grenze = int((time.time() - tage * 86400) * 1000)
+        # max(1, ...) wie beim Nachbarn: ohne die Klammer raeumt eine Null
+        # die ganze Tabelle ab. Heute ruft das niemand mit einer Null -- und
+        # "heute ruft das niemand so" ist keine Eigenschaft, auf die man baut.
+        grenze = int((time.time() - max(1, int(tage)) * 86400) * 1000)
         c = self.v.execute("DELETE FROM htlc WHERE zeit_ms < ?", (grenze,))
         self.v.commit()
         return c.rowcount
 
     def nachrichten_aufraeumen(self, tage: int = NACHRICHTEN_TAGE) -> int:
-        grenze = int(time.time()) - tage * 86400
+        grenze = int(time.time()) - max(1, int(tage)) * 86400
         c = self.v.execute(
             "DELETE FROM nachrichten WHERE COALESCE(zeitpunkt, geholt_s) < ?",
             (grenze,))

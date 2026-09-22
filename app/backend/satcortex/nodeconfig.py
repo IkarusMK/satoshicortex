@@ -1145,7 +1145,12 @@ def setze_entsperrdatei(conf: str, pfad: str) -> str:
             "# Passwort tippt. Das Passwort liegt dafuer neben der Wallet und",
             "# schuetzt sie nicht gegen jemanden, der die Platte hat. Was",
             "# wirklich schuetzt, ist der Seed auf Papier.",
-            f"wallet-unlock-password-file={pfad}",
+            # Durch dieselbe Wache wie jeder andere freie Wert in dieser
+            # Datei. Heute kommt der Pfad ausschliesslich von uns selbst --
+            # aber diese eine Schreibfunktion war die einzige im Modul, die
+            # sich nicht so verteidigt wie ihre Nachbarn. Befund vom
+            # 22.09.2026.
+            f"wallet-unlock-password-file={nur_eine_zeile(str(pfad))}",
         ]
         # Hinter die Identitaet, noch in den [Application Options].
         #

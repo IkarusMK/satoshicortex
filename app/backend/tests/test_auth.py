@@ -533,3 +533,128 @@ def test_eine_zerschossene_datei_gilt_nicht_als_fehlende_pin(mit_pin):
     assert mit_pin.vorhanden, "die Datei ist da, also ist die PIN da"
     with pytest.raises(auth.FreigabeAbgelehnt):
         mit_pin.pruefe(PIN)
+
+
+# ── Befunde des Audits vom 22.09.2026 ──────────────────────────────────────
+
+def test_fehlversuche_unter_fremden_namen_fuellen_nichts_auf(verwaltung):
+    """DER BEFUND: gezaehlt wurde unter dem Namen, den der Angreifer TIPPT.
+
+    Der Eintrag wuchs damit unbegrenzt -- ein Anmeldeversuch mit jeweils
+    neuem Namen genuegte, unangemeldet, auf einem Behaelter mit 400 MB
+    Grenze, der genau daran schon einmal gestorben ist.
+
+    Und eine blosse Obergrenze waere die falsche Behebung gewesen: dann
+    haette man den Eintrag des ECHTEN Namens hinausdraengen und so seine
+    Sperre aufheben koennen. Es gibt genau ein Konto -- also gibt es auch
+    nur zwei Toepfe: dieses Konto und alles andere.
+    """
+    verwaltung.lege_an("betreiber", "ein-langes-passwort")
+    for n in range(50):
+        with pytest.raises(PermissionError):
+            verwaltung.melde_an(f"fremd-{n}", "falsch")
+    assert len(verwaltung._fehlversuche) <= 2
+
+
+def test_fremde_namen_heben_die_sperre_des_echten_nicht_auf(verwaltung):
+    """Die Gegenprobe zur Behebung: wer den echten Namen ausgesperrt hat,
+    darf ihn nicht durch Rauschen wieder freibekommen."""
+    verwaltung.lege_an("betreiber", "ein-langes-passwort")
+    for _ in range(auth.MAX_FEHLVERSUCHE):
+        with pytest.raises(PermissionError):
+            verwaltung.melde_an("betreiber", "falsch")
+    for n in range(40):
+        with pytest.raises(PermissionError):
+            verwaltung.melde_an(f"fremd-{n}", "falsch")
+    # Immer noch gesperrt -- auch mit dem RICHTIGEN Passwort.
+    with pytest.raises(PermissionError) as f:
+        verwaltung.melde_an("betreiber", "ein-langes-passwort")
+    assert "zu_viele" in str(f.value)
+
+
+def test_die_anmeldesperre_ueberlebt_einen_neustart(verwaltung, tmp_path):
+    """Die PIN-Sperre tut das laengst (siehe oben), die ANMELDE-Sperre nicht.
+
+    Sitzungen ueberdauern einen Neustart, die Sperre bisher nicht -- und
+    das Protokoll dieser Anwendung sagt selbst, warum das zaehlt: ein
+    Neustart laesst sich aus der Oberflaeche ausloesen."""
+    verwaltung.lege_an("betreiber", "ein-langes-passwort")
+    for _ in range(auth.MAX_FEHLVERSUCHE):
+        with pytest.raises(PermissionError):
+            verwaltung.melde_an("betreiber", "falsch")
+    frisch = auth.Kontoverwaltung(str(tmp_path / "ablage"))
+    with pytest.raises(PermissionError) as f:
+        frisch.melde_an("betreiber", "ein-langes-passwort")
+    assert "zu_viele" in str(f.value)
+
+
+def test_gleichzeitige_versuche_zaehlen_alle(verwaltung, monkeypatch):
+    """DER TOCTOU-BEFUND. Pruefen und Zaehlen liefen ohne Schloss, und
+    dazwischen liegt scrypt -- also ein langer Augenblick. Mehrere
+    gleichzeitige Versuche kamen alle an der Sperre vorbei, bevor der erste
+    sie hochgezaehlt hatte.
+
+    Erzwungene Verschraenkung statt Hoffen: die Passwortpruefung wird
+    kuenstlich langsam gemacht. Ohne sie ist der Test gruen, egal wie der
+    Code aussieht -- und waere damit wertlos.
+    """
+    import threading
+    verwaltung.lege_an("betreiber", "ein-langes-passwort")
+    # Einen Versuch unter der Grenze aufbauen.
+    for _ in range(auth.MAX_FEHLVERSUCHE - 1):
+        with pytest.raises(PermissionError):
+            verwaltung.melde_an("betreiber", "falsch")
+
+    echt = auth.pruefe_passwort
+    monkeypatch.setattr(auth, "pruefe_passwort",
+                        lambda h, p: (time.sleep(0.25), echt(h, p))[1])
+
+    ergebnis = []
+
+    def versuchen():
+        try:
+            verwaltung.melde_an("betreiber", "falsch")
+            ergebnis.append("durch")
+        except PermissionError as f:
+            ergebnis.append("zu_viele" if "zu_viele" in str(f) else "falsch")
+
+    faeden = [threading.Thread(target=versuchen) for _ in range(6)]
+    for f in faeden:
+        f.start()
+    for f in faeden:
+        f.join()
+    # Genau EINER darf die Passwortpruefung noch erreichen; die Sperre faellt
+    # mit seinem Versuch. Ohne Schloss kamen alle sechs durch.
+    durchgelassen = sum(1 for e in ergebnis if e == "falsch")
+    assert durchgelassen == 1, ergebnis
+
+
+def test_gleichzeitige_pin_versuche_zaehlen_alle(tmp_path, monkeypatch):
+    """Dasselbe fuer die PIN. Dort liegt der Zaehler in einer DATEI, und
+    Lesen-Aendern-Schreiben ohne Schloss VERLIERT Versuche -- bei genau dem
+    Zaehler, der zwischen einer uebernommenen Sitzung und dem Geld steht.
+
+    Aus dem Ruhezustand heraus: alle fuenf duerfen die Pruefung erreichen,
+    also muessen danach auch fuenf gezaehlt sein. Ohne Schloss sind es
+    weniger, weil jeder Faden denselben Stand gelesen hat.
+    """
+    import threading
+    frei = auth.Freigabe(str(tmp_path / "pin"))
+    frei.einrichten("531794")
+
+    echt = auth.pruefe_passwort
+    monkeypatch.setattr(auth, "pruefe_passwort",
+                        lambda h, p: (time.sleep(0.25), echt(h, p))[1])
+
+    def versuchen():
+        try:
+            frei.pruefe("000000")
+        except Exception:
+            pass
+
+    faeden = [threading.Thread(target=versuchen) for _ in range(5)]
+    for f in faeden:
+        f.start()
+    for f in faeden:
+        f.join()
+    assert len(frei._versuche()) == 5, len(frei._versuche())

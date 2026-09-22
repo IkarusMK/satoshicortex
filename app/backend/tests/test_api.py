@@ -1331,6 +1331,10 @@ class FakeLnd:
         self.rechnungen_roh = []
         self.rechnung_bestellt = None
         self.sendefehler = ""
+        # Pfade, auf denen LND nicht rechtzeitig antwortet. Kein Fehlschlag:
+        # der Auftrag kann laengst ausgefuehrt sein, nur die Antwort blieb
+        # aus. Genau darum geht es in den Tests unten.
+        self.beschaeftigt_auf = set()
         # Erst noetig, seit es Endpunkte gibt, die das eigene Macaroon
         # brauchen -- vorher kam die Attrappe nie so weit.
         self.macaroons = macaroons or Path("/nicht/vorhanden")
@@ -1338,6 +1342,9 @@ class FakeLnd:
 
     def ruf(self, pfad, macaroon="readonly", daten=None, zeitlimit=None,
             methode=None):
+        if pfad in self.beschaeftigt_auf:
+            from satcortex import lnd as lnd_modul
+            raise lnd_modul.Beschaeftigt("kein Wort innerhalb des Zeitlimits")
         if pfad == "/v1/state":
             return {"state": self.stand}
         if methode == "DELETE" and pfad.startswith("/v2/watchtower/client/"):
@@ -6771,3 +6778,108 @@ def test_die_halbierung_zaehlt_ab_der_spitze_des_netzes(client, monkeypatch):
     # Waehrend des Abgleichs ist der eigene Takt nicht messbar -- unsere
     # Bloecke sind von 2016. Dann der Zielabstand, und die Antwort sagt es.
     assert h["gemessen"] is False
+
+
+# ── Ein Zeitlimit ist kein Fehlschlag (Befund vom 22.09.2026) ──────────────
+#
+# Beim Audit der Geldwege gefunden: lnd.py unterscheidet sauber zwischen "LND
+# ist weg" (NichtErreichbar) und "LND antwortet nicht rechtzeitig"
+# (Beschaeftigt). Nur ERBT Beschaeftigt von NichtErreichbar -- und wer nur die
+# Oberklasse faengt, macht aus beidem dieselbe Meldung.
+#
+# Beim Zahlen und Umschichten war das richtig gebaut. Bei den zwei
+# unwiderruflichen ON-CHAIN-Vorgaengen nicht: "LND antwortet nicht" liest sich
+# wie "es ist nichts passiert" -- und der naechste Griff ist, es noch einmal
+# zu versuchen. On-Chain gibt es dagegen keinen Schutz: der zweite Versuch
+# ist eine zweite Transaktion.
+
+def test_ein_zeitlimit_beim_senden_heisst_nicht_dass_nichts_geschah(
+        client, lnd_da, monkeypatch):
+    _sendebereit(client, lnd_da, monkeypatch)
+    lnd_da.beschaeftigt_auf = {"/v1/transactions"}
+    a = client.post("/api/lightning/senden",
+                    json={"adresse": ADRESSE, "betrag": 100_000})
+    assert a.status_code == 504, a.text
+    assert a.json()["detail"]["meldung"] == "sendung_unklar"
+
+
+def test_ein_zeitlimit_beim_kanal_oeffnen_heisst_nicht_dass_nichts_geschah(
+        client, lnd_da, monkeypatch):
+    """Das Oeffnen ist eine On-Chain-Transaktion wie das Senden."""
+    _sendebereit(client, lnd_da, monkeypatch)
+    lnd_da.beschaeftigt_auf = {"/v1/channels"}
+    a = client.post("/api/lightning/kanal/oeffnen",
+                    json={"gegenstelle": "02" + "ab" * 32 + "@127.0.0.1:9735",
+                          "betrag": 1_000_000})
+    assert a.status_code == 504, a.text
+    assert a.json()["detail"]["meldung"] == "kanal_unklar"
+
+
+def test_ein_wirklich_abwesendes_lnd_bleibt_unterscheidbar(client, lnd_da,
+                                                           monkeypatch):
+    """Die Gegenprobe: "weg" darf NICHT zu "unklar" werden.
+
+    Sonst waere der Fix nur ein Umbenennen -- und jemand suchte nach einer
+    Transaktion, die es nie gab.
+    """
+    from satcortex import lnd as lnd_modul
+    _sendebereit(client, lnd_da, monkeypatch)
+
+    def weg(*_a, **_kw):
+        raise lnd_modul.NichtErreichbar("connection refused")
+    monkeypatch.setattr(lnd_modul, "sende", weg)
+    a = client.post("/api/lightning/senden",
+                    json={"adresse": ADRESSE, "betrag": 100_000})
+    assert a.status_code == 503
+    assert a.json()["detail"]["meldung"] == "lnd_antwortet_nicht"
+
+
+# ── Die uebrigen Befunde des Audits ────────────────────────────────────────
+
+def test_die_pin_wird_auch_beim_loeschen_als_erstes_geprueft(client, lnd_da):
+    """Fuenf der sechs Geldwege pruefen die PIN als allererste Zeile.
+
+    Das Loeschen sah zuerst nach, ob gerade eine Wallet-Arbeit laeuft -- der
+    Kommentar DARUNTER sagte dabei "ZUERST die PIN, vor jeder anderen
+    Pruefung". Die Zeile widersprach also dem Satz, der sie erklaerte.
+    """
+    _richte_ein(client)
+    _freigabe_ein(client)
+    a = _tilgung(client, pin="000001")
+    assert a.status_code == 400
+    assert a.json()["detail"]["meldung"] == "pin_falsch"
+
+
+def test_ein_zu_kleiner_kanal_wird_auch_beim_oeffnen_abgewiesen(
+        client, lnd_da, monkeypatch):
+    """Die Schaetzung prueft die Mindestgroesse, das Oeffnen bisher nicht --
+    wer den Endpunkt direkt ruft, umging sie."""
+    _sendebereit(client, lnd_da, monkeypatch)
+    a = client.post("/api/lightning/kanal/oeffnen",
+                    json={"gegenstelle": "02" + "ab" * 32 + "@127.0.0.1:9735",
+                          "betrag": 5_000})
+    assert a.status_code == 400, a.text
+    assert a.json()["detail"]["meldung"] == "kanal_zu_klein"
+
+
+def test_eine_gebuehrengrenze_von_null_bleibt_null(client, lnd_voll,
+                                                   monkeypatch):
+    """"0" hiess bisher "nimm den Vorschlag" -- die Sentinel-Falle aus der
+    eigenen AGENTS.md, diesmal beim Geld. Wer ausdruecklich null schreibt,
+    meint null: zahle nur, wenn die Route nichts kostet."""
+    _kanalbereit(client, monkeypatch)
+    a = client.post("/api/lightning/rechnung/zahlen", json={
+        "rechnung": "lnbc15u1abc", "gebuehrengrenze": 0, "pin": PIN})
+    assert a.status_code == 200, a.text
+    assert lnd_voll.gezahlt["fee_limit_sat"] == "0"
+
+
+def test_ohne_angabe_gilt_weiter_der_vorschlag(client, lnd_voll, monkeypatch):
+    """Die Gegenprobe: das Feld wegzulassen muss den Vorschlag ergeben --
+    die Oberflaeche schickt es naemlich gar nicht mit."""
+    from satcortex import lnd as lnd_modul
+    _kanalbereit(client, monkeypatch)
+    client.post("/api/lightning/rechnung/zahlen", json={
+        "rechnung": "lnbc15u1abc", "pin": PIN})
+    assert lnd_voll.gezahlt["fee_limit_sat"] == str(
+        lnd_modul.gebuehrgrenze(1500))

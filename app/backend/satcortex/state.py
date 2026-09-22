@@ -166,6 +166,13 @@ class Ablage:
             return Einrichtung()
         try:
             roh = json.loads(self.datei.read_text(encoding="utf-8"))
+            # Gueltiges JSON ist noch kein Objekt: "null", "42" und "[]"
+            # kommen hier unbeschadet durch und lassen dann roh.get() mit
+            # einem AttributeError durchschlagen -- der unten NICHT gefangen
+            # wird. Befund vom 22.09.2026. Eine kaputte Zustandsdatei soll
+            # zum Neuanfang fuehren, nicht zum Absturz beim Start.
+            if not isinstance(roh, dict):
+                raise ValueError("Zustandsdatei ist kein Objekt")
             return Einrichtung(
                 schritt=Schritt(roh.get("schritt", Schritt.WILLKOMMEN.value)),
                 antworten=roh.get("antworten", {}),

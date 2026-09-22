@@ -16,6 +16,7 @@ import hmac
 import json
 import os
 import secrets
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -92,7 +93,11 @@ class Kontoverwaltung:
         self.datei = self.pfad / "konto.json"
         self.sitzungsdatei = self.pfad / "sitzungen.json"
         self._sitzungen: Dict[str, float] = self._lade_sitzungen()
-        self._fehlversuche: Dict[str, list] = {}
+        # Ein Schloss ueber Pruefen UND Zaehlen. Ohne es liefen beide
+        # auseinander -- siehe melde_an().
+        self._schloss = threading.Lock()
+        self.fehlerdatei = self.pfad / "fehlversuche.json"
+        self._fehlversuche: Dict[str, list] = self._lade_fehlversuche()
 
     # -------------------------------------------------------- Sitzungen
     def _lade_sitzungen(self) -> Dict[str, float]:
@@ -116,6 +121,52 @@ class Kontoverwaltung:
             m: a for m, a in roh.items()
             if isinstance(m, str) and isinstance(a, (int, float)) and a > jetzt
         }
+
+    # ---------------------------------------------------- Fehlversuche
+    #
+    # DER BEFUND VOM 22.09.2026, drei Teile:
+    #
+    # 1. Gezaehlt wurde unter dem Namen, den der Angreifer TIPPT. Der Eintrag
+    #    wuchs damit unbegrenzt -- ein Anmeldeversuch je neuem Namen genuegte,
+    #    unangemeldet, auf einem Behaelter mit 400 MB Grenze, der genau daran
+    #    schon einmal gestorben ist. Eine blosse Obergrenze waere die falsche
+    #    Behebung: dann liesse sich der Eintrag des ECHTEN Namens
+    #    hinausdraengen und seine Sperre damit aufheben. Es gibt genau EIN
+    #    Konto, also gibt es zwei Toepfe: dieses Konto und alles andere.
+    #
+    # 2. Die Sperre lag nur im Arbeitsspeicher -- waehrend Sitzungen
+    #    ausdruecklich auf die Platte geschrieben werden, weil "ein Neustart
+    #    sich aus der Oberflaeche ausloesen laesst". Fuer die Sperre gilt das
+    #    genauso, und dort wiegt es mehr.
+    #
+    # 3. Pruefen und Zaehlen liefen ohne Schloss, und dazwischen liegt scrypt.
+    #    Gemessen: sechs gleichzeitige Versuche kamen ALLE an der Sperre
+    #    vorbei, wo einer durchgehen darf.
+    UNBEKANNT = "\x00andere"
+
+    def _topf(self, benutzer: str) -> str:
+        """Unter welchem Schluessel ein Fehlversuch gezaehlt wird."""
+        konto = self.lade()
+        if konto and hmac.compare_digest(konto.benutzer.encode("utf-8"),
+                                         (benutzer or "").encode("utf-8")):
+            return konto.benutzer
+        return self.UNBEKANNT
+
+    def _lade_fehlversuche(self) -> Dict[str, list]:
+        try:
+            roh = json.loads(self.fehlerdatei.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {}
+        if not isinstance(roh, dict):
+            return {}
+        return {k: [t for t in v if isinstance(t, (int, float))]
+                for k, v in roh.items() if isinstance(v, list)}
+
+    def _speichere_fehlversuche(self) -> None:
+        temp = self.fehlerdatei.with_suffix(".json.tmp")
+        temp.write_text(json.dumps(self._fehlversuche), encoding="utf-8")
+        os.chmod(temp, 0o600)
+        os.replace(temp, self.fehlerdatei)
 
     def _speichere_sitzungen(self) -> None:
         temp = self.sitzungsdatei.with_suffix(".json.tmp")
@@ -157,25 +208,38 @@ class Kontoverwaltung:
         os.replace(temp, self.datei)
 
     # --------------------------------------------------------- Anmeldung
-    def _gesperrt(self, benutzer: str) -> bool:
+    def _gesperrt(self, topf: str) -> bool:
         jetzt = time.time()
-        versuche = [t for t in self._fehlversuche.get(benutzer, []) if jetzt - t < SPERRE_SEKUNDEN]
-        self._fehlversuche[benutzer] = versuche
+        versuche = [t for t in self._fehlversuche.get(topf, [])
+                    if jetzt - t < SPERRE_SEKUNDEN]
+        self._fehlversuche[topf] = versuche
         return len(versuche) >= MAX_FEHLVERSUCHE
 
     def melde_an(self, benutzer: str, passwort: str) -> str:
-        if self._gesperrt(benutzer):
-            raise PermissionError("zu_viele_versuche")
+        # Pruefen und Zaehlen in EINEM Zug, unter dem Schloss -- und der
+        # Versuch wird VOR der teuren Rechnung vermerkt, nicht danach. Genau
+        # der Abstand dazwischen war die Luecke: scrypt braucht seine Zeit,
+        # und in dieser Zeit kamen alle gleichzeitigen Versuche an einer
+        # Sperre vorbei, die keiner von ihnen schon hochgezaehlt hatte.
+        topf = self._topf(benutzer)
+        with self._schloss:
+            if self._gesperrt(topf):
+                raise PermissionError("zu_viele_versuche")
+            self._fehlversuche.setdefault(topf, []).append(time.time())
+            self._speichere_fehlversuche()
+
         konto = self.lade()
         # Auch ohne Konto rechnen, damit die Antwortzeit nicht verraet, ob es
         # den Benutzer gibt.
         gespeichert = konto.hash if konto else hashe("platzhalter")
         passt = pruefe_passwort(gespeichert, passwort) and konto is not None \
-            and hmac.compare_digest(konto.benutzer, benutzer)
+            and hmac.compare_digest(konto.benutzer.encode("utf-8"),
+                                    (benutzer or "").encode("utf-8"))
         if not passt:
-            self._fehlversuche.setdefault(benutzer, []).append(time.time())
             raise PermissionError("anmeldung_fehlgeschlagen")
-        self._fehlversuche.pop(benutzer, None)
+        with self._schloss:
+            self._fehlversuche.pop(topf, None)
+            self._speichere_fehlversuche()
         token = secrets.token_urlsafe(32)
         self._sitzungen[_merkmal(token)] = time.time() + SITZUNG_GUELTIG_SEKUNDEN
         self._speichere_sitzungen()

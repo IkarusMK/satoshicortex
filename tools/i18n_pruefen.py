@@ -59,6 +59,13 @@ _ALS_TEXT = re.compile(r'"([a-z_][a-z0-9_]*)"')
 # NEUE solche Stelle nicht stillschweigend ungeprueft bleibt -- taucht unten
 # ein t(...) auf, das hier fehlt, meldet die Pruefung das.
 ZUSAMMENGESETZT = {
+    # Was ein Geldweg meldet, wenn KEIN Bescheid kam -- der Abbruch der
+    # Oberflaeche oder das 504 des Servers. Entweder nennt der Server den
+    # Schluessel selbst, oder es gilt der, den der Aufrufer mitgibt: fuer
+    # jede der drei Arten ein eigener, denn "in den Kanaelen nachsehen" waere
+    # bei einer Ueberweisung falsch. Befund vom 22.09.2026.
+    't(d.meldung || unklar, d)': [
+        "zahlung_unklar", "sendung_unklar", "kanal_unklar"],
     # Uebersetzbare ATTRIBUTE. applyI18n liest den Schluessel aus
     # data-i18n-attr und schickt ihn durch dieselbe Weiche wie alles andere.
     # Welche dort ankommen, steht in der Vorlage und wird von dort auch

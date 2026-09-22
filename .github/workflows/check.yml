@@ -21,8 +21,14 @@ jobs:
     name: Code and dependencies
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
+        with:
+          # Sonst schreibt die Aktion den GITHUB_TOKEN nach
+          # .git/config -- lesbar fuer alles, was danach im
+          # Lauf ausgefuehrt wird, auch fuer Installationshaken
+          # fremder Pakete. Befund vom 22.09.2026.
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
         with:
           python-version: "3.14"
       - working-directory: app/backend
@@ -49,9 +55,11 @@ jobs:
       list: ${{ steps.detect.outputs.list }}
       stack: ${{ steps.detect.outputs.stack }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
         with:
           fetch-depth: 0
+          # Kein GITHUB_TOKEN in .git/config zuruecklassen.
+          persist-credentials: false
       # Why at all: every push to main used to build all four images, and the
       # stack job built three of them a second time. A changed line of text in
       # the frontend therefore also cost a bitcoind, a tor and an lnd build.
@@ -133,7 +141,13 @@ jobs:
     name: Dockerfiles and scripts
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
+        with:
+          # Sonst schreibt die Aktion den GITHUB_TOKEN nach
+          # .git/config -- lesbar fuer alles, was danach im
+          # Lauf ausgefuehrt wird, auch fuer Installationshaken
+          # fremder Pakete. Befund vom 22.09.2026.
+          persist-credentials: false
       - name: Check the Dockerfiles
         run: |
           for f in app/Dockerfile images/*/Dockerfile; do
@@ -190,10 +204,16 @@ jobs:
       matrix:
         include: ${{ fromJSON(needs.changes.outputs.list) }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
+        with:
+          # Sonst schreibt die Aktion den GITHUB_TOKEN nach
+          # .git/config -- lesbar fuer alles, was danach im
+          # Lauf ausgefuehrt wird, auch fuer Installationshaken
+          # fremder Pakete. Befund vom 22.09.2026.
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3
       - name: Build, but do not publish
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6
         with:
           context: .
           file: ${{ matrix.dockerfile }}
@@ -320,14 +340,20 @@ jobs:
     needs: [code, files, changes]
     if: needs.changes.outputs.stack == 'true'
     steps:
-      - uses: actions/checkout@v5
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
+        with:
+          # Sonst schreibt die Aktion den GITHUB_TOKEN nach
+          # .git/config -- lesbar fuer alles, was danach im
+          # Lauf ausgefuehrt wird, auch fuer Installationshaken
+          # fremder Pakete. Befund vom 22.09.2026.
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3
 
       # Build the images under exactly the names the Compose file expects.
       # Then "up" finds them locally and does not rebuild -- what is tested is
       # the project's unmodified Compose file, not a test variant of it.
       - name: app
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6
         with:
           context: .
           file: app/Dockerfile
@@ -337,7 +363,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: bitcoind
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6
         with:
           context: .
           file: images/bitcoind/Dockerfile
@@ -347,7 +373,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: tor
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6
         with:
           context: .
           file: images/tor/Dockerfile

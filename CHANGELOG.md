@@ -4,6 +4,233 @@ All notable changes to SatoshiCortex. Format loosely after
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning after
 [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+### Audit of 2026-09-22 — the money paths
+
+A deliberate audit of the six operations that move money, plus the claims the
+interface makes. Seven findings, all fixed. The most expensive one first.
+
+#### Fixed: a payment without an answer was reported as a failure
+
+The backend was careful here. When LND does not answer in time it raises
+`Beschaeftigt`, the endpoint turns that into HTTP 504, and the text for it
+exists in both languages:
+
+> "No answer within the waiting time. The payment may still be on its way —
+> do NOT repeat it, check the channels instead."
+
+That text was unreachable. The numbers did not line up:
+
+| | |
+|---|---|
+| LND payment timeout | 60 s |
+| plus slack | 20 s |
+| **server answers after at most** | **80 s** |
+| **interface gave up after** | **25 s** |
+
+On abort there is no `detail`, so the handler fell through to a generic
+"Error" — and the `finally` block re-enabled the button. The interface said
+"that failed" about a payment that was in flight, and offered to repeat it.
+A comment two lines from the call even said "a payment can be on its way for
+up to a minute".
+
+Money paths now use their own timeout, longer than the server's, and a shared
+`geldfehler()` decides what a failure means. When nothing is decided — a
+client abort *or* the server's own 504 — the panel says so and the button
+stays locked. A guard test compares the two timeouts across the file boundary,
+so they cannot drift apart again.
+
+#### Fixed: two irreversible on-chain paths could not tell "timeout" from "gone"
+
+`Beschaeftigt` inherits from `NichtErreichbar`. Paying an invoice and
+rebalancing caught it separately; sending on-chain and opening a channel did
+not, so a timeout became "LND is not answering" — which reads as "nothing
+happened".
+
+It matters more here than anywhere else: a Lightning invoice cannot be paid
+twice, the payment hash prevents it. A second on-chain send is simply a second
+transaction.
+
+#### Fixed: the fee limit could not express "only if free"
+
+`int(wunsch.gebuehrengrenze) or lnd.gebuehrgrenze(betrag)` — a zero, which is
+a valid instruction ("pay only if the route costs nothing"), was replaced by
+the computed default. The field is now `Optional[int]` defaulting to `None`.
+The interface never sent the field at all, so nothing changes for it.
+
+#### Fixed: one of the six PIN checks was not first
+
+Deleting the wallet asked whether wallet work was running *before* checking
+the PIN — while the comment directly below that line read "the PIN FIRST,
+before any other check". The line contradicted the sentence explaining it.
+
+#### Fixed: opening a channel did not check the minimum size
+
+The estimate did; the open did not. Calling the endpoint directly went around
+it.
+
+#### Fixed: a language switch left two places in the old language
+
+`zeichneGegenstellenwege()` built its list once ("once is enough") and the
+list holds translated text. The switch clears four caches and redraws — this
+function returned immediately, and nothing else touches that element. Whoever
+switched to English kept that list in German until they reloaded. The same
+applied to the `aria-label`s of the twenty-four seed fields, where only a
+screen reader would ever have noticed.
+
+The trap is documented in this repository, in `kennzahl()`. The lesson had
+been learned in one place and not applied in two others.
+
+### Audit of 2026-09-22 — what the interface claims
+
+#### Fixed: "not measured" was displayed as a measurement
+
+For a block this node did not witness, the backend deliberately sends `None`:
+
+```python
+# Explicitly None instead of zero: we were not there,
+# and a zero would look like a measurement.
+"bekannte_tx": None,
+```
+
+Four places in the interface rendered `bekannte_tx || 0` and showed
+"0 / 2431 tx" — exactly the measurement the backend had refused to invent,
+and for the one number a private node exists to produce. In the same table
+row, `verweildauer_ms` from the same dict was handled correctly.
+
+The strip now shows the total alone and explains in its tooltip why the other
+number is missing; the table shows a dash like its neighbouring columns.
+
+#### Fixed: two numbers the interface did not own
+
+The dust limit (546 sat) and the restore scan window (2500 addresses) were
+literals in the translations while the backend owned the real values. Rather
+than plumbing a constant through an endpoint, a guard test now compares them
+across files — both were verified to fail when the backend constant is changed.
+
+### Checked and sound
+
+- All 89 messages the backend can send have a text in both languages, so a raw
+  key can never reach a user.
+- Every message text containing a placeholder always gets that field filled.
+- Of 400 element ids the interface looks up, none is missing from the markup.
+- Of 286 interface functions, only two guarded themselves with "once is
+  enough"; both are covered above.
+- The five interface sentences that state a hard number about the network are
+  correct: the ppm arithmetic, Core's 24-hour upload window, and that an
+  exhausted budget stops only *historical* blocks.
+
+### Audit of 2026-09-22 — sign-in, the PIN, and stored data
+
+#### Fixed: the lockout counters could be outrun by running in parallel
+
+Checking the lockout and recording the attempt were two separate steps with no
+lock between them — and scrypt sits in that gap, which makes it a long moment.
+Measured with forced interleaving rather than assumed:
+
+| | allowed | actually got through |
+|---|---|---|
+| Sign-in, 6 simultaneous attempts | 1 | **6** |
+| Transaction PIN, 5 simultaneous attempts | 5 counted | **3 counted, 2 lost** |
+
+This is the counter standing between a hijacked session and the six operations
+that move money. Both counters are now taken under one lock, and the attempt is
+recorded *before* the expensive comparison rather than after it.
+
+#### Fixed: failed sign-ins were counted under the name the attacker types
+
+The dictionary grew without limit — one request per made-up name, no sign-in
+required, on a container with a 400 MB limit that has already been killed once
+for exactly this reason.
+
+A simple cap would have been the wrong fix: entries could then be pushed out
+deliberately, which would clear the lockout on the real account. There is
+exactly one account here, so there are now two buckets — that account, and
+everything else. A test covers the eviction attack specifically.
+
+#### Fixed: the sign-in lockout did not survive a restart
+
+Sessions are deliberately written to disk, with the reasoning that "a restart
+can be triggered from the interface". The lockout was memory-only, so the same
+restart cleared it. It is now persisted the same way.
+
+#### Fixed: the HTLC table was never cleaned up
+
+`htlc_aufraeumen()` existed and nothing ever called it, while its sibling has
+been wired into the daily watcher all along. On a node that forwards payments a
+row is written for every HTLC event — so the table grew without bound precisely
+on the node doing what the software is for.
+
+#### Fixed: a write transaction was held open across two RPC calls
+
+Recording a block opened a write transaction and then computed the values for
+the next call — including a fee lookup (30 s timeout) and a pool lookup (20 s).
+The transaction could therefore stay open for up to fifty seconds while every
+other writer gives up after twenty ("database is locked"). The lookups now
+happen before the write.
+
+#### Fixed: valid JSON that is not an object crashed the state load
+
+`laden()` catches malformed JSON and starts over, which is the documented
+policy. A file containing `null`, `42` or `[]` parses fine and then raised an
+uncaught `AttributeError` — at startup, on the file whose loss costs the entire
+setup.
+
+Also: two cleanup functions lacked the `max(1, ...)` clamp their sibling has,
+where a zero would have emptied the table.
+
+### Audit of 2026-09-22 — the stack, setup and recovery
+
+Both came through largely clean, which is worth recording as plainly as the
+findings.
+
+The **seed** has no leak path: the twenty-four words live only in an in-memory
+holder, never reach the log, the state file or a response, expire after thirty
+minutes, and the read-back check cannot be walked around — the four positions
+are fixed before the question is asked, and wallet creation cannot reach the
+words without that holder.
+
+The **eclipse-attack gate** from the 2026-08-23 audit still holds, and more
+strictly than "once": the one path that changes anything after setup
+deliberately excludes the peer count, the upload budget and the RPC line.
+
+`entrypoint.sh` targets the real service PID (it captures `$$` before `exec`,
+which does not change the PID), the config file is swapped atomically so a
+half-read is not reachable, and `.ready` is always written after `.conf`.
+Every free-text value entering a config file is rejected if it contains a line
+break, and `rpcallowip` cannot be widened to `0.0.0.0/0`.
+
+Two things came out of it:
+
+- The one writer in `nodeconfig.py` that did not defend itself like its
+  neighbours now does. Not reachable today — every caller passes an internally
+  computed path — but it was the exception in a file whose rule is the point.
+- **`SECURITY.md` claimed "the setup is final".** That was no longer true, and
+  it undersold the work: the narrow path exists precisely so the dangerous
+  fields cannot be reached. Corrected.
+
+One finding is deliberately **not** fixed here: `bitcoind`, `lnd` and `tor`
+still run with a writable root filesystem while `app` does not. The change
+looks safe on paper, but the only honest proof is a full stack coming up, and
+that belongs in a change where the build can be watched.
+
+### Audit of 2026-09-22 — the build path
+
+See SECURITY.md for the detail. In short: every GitHub Action is now pinned to
+a commit hash instead of a movable tag; `packages: write` belongs to the
+publishing job alone rather than to the job that runs `pip install`;
+`actions/checkout` no longer leaves the token in `.git/config`; upstream release
+tag names no longer reach a shell (git permits backticks and `$` in tag names);
+the mining-pool list is pinned to a commit instead of a moving branch; and
+`renovate.json` was not valid JSON, so the component watching for new
+third-party versions could not read its own configuration.
+
+One finding is deliberately **not** bundled here: the Python dependency tree has
+no hash lock, so two builds of the same commit months apart can differ. Fixing
+it properly means resolving against the image's own Python version and watching
+a full build, which belongs in its own change.
+
 ## [1.0.2] — 2026-09-21
 
 ### Fixed: an explanation that printed itself nine times

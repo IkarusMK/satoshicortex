@@ -6,6 +6,7 @@ darum, dass sie entsteht, stehen bleibt und richtig verrechnet wird.
 """
 import threading
 import time
+from pathlib import Path
 
 import pytest
 
@@ -544,3 +545,41 @@ def test_eine_bestehende_datenbank_bekommt_die_spalte_nachgereicht(tmp_path):
         assert neu.netzgebuehren_verlauf()[0]["stufen"] == STUFEN
     finally:
         neu.schliesse()
+
+
+# ── Befunde des Audits vom 22.09.2026 ──────────────────────────────────────
+
+def _htlc_zeile(zeit_ms, art="weiterleitung"):
+    return {"zeit_ms": zeit_ms, "art": art, "rein_kanal": "111",
+            "raus_kanal": "222", "betrag": 1000, "gebuehr": 1, "grund": None}
+
+def test_die_htlc_tabelle_wird_ueberhaupt_aufgeraeumt():
+    """DER BEFUND: htlc_aufraeumen() war da und wurde NIE gerufen.
+
+    Daneben haengt nachrichten_aufraeumen() seit jeher im Waechter. Auf
+    einem Knoten, der weiterleitet, schreibt htlc_merken() bei jedem
+    HTLC-Ereignis eine Zeile -- also dauernd. Die Tabelle wuchs damit ohne
+    Ende, ausgerechnet auf dem Knoten, der seinen Zweck erfuellt.
+
+    Diese Wache prueft die EINHAENGUNG, nicht die Funktion: dass es sie gibt,
+    war ja nie das Problem. Sie muss dort stehen, wo ihr Schwesterstueck
+    schon steht -- im selben taeglichen Fenster.
+    """
+    quelle = (Path(__file__).resolve().parents[1]
+              / "satcortex" / "api.py").read_text(encoding="utf-8")
+    stelle = quelle.index("auswertung.nachrichten_aufraeumen()")
+    # Im selben Block -- bis zum naechsten "def" auf Methodenebene.
+    rest = quelle[stelle:]
+    block = rest[:rest.index("\n    def ")]
+    assert "auswertung.htlc_aufraeumen()" in block
+
+
+def test_kein_aufraeumer_leert_bei_null_tagen_die_ganze_tabelle(ablage):
+    """netzgebuehren_aufraeumen klammert mit max(1, ...), die beiden
+    anderen nicht. Heute unerreichbar -- aber eine Null loescht dort alles,
+    und "heute unerreichbar" ist keine Eigenschaft, auf die man baut."""
+    jetzt_ms = int(time.time() * 1000)
+    ablage.htlc_merken(_htlc_zeile(jetzt_ms))
+    assert ablage.htlc_aufraeumen(0) == 0
+    assert ablage.htlc_aufraeumen(-5) == 0
+    assert ablage.nachrichten_aufraeumen(0) == 0

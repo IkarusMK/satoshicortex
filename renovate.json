@@ -33,7 +33,7 @@
       "//": "Red: never merge automatically. A major release of Core changes policy and database format; with LND a database migration is even irreversible. IMPORTANT for context: this concerns MERGING, not building. Once the pull request is accepted the image is created and sits ready in the registry -- WHEN it gets deployed is still decided by the number in your own .env on the machine.",
       "matchDepNames": [
         "bitcoin/bitcoin",
-        "lightningnetwork/lnd",
+        "lightningnetwork/lnd"
       ],
       "automerge": false,
       "addLabels": [

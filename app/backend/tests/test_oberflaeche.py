@@ -2949,3 +2949,149 @@ def test_die_blockzeit_sagt_ob_gemessen_oder_gerechnet_wurde(js):
     Messung zu behaupten."""
     for schluessel in ("bz_takt_gemessen", "bz_takt_gerechnet"):
         assert js.count(schluessel + ":") == 2
+
+
+# ── Die Geldwege: ein Abbruch ist kein Fehlschlag (Befund 22.09.2026) ──────
+#
+# Beim Audit gefunden, und es ist der teuerste Befund bisher: die Oberflaeche
+# brach jeden Aufruf nach 25 Sekunden ab. Der Server wartet beim Zahlen aber
+# bis zu 80 und antwortet dann mit "zahlung_unklar" -- "kann trotzdem
+# unterwegs sein, NICHT wiederholen". Dieser Text war unerreichbar. Was der
+# Mensch sah, war "Fehler", ueber eine Zahlung, die gerade lief.
+
+WEB_BACKEND = Path(__file__).resolve().parents[1] / "satcortex"
+
+
+def test_die_frist_fuer_geld_ist_laenger_als_das_zeitlimit_des_servers(js):
+    """DIE WACHE, die den Befund festnagelt.
+
+    Sie vergleicht die beiden Zahlen ueber die Dateigrenze hinweg. Stellt
+    jemand eine davon um, faellt es hier auf -- und nicht erst bei einer
+    Zahlung, die gerade unterwegs ist.
+    """
+    import re
+    lnd = (WEB_BACKEND / "lnd.py").read_text(encoding="utf-8")
+    zeitlimit = int(re.search(r"ZAHLUNG_ZEITLIMIT_SEKUNDEN = (\d+)",
+                              lnd).group(1))
+    luft = float(re.search(r"ZAHLUNG_LUFT_SEKUNDEN = ([\d.]+)", lnd).group(1))
+    frist_ms = int(re.search(r"const FRIST_GELD_MS = (\d+)", js).group(1))
+    assert frist_ms > (zeitlimit + luft) * 1000, (
+        "die Oberflaeche gibt auf, bevor der Server antworten kann")
+
+
+def test_die_geldwege_nehmen_die_laengere_frist(js):
+    """Alle fuenf -- eine vergessene genuegt, um den Befund zurueckzuholen."""
+    for pfad in ("/lightning/senden", "/lightning/rechnung/zahlen",
+                 "/lightning/kanal/oeffnen", "/lightning/kanal/schliessen",
+                 "/lightning/umschichten"):
+        stelle = js.index('api("%s"' % pfad)
+        assert "FRIST_GELD_MS" in js[stelle:stelle + 400], pfad
+
+
+def test_ohne_bescheid_wird_kein_fehlschlag_gemeldet(js):
+    """Der Kern: kein Bescheid heisst "unklar", nicht "Fehler"."""
+    anfang = js.index("function geldfehler(")
+    import re
+    ende = re.search(r"\n(?:async )?function ", js[anfang + 10:])
+    rumpf = js[anfang:anfang + 10 + ende.start()]
+    code = "\n".join(z for z in rumpf.splitlines()
+                     if not z.lstrip().startswith("//"))
+    assert "netzfehler" in code, "der Abbruch der Oberflaeche"
+    assert "504" in code, "und das Zeitlimit des Servers"
+
+
+def test_nach_einem_abbruch_bleibt_der_knopf_zu(js):
+    """"NICHT wiederholen" ist eine Anweisung -- die Oberflaeche soll das
+    Wiederholen nicht im selben Atemzug wieder anbieten."""
+    for name in ("sendenAusloesen", "rechnungZahlen"):
+        anfang = js.index("function %s(" % name)
+        import re
+        ende = re.search(r"\n(?:async )?function ", js[anfang + 10:])
+        rumpf = js[anfang:anfang + 10 + ende.start()]
+        code = "\n".join(z for z in rumpf.splitlines()
+                         if not z.lstrip().startswith("//"))
+        assert "knopf.disabled = false;" not in code.replace(
+            "if (wiederFrei) knopf.disabled = false;", ""), name
+        assert "wiederFrei" in code, name
+
+
+def test_fuer_jede_art_von_unklarheit_gibt_es_einen_eigenen_text(js):
+    """"in den Kanaelen nachsehen" waere bei einer Ueberweisung falsch --
+    dort sieht man in die Kette."""
+    for schluessel in ("zahlung_unklar", "sendung_unklar", "kanal_unklar"):
+        assert js.count(schluessel + ":") == 2, schluessel
+
+
+# ── Der Sprachwechsel (Befund 22.09.2026) ─────────────────────────────────
+
+def test_die_gegenstellenwege_folgen_dem_sprachwechsel(js):
+    """Die Liste wurde EINMAL gebaut ("einmal reicht") und trug uebersetzten
+    Text. Wer auf Englisch umschaltete, behielt sie dauerhaft auf Deutsch --
+    sie wird nirgendwo sonst angefasst."""
+    anfang = js.index("function zeichneGegenstellenwege(")
+    import re
+    ende = re.search(r"\n(?:async )?function ", js[anfang + 10:])
+    code = "\n".join(z for z in js[anfang:anfang + 10 + ende.start()]
+                     .splitlines() if not z.lstrip().startswith("//"))
+    assert "ziel.firstChild" not in code, "die Wache war der Fehler"
+    assert "textContent = \"\"" in code, "leeren statt aussteigen"
+
+
+def test_die_seedfelder_beschriften_sich_neu(js):
+    """Dieselbe Sache bei den aria-label der 24 Woerter. Nur fuer
+    Vorlesewerkzeuge sichtbar -- und genau deshalb faellt es sonst nie auf."""
+    assert "function whBeschriften(" in js
+
+
+# ── "Nicht gemessen" darf keine Messung werden (Befund 22.09.2026) ─────────
+
+def test_unbekannte_tx_zahl_wird_nicht_zur_null(js):
+    """DER BEFUND, und das Backend sagt selbst, worum es geht:
+
+        # Ausdruecklich None statt null-Zahlen: wir waren nicht dabei,
+        # und eine Null saehe aus wie eine Messung.
+        "bekannte_tx": None,
+
+    Die Oberflaeche machte daraus zahl(b.bekannte_tx || 0) und zeigte
+    "0 / 2431 Tx" -- genau die Messung, die das Backend zu erfinden sich
+    geweigert hatte. Und das bei der Zahl, fuer die man einen eigenen Knoten
+    betreibt.
+    """
+    code = "\n".join(z for z in js.splitlines()
+                     if not z.lstrip().startswith("//"))
+    assert "bekannte_tx || 0" not in code
+
+
+def test_es_gibt_einen_text_fuer_nicht_dabei_gewesen(js):
+    for schluessel in ("a_kb_nicht_dabei", "a_nicht_dabei_kurz"):
+        assert js.count(schluessel + ":") == 2, schluessel
+
+
+# ── Zahlen, die die Oberflaeche nicht selbst besitzt ───────────────────────
+
+def test_die_staubgrenze_stimmt_mit_dem_backend_ueberein(js):
+    """546 steht als Literal in beiden Uebersetzungen ("Mindestens 546
+    Satoshi. Darunter nimmt das Netz die Ausgabe nicht an"). Die Wahrheit
+    ist lnd.SENDEN_MIN_SAT. Laufen sie auseinander, behauptet die
+    Oberflaeche etwas Falsches ueber das Netz -- und der Nutzer bekommt
+    eine Abfuhr mit einer anderen Zahl als der angezeigten."""
+    import re
+    lnd = (WEB_BACKEND / "lnd.py").read_text(encoding="utf-8")
+    echt = int(re.search(r"SENDEN_MIN_SAT = (\d+)", lnd).group(1))
+    for sprache in ("de", "en"):
+        anfang = js.index("\n  %s: {" % sprache)
+        block = js[anfang:anfang + 200000]
+        text = re.search(r'\n    sd_betrag_d: "([^"]*)"', block).group(1)
+        assert str(echt) in text, (sprache, text[:80])
+
+
+def test_das_wiederherstellungsfenster_stimmt_mit_dem_backend_ueberein(js):
+    """Dasselbe fuer die 2500 Adressen, die LND beim Wiederherstellen
+    absucht. Die Zahl steht fest in app.js, waehrend lnd.py sie besitzt."""
+    import re
+    lnd = (WEB_BACKEND / "lnd.py").read_text(encoding="utf-8")
+    echt = int(re.search(r"WIEDERHERSTELLUNG_FENSTER = (\d+)", lnd).group(1))
+    code = "\n".join(z for z in js.splitlines()
+                     if not z.lstrip().startswith("//"))
+    stelle = code.index('t("wh_dauer"')
+    assert str(echt) in code[stelle:stelle + 120], code[stelle:stelle + 120]

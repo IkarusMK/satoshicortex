@@ -56,17 +56,31 @@ on:
         required: false
         type: string
 
+# Nur Lesen fuer den ganzen Ablauf. Das Schreibrecht auf die Registry
+# bekommt ALLEIN der Auftrag, der wirklich schiebt (siehe "images" unten).
+#
+# DER BEFUND VOM 22.09.2026: es stand hier oben und galt damit auch fuer den
+# Testauftrag -- und der fuehrt mit "pip install" fremde Installationshaken
+# aus. Zusammen mit dem GITHUB_TOKEN, den checkout bis heute in .git/config
+# liegen liess, haette ein uebernommenes PyPI-Paket damit ein Abbild nach
+# ghcr.io schieben koennen, das anschliessend auf Maschinen mit einer Wallet
+# laeuft.
 permissions:
   contents: read
-  packages: write
 
 jobs:
   test:
     name: Web interface tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
+        with:
+          # Sonst schreibt die Aktion den GITHUB_TOKEN nach
+          # .git/config -- lesbar fuer alles, was danach im
+          # Lauf ausgefuehrt wird, auch fuer Installationshaken
+          # fremder Pakete. Befund vom 22.09.2026.
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
         with:
           python-version: "3.14"
       - name: Dependencies
@@ -108,9 +122,11 @@ jobs:
     outputs:
       list: ${{ steps.detect.outputs.list }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
         with:
           fetch-depth: 0
+          # Kein GITHUB_TOKEN in .git/config zuruecklassen.
+          persist-credentials: false
       - id: detect
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -247,6 +263,9 @@ jobs:
   images:
     name: ${{ matrix.name }}
     needs: [test, changes]
+    permissions:
+      contents: read
+      packages: write
     if: needs.changes.outputs.list != '[]'
     runs-on: ubuntu-latest
     strategy:
@@ -254,9 +273,15 @@ jobs:
       matrix:
         include: ${{ fromJSON(needs.changes.outputs.list) }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
+        with:
+          # Sonst schreibt die Aktion den GITHUB_TOKEN nach
+          # .git/config -- lesbar fuer alles, was danach im
+          # Lauf ausgefuehrt wird, auch fuer Installationshaken
+          # fremder Pakete. Befund vom 22.09.2026.
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9  # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -271,6 +296,14 @@ jobs:
       # and there would be no number left to roll back to.
       - name: Determine the image version
         id: ver
+        env:
+          # Alles, was von aussen kommt, geht ueber die Umgebung -- nicht
+          # ueber ${{ }} in den Schalentext. Siehe die Begruendung unten.
+          NAME: ${{ matrix.name }}
+          WUNSCH_VERSION: ${{ inputs.version }}
+          FUND_VERSION: ${{ matrix.version }}
+          OWNER_ROH: ${{ github.repository_owner }}
+          EREIGNIS: ${{ github.event_name }}
         run: |
           # The single source for the third-party versions is example.env. The
           # text there always said so ("raise the number here"); until
@@ -291,33 +324,40 @@ jobs:
             *) PROJECT="$(git describe --tags --abbrev=0 2>/dev/null || echo dev)"
                PROJECT="${PROJECT#v}" ;;
           esac
-          case "${{ matrix.name }}" in
+          case "$NAME" in
             satcortex-bitcoind) TAG="$BITCOIN_VERSION" ;;
             satcortex-lnd)      TAG="$LND_VERSION" ;;
             *)                  TAG="$PROJECT" ;;
           esac
-          if [ -n "${{ inputs.version }}" ]; then
-            TAG="${{ inputs.version }}"
+          # NICHT ueber ${{ }} in die Schale: WUNSCH_VERSION kommt aus einem
+          # freien Eingabefeld, FUND_VERSION aus dem Namen eines fremden
+          # Release-Tags (bitcoin/bitcoin, lightningnetwork/lnd). Tag-Namen
+          # duerfen Backticks, $ und ; enthalten -- git verbietet sie nicht.
+          # Eingesetzt wuerde das hier ausgefuehrt, in einem Auftrag, der bei
+          # ghcr.io angemeldet ist. Befund vom 22.09.2026; check.yml macht es
+          # mit seinem env-Block seit jeher richtig.
+          if [ -n "$WUNSCH_VERSION" ]; then
+            TAG="$WUNSCH_VERSION"
             echo "Version on demand: $TAG"
           fi
           # The daily look upstream carries the version it found in the matrix.
-          if [ -n "${{ matrix.version }}" ]; then
-            TAG="${{ matrix.version }}"
+          if [ -n "$FUND_VERSION" ]; then
+            TAG="$FUND_VERSION"
             echo "New third-party version found: $TAG"
           fi
-          test -n "$TAG" || { echo "No version for ${{ matrix.name }}"; exit 1; }
+          test -n "$TAG" || { echo "No version for $NAME"; exit 1; }
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
           # The registry demands lowercase, github.repository_owner returns the
           # account's spelling (IkarusMK). Without this the build fails with
           # "repository name must be lowercase" -- and the Compose file, which
           # points at ghcr.io/ikarusmk/..., would find nothing anyway.
-          OWNER="$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
+          OWNER="$(echo "$OWNER_ROH" | tr '[:upper:]' '[:lower:]')"
           echo "owner=$OWNER" >> "$GITHUB_OUTPUT"
 
           # Only the build argument this image actually knows. Otherwise
           # BuildKit warns about unused arguments and you read straight past it.
-          case "${{ matrix.name }}" in
+          case "$NAME" in
             satcortex-bitcoind) echo "buildarg=BITCOIN_VERSION=$TAG"   >> "$GITHUB_OUTPUT" ;;
             satcortex-lnd)      echo "buildarg=LND_VERSION=$TAG"       >> "$GITHUB_OUTPUT" ;;
             satcortex)          echo "buildarg=SATCORTEX_VERSION=$TAG" >> "$GITHUB_OUTPUT" ;;
@@ -327,16 +367,16 @@ jobs:
           # "latest" only when it really is the newest. A manual run with an
           # older version would otherwise move the tag backwards -- and whoever
           # uses it would silently get a downgrade.
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] \
-             && [ -n "${{ inputs.version }}" ]; then
+          if [ "$EREIGNIS" = "workflow_dispatch" ] \
+             && [ -n "$WUNSCH_VERSION" ]; then
             echo "also_latest=" >> "$GITHUB_OUTPUT"
             echo "On demand with a fixed version: latest stays where it is."
           else
-            echo "also_latest=ghcr.io/$OWNER/${{ matrix.name }}:latest" >> "$GITHUB_OUTPUT"
+            echo "also_latest=ghcr.io/$OWNER/$NAME:latest" >> "$GITHUB_OUTPUT"
           fi
-          echo "${{ matrix.name }} becomes ghcr.io/$OWNER/${{ matrix.name }}:$TAG"
+          echo "$NAME becomes ghcr.io/$OWNER/$NAME:$TAG"
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6
         with:
           # The build context is the repository root: the images need
           # images/common/entrypoint.sh and app/templates respectively.

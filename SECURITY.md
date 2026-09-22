@@ -16,12 +16,28 @@ repository directly.
   the shared `config` volume. On a machine holding a wallet, a Docker socket is
   equivalent to root.
 - **Every service runs as UID 1000**, without special privileges (`cap_drop:
-  ALL`, `no-new-privileges`) and with a process limit. The application
-  additionally runs with a read-only filesystem.
+  ALL`, `no-new-privileges`) and with a process limit on all four. The
+  application additionally runs with a read-only filesystem.
+
+  **Open, reviewed 2026-09-22:** `bitcoind`, `lnd` and `tor` still run with a
+  writable root filesystem. Their own data lives in mounted volumes, so a
+  read-only root plus a `tmpfs` for `/tmp` looks available — most of all for
+  `lnd`, which is the container holding the wallet. It is not switched on yet
+  because the only honest proof is a full stack coming up, and that has to be
+  watched rather than assumed.
 - **Third-party software is signature-checked** before it enters an image:
-  Bitcoin Core against at least three independent builder signatures from a
-  pinned `guix.sigs` commit,
-  Tor through Debian's package signature.
+  Bitcoin Core against at least three builder signatures from a pinned
+  `guix.sigs` commit, **LND** against a pinned Lightning Labs key set with its
+  extracted binaries re-checked against the signed manifest, and Tor through
+  Debian's package signature. Every one of these fails the build closed.
+
+  **What is not signature-checked, stated plainly** (reviewed 2026-09-22):
+  the Python dependency tree is pinned with `==` for its direct dependencies
+  but has no lock file and no hash verification, so transitive packages
+  resolve at build time; the GeoIP city list from DB-IP is an unauthenticated
+  download whose filename is derived from the current month and therefore
+  cannot be pinned. The mining-pool list used to be fetched from a moving
+  branch and is now pinned to a commit.
 - **Secrets never leave the machine.** The application generates the RPC
   password itself and stores it with mode 0600; only the hash goes into the
   service configuration.
@@ -204,11 +220,48 @@ rest. *Improved:* session cookie with `SameSite=Strict`.
 - **HTTPS** is not supplied by SatoshiCortex itself. On a home network that is
   defensible; anyone exposing the interface belongs behind a reverse proxy with
   TLS.
-- **Changes during operation** need their own explicit path with confirmation.
-  At present the setup is final.
+- **Changes during operation** go through one narrow path, and only that one.
+  `/knoten/netzwege` writes network visibility (Tor, clearnet, the announced
+  addresses) in a single write, because every configuration change restarts
+  bitcoind. It deliberately does **not** touch the upload budget, the peer
+  count or the RPC line: pushing the peer count down makes an eclipse attack
+  considerably easier, which was finding 2 of the audit above. Everything else
+  decided during setup stays decided — completing the setup a second time is
+  refused with 409.
+
+  (Until 2026-09-22 this section claimed "the setup is final". That was no
+  longer true, and it undersold the work: the narrow path exists precisely so
+  that the dangerous fields cannot be reached.)
 
 ## Keeping it that way
 
 Every finding has a test in `app/backend/tests/test_sicherheit.py`. They fail
-if the protection is ever removed again. CI runs the tests before every image
-build.
+if the protection is ever removed again. CI runs the unit tests, `pip-audit
+--strict` and `bandit` before every image build; the image-level checks (the
+container starts, refuses access without a sign-in, ships its licence texts)
+run on pull requests and on pushes to `main`.
+
+## Audit of 2026-09-22 — the build path
+
+Carried out on the repository's own CI, because everything above is only worth
+as much as the pipeline that ships it.
+
+- **Every GitHub Action is now pinned to a commit hash.** They were on mutable
+  major tags (`@v5`). A moved tag in an unattended nightly build that holds a
+  registry token would have reached every operator through `:latest`.
+- **`packages: write` now belongs to the publishing job alone.** It used to
+  apply to the whole workflow, including the job that runs `pip install` and
+  therefore executes third-party install hooks.
+- **`actions/checkout` no longer leaves the token in `.git/config`**
+  (`persist-credentials: false`), which is what made the point above reachable.
+- **Upstream version strings no longer reach a shell.** The nightly build
+  takes release tag names from `bitcoin/bitcoin` and `lightningnetwork/lnd`
+  and used to interpolate them into a `run:` block. Git permits backticks and
+  `$` in tag names. They now travel through the environment.
+- **`renovate.json` was not valid JSON** — a trailing comma — so the component
+  that watches for new third-party versions could not read its configuration.
+
+**Known and open:** the Python dependency tree has no hash lock, so two builds
+of the same commit months apart can differ. Fixing it properly means generating
+a hash-locked requirements file against the image's own Python version and
+watching a full build; it is deliberately not bundled with the changes above.

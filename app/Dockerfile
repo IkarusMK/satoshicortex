@@ -72,8 +72,17 @@ RUN set -eu; \
 # AGPL steht). Schlaegt der Abruf fehl, BRICHT DER BAU AB: ein Abbild, in dem
 # jeder Block still "unbekannt" als Pool zeigt, waere schwerer zu bemerken
 # als ein Bau, der sich meldet.
+# Auf einen FESTEN Stand gepinnt, nicht auf master. Befund vom 22.09.2026:
+# wer Schreibrecht auf diesen Zweig hat, bestimmte damit den Inhalt jedes
+# gebauten Abbilds -- ohne dass hier je jemand hinsieht. Die Schluessel von
+# Bitcoin Core und LND werden im selben Stapel laengst so gepinnt
+# (images/bitcoind/Dockerfile, images/lnd/Dockerfile); diese Datei war die
+# Ausnahme.
+#
+# renovate: datasource=github-refs depName=mempool/mining-pools
+ARG POOLS_COMMIT=f678a4a620537ad7997a475ad0f14bfab1de3c8b
 RUN curl -fsSL --retry 3 -o /pools.json \
-    "https://raw.githubusercontent.com/mempool/mining-pools/master/pools-v2.json" \
+    "https://raw.githubusercontent.com/mempool/mining-pools/${POOLS_COMMIT}/pools-v2.json" \
     && python -c "import json,sys; d=json.load(open('/pools.json')); \
 assert isinstance(d, list) and len(d) > 50, 'Pool-Liste sieht falsch aus'; \
 print(f'/pools.json: {len(d)} Pools')"

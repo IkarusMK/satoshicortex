@@ -342,7 +342,8 @@ class Umschichtung(BaseModel):
     von: str = Field("", max_length=32)
     nach: str = Field("", max_length=80)
     betrag: int = Field(0, ge=0, le=21_000_000 * 100_000_000)
-    gebuehrengrenze: int = Field(0, ge=0, le=100_000_000)
+    # Fehlt das Feld, gilt der Vorschlag -- siehe Rechnungswunsch.
+    gebuehrengrenze: Optional[int] = Field(None, ge=0, le=100_000_000)
     pin: str = Field("", max_length=32)
 
 
@@ -390,9 +391,15 @@ class Rechnungswunsch(BaseModel):
     rechnung: str = Field("", max_length=2048)
     # Nur bei einer Rechnung OHNE Betrag -- dann bestimmt ihn der Zahlende.
     betrag: int = Field(0, ge=0, le=21_000_000 * 100_000_000)
-    # Was die Weiterleitung hoechstens kosten darf. 0 heisst "nimm den
-    # Vorschlag" -- die Zahl steht dann in der Vorschau.
-    gebuehrengrenze: int = Field(0, ge=0, le=100_000_000)
+    # Was die Weiterleitung hoechstens kosten darf. FEHLT das Feld, gilt der
+    # Vorschlag aus der Vorschau.
+    #
+    # None und nicht 0: bis zum 22.09.2026 stand hier eine Null fuer "nicht
+    # gesetzt" -- und damit konnte niemand ausdruecken, was eine Null
+    # eigentlich heisst ("zahle nur, wenn die Route nichts kostet"). Eine
+    # Vorgabe, die zugleich ein gueltiger Wert ist, hat dieses Projekt schon
+    # dreimal Zeit gekostet; hier haette sie Geld gekostet.
+    gebuehrengrenze: Optional[int] = Field(None, ge=0, le=100_000_000)
     pin: str = Field("", max_length=32)
 
 
@@ -3519,6 +3526,20 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         satz = sendesatz(wunsch.tempo)
         try:
             txid = lnd.sende(knoten, adresse, betrag, satz, alles=wunsch.alles)
+        except lnd.Beschaeftigt as fehler:
+            # DER BEFUND VOM 22.09.2026, beim Audit der Geldwege: hier stand
+            # nur das NichtErreichbar darunter -- und Beschaeftigt erbt davon.
+            # Ein Zeitlimit wurde damit zu "LND antwortet nicht", und das
+            # liest sich wie "es ist nichts passiert".
+            #
+            # Es kann aber alles passiert sein: die Ueberweisung ist
+            # womoeglich laengst gesendet, nur die Antwort blieb aus. Beim
+            # Zahlen und Umschichten war das richtig gebaut, ausgerechnet bei
+            # den zwei UNWIDERRUFLICHEN On-Chain-Wegen nicht. Und anders als
+            # eine Lightning-Rechnung, die sich kein zweites Mal zahlen
+            # laesst, ist ein zweiter Versuch hier eine zweite Transaktion.
+            log.warning("Senden ohne Antwort im Zeitlimit: %s", fehler)
+            raise HTTPException(504, {"meldung": "sendung_unklar"})
         except lnd.NichtErreichbar:
             raise HTTPException(503, {"meldung": "lnd_antwortet_nicht"})
         except lnd.LndFehler as fehler:
@@ -3596,11 +3617,24 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         Deshalb dieselbe PIN wie beim Senden, und zuerst geprueft.
         """
         freigabe_pruefen(wunsch.pin)
+        # Die Mindestgroesse wurde bisher nur beim SCHAETZEN geprueft. Wer
+        # den Endpunkt direkt ruft, ging daran vorbei und bekam statt der
+        # klaren Auskunft LNDs eigene Abfuhr. Befund vom 22.09.2026.
+        betrag = int(wunsch.betrag)
+        if betrag < lnd.KANAL_MIN_SAT:
+            raise HTTPException(400, {"meldung": "kanal_zu_klein",
+                                      "einzelheit": str(lnd.KANAL_MIN_SAT)})
         knoten = sendbereit()
         satz = sendesatz(wunsch.tempo)
         try:
-            d = lnd.kanal_oeffnen(knoten, wunsch.gegenstelle, wunsch.betrag,
+            d = lnd.kanal_oeffnen(knoten, wunsch.gegenstelle, betrag,
                                   satz, privat=wunsch.privat)
+        except lnd.Beschaeftigt as fehler:
+            # Dieselbe Sache wie beim Senden: das Oeffnen ist eine
+            # On-Chain-Transaktion, und ein Zeitlimit heisst nicht, dass
+            # keine unterwegs ist.
+            log.warning("Kanal oeffnen ohne Antwort im Zeitlimit: %s", fehler)
+            raise HTTPException(504, {"meldung": "kanal_unklar"})
         except lnd.NichtErreichbar:
             raise HTTPException(503, {"meldung": "lnd_antwortet_nicht"})
         except lnd.LndFehler as fehler:
@@ -3609,7 +3643,7 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
                                       "einzelheit": str(fehler)})
         # Ins Betriebsprotokoll, mit allem, was man spaeter sucht.
         log.warning("Kanal geoeffnet: %s sat zu %s (%s sat/vB), txid %s:%s",
-                    wunsch.betrag, d["gegenstelle"], satz, d["txid"],
+                    betrag, d["gegenstelle"], satz, d["txid"],
                     d["ausgang"])
         # Die Sicherung ist ab JETZT eine andere -- es gibt einen Kanal mehr.
         # Sie sofort nachzuziehen ist der halbe Sinn des Sicherungsziels.
@@ -3989,7 +4023,12 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
             else gelesen["betrag"]
         if betrag <= 0:
             raise HTTPException(400, {"meldung": "betrag_fehlt"})
-        grenze = int(wunsch.gebuehrengrenze) or lnd.gebuehrgrenze(betrag)
+        # KEIN "or": eine Null ist hier ein gueltiger Wunsch ("zahle nur,
+        # wenn die Route nichts kostet") und kein "nicht gesetzt". Genau die
+        # Sentinel-Falle, die in AGENTS.md steht -- diesmal beim Geld.
+        # Befund vom 22.09.2026.
+        grenze = (lnd.gebuehrgrenze(betrag) if wunsch.gebuehrengrenze is None
+                  else int(wunsch.gebuehrengrenze))
 
         try:
             d = lnd.zahle(knoten, gelesen["rechnung"], grenze,
@@ -4063,7 +4102,11 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         """
         freigabe_pruefen(wunsch.pin)
         knoten = sendbereit()
-        grenze = int(wunsch.gebuehrengrenze) or lnd.gebuehrgrenze(wunsch.betrag)
+        # Dieselbe Sentinel-Falle wie beim Zahlen, derselbe Grund: eine
+        # ausdrueckliche Null heisst "nur kostenlos", nicht "nicht gesetzt".
+        grenze = (lnd.gebuehrgrenze(wunsch.betrag)
+                  if wunsch.gebuehrengrenze is None
+                  else int(wunsch.gebuehrengrenze))
         try:
             d = lnd.umschichten(knoten, wunsch.von, wunsch.nach,
                                 wunsch.betrag, grenze)
@@ -4440,11 +4483,16 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         Attrappe -- deshalb muss die Wallet vorher zu sein, und deshalb gibt
         es den Knopf zum Sperren daneben.
         """
-        if wallet_arbeit["laeuft"]:
-            raise HTTPException(409, {"meldung": "wallet_arbeit_laeuft"})
         # ZUERST die PIN, vor jeder anderen Pruefung. Wer sie nicht hat, soll
         # nicht erst erfahren, ob sein Wallet-Passwort stimmt.
+        #
+        # Bis zum 22.09.2026 stand die Frage nach der laufenden Wallet-Arbeit
+        # UEBER diesem Kommentar -- die Zeile widersprach also dem Satz, der
+        # sie erklaerte. Klein, aber es war die einzige Ausnahme von einer
+        # Regel, die nur etwas wert ist, wenn sie keine hat.
         freigabe_pruefen(wahl.pin)
+        if wallet_arbeit["laeuft"]:
+            raise HTTPException(409, {"meldung": "wallet_arbeit_laeuft"})
         knoten = lndverbindung()
         stand = lnd.zustand(knoten)["stand"]
         if stand != "gesperrt":
@@ -5939,6 +5987,12 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
             if time.time() - nachrichtenstand["aufgeraeumt"] > 24 * 3600:
                 nachrichtenstand["aufgeraeumt"] = time.time()
                 auswertung.nachrichten_aufraeumen()
+                # DER BEFUND VOM 22.09.2026: htlc_aufraeumen() gab es, und
+                # gerufen hat es nie jemand. Auf einem Knoten, der
+                # weiterleitet, schreibt htlc_merken() bei jedem Ereignis
+                # eine Zeile -- die Tabelle wuchs also genau dort ohne Ende,
+                # wo der Knoten seinen Zweck erfuellt.
+                auswertung.htlc_aufraeumen()
         except Exception:                                        # nosec B902
             log.exception("Nachrichtenabruf fehlgeschlagen")
 

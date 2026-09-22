@@ -669,8 +669,12 @@ const I18N = {
     a_kb_vor: "vor {dauer}",
     a_kb_bekannt: "{n} / {gesamt} Tx",
     a_kb_bekannt_lang: "{n} von {gesamt} Transaktionen lagen vorher bei dir",
+    a_kb_nur_gesamt: "{gesamt} Tx",
+    a_kb_nicht_dabei: "{gesamt} Transaktionen. Wie viele davon vorher bei dir lagen, weiß dieser Knoten nicht — der Block ist älter als seine Aufzeichnung.",
+    a_nicht_dabei_kurz: "nicht dabei gewesen",
     a_bd_titel: "Block {hoehe} — was du davon gesehen hast",
     a_bd_lead: "{bekannt} von {gesamt} Transaktionen dieses Blocks lagen vorher in deinem Mempool. Die längste Wartezeit steht oben.",
+    a_bd_lead_nicht_dabei: "{gesamt} Transaktionen. Dieser Block ist älter als die Aufzeichnung dieses Knotens — wie viele davon vorher in deinem Mempool lagen, lässt sich nicht nachträglich feststellen.",
     a_bd_leer: "Von diesem Block hast du keine Transaktion vorher gesehen. Entweder ist er älter als deine Aufzeichnung, oder seine Transaktionen kamen nie durch deinen Mempool.",
     a_bd_laedt: "Wird geholt …",
     a_bd_nichts: "Zu diesem Block liegt hier nichts.",
@@ -1110,6 +1114,8 @@ const I18N = {
     rechnung_unlesbar: "Diese Rechnung ließ sich nicht lesen: {einzelheit}",
     zahlung_gescheitert: "Die Zahlung kam nicht durch: {einzelheit}",
     zahlung_unklar: "Keine Antwort innerhalb der Wartezeit. Die Zahlung kann trotzdem unterwegs sein — NICHT wiederholen, sondern gleich in den Kanälen nachsehen.",
+    sendung_unklar: "Keine Antwort innerhalb der Wartezeit. Die Überweisung kann trotzdem unterwegs sein — NICHT noch einmal senden, sondern erst unter Bewegungen nachsehen, ob sie dort steht.",
+    kanal_unklar: "Keine Antwort innerhalb der Wartezeit. Der Vorgang kann trotzdem laufen — NICHT wiederholen, sondern erst in der Kanalliste nachsehen.",
     betrag_fehlt: "Diese Rechnung nennt keinen Betrag. Trag einen ein.",
     sd_titel: "Senden",
     sd_lead: "On-Chain aus der Wallet deines Knotens heraus, an eine gewöhnliche Bitcoin-Adresse. Was in Kanälen liegt, geht so nicht — das kommt erst zurück auf die Kette, wenn ein Kanal schließt. Eine Lightning-Rechnung (lnbc…) gehört nicht hierher, sondern unter Zahlen.",
@@ -1835,8 +1841,12 @@ const I18N = {
     a_kb_vor: "{dauer} ago",
     a_kb_bekannt: "{n} / {gesamt} tx",
     a_kb_bekannt_lang: "{n} of {gesamt} transactions were already yours",
+    a_kb_nur_gesamt: "{gesamt} tx",
+    a_kb_nicht_dabei: "{gesamt} transactions. How many of them were already yours is something this node does not know — the block predates its records.",
+    a_nicht_dabei_kurz: "was not watching",
     a_bd_titel: "Block {hoehe} — what you saw of it",
     a_bd_lead: "{bekannt} of {gesamt} transactions in this block were in your mempool beforehand. The longest wait is on top.",
+    a_bd_lead_nicht_dabei: "{gesamt} transactions. This block predates this node's records — how many of them sat in your mempool beforehand cannot be established after the fact.",
     a_bd_leer: "You saw none of this block's transactions beforehand. Either it predates your records, or its transactions never passed through your mempool.",
     a_bd_laedt: "Fetching …",
     a_bd_nichts: "Nothing here for this block.",
@@ -2276,6 +2286,8 @@ const I18N = {
     rechnung_unlesbar: "That invoice could not be read: {einzelheit}",
     zahlung_gescheitert: "The payment did not get through: {einzelheit}",
     zahlung_unklar: "No answer within the waiting time. The payment may still be on its way — do NOT repeat it, check the channels instead.",
+    sendung_unklar: "No answer within the waiting time. The transfer may still be on its way — do NOT send again, check under Movements whether it is there.",
+    kanal_unklar: "No answer within the waiting time. The operation may still be running — do NOT repeat it, check the channel list first.",
     betrag_fehlt: "This invoice names no amount. Enter one.",
     sd_titel: "Send",
     sd_lead: "On-chain, out of your node's wallet, to an ordinary Bitcoin address. What sits in channels cannot go this way — it returns to the chain only when a channel closes. A Lightning invoice (lnbc…) does not belong here; use Pay instead.",
@@ -2392,6 +2404,41 @@ const TOR_PFADE = ["/zustand", "/anmelden", "/konto/anlegen", "/abmelden"];
 // wartet. Das Backend deckelt seine Kettenlage auf fuenfzehn Sekunden;
 // fuenfundzwanzig lassen ihr Luft und geben trotzdem irgendwann auf.
 const FRIST_MS = 25000;
+
+/* Die Frist fuer alles, was Geld bewegt.
+
+   DER BEFUND VOM 22.09.2026, beim Audit der Geldwege: hier galt ueberall die
+   25 Sekunden oben. Der Server wartet beim Zahlen aber bis zu 80 -- LNDs
+   sechzig plus zwanzig Luft -- und antwortet dann mit "zahlung_unklar":
+   "kann trotzdem unterwegs sein, NICHT wiederholen, sondern nachsehen".
+
+   Dieser Text war damit unerreichbar. Was ein Mensch sah, war "Fehler", ueber
+   eine Zahlung, die in diesem Augenblick lief. Ein Kommentar zwei Zeilen
+   neben dem Aufruf sagte es sogar: "Eine Zahlung kann bis zu einer Minute
+   unterwegs sein."
+
+   Die Wache dazu steht in test_oberflaeche.py und vergleicht diese Zahl mit
+   der des Servers. */
+const FRIST_GELD_MS = 95000;
+
+/* Was ein misslungener Geldweg anzeigt -- und ob der Knopf wieder darf.
+
+   Gibt false zurueck, wenn NICHTS ENTSCHIEDEN ist: dann bleibt der Knopf zu.
+   "Nicht wiederholen" im Text zu schreiben und das Wiederholen im selben
+   Atemzug wieder anzubieten, waere eine halbe Warnung. */
+function geldfehler(e, meldung, unklar) {
+  if (e && e.abgemeldet) return false;
+  // Zwei Wege, auf denen kein Bescheid kommt: die Oberflaeche bricht ab
+  // (netzfehler), oder der Server sagt selbst, dass er es nicht weiss (504).
+  if (e && (e.netzfehler || e.status === 504)) {
+    const d = (e && e.detail) || {};
+    meldung.textContent = t(d.meldung || unklar, d);
+    return false;
+  }
+  const d = (e && e.detail) || {};
+  meldung.textContent = d.meldung ? t(d.meldung, d) : t("e_fehler");
+  return true;
+}
 // Die Erreichbarkeitsmessung baut echte Verbindungen ueber Tor auf: je
 // Adresse bis zu einer halben Minute, und es koennen mehrere sein.
 const FRIST_MESSUNG_MS = 180000;
@@ -5557,7 +5604,17 @@ const GEGENSTELLEN_WEGE = [
 
 function zeichneGegenstellenwege() {
   const ziel = $("#lgw-liste");
-  if (!ziel || ziel.firstChild) return;      // einmal reicht
+  if (!ziel) return;
+  // DER BEFUND VOM 22.09.2026: hier stand "if (ziel.firstChild) return --
+  // einmal reicht". Einmal reicht aber nicht, denn in dieser Liste steht
+  // UEBERSETZTER Text. Der Sprachumschalter loest die Nachlade-Sperren und
+  // zeichnet neu -- diese Funktion stieg dabei sofort wieder aus, und
+  // #lgw-liste wird nirgendwo sonst angefasst. Wer auf Englisch umschaltete,
+  // behielt sie dauerhaft auf Deutsch, bis er neu lud.
+  //
+  // Dieselbe Falle steht seit einem frueheren Befund in kennzahl()
+  // beschrieben. Die Lehre war gezogen und an dieser Stelle nicht angewandt.
+  ziel.textContent = "";
   for (const w of GEGENSTELLEN_WEGE) {
     const zeile2 = document.createElement("p");
     zeile2.style.cssText = "margin:0 0 10px;line-height:1.5";
@@ -5935,11 +5992,12 @@ async function umschichten() {
   knopf.disabled = true;
   meldung.textContent = t("us_laeuft");
   $("#us-fertig").classList.add("hidden");
+  let wiederFrei = true;
   try {
     const d = await api("/lightning/umschichten", "POST", {
       von, nach, betrag: Number($("#us-betrag").value || 0),
       ...mitPin("#us-pin"),
-    });
+    }, FRIST_GELD_MS);
     const fertig = $("#us-fertig");
     fertig.textContent = t("us_fertig", { betrag: zahl(d.betrag),
                                           gebuehr: zahl(d.gebuehr) });
@@ -5948,11 +6006,12 @@ async function umschichten() {
     meldung.textContent = "";
     ladeLightningKanaele();
   } catch (e) {
-    if (e && e.abgemeldet) return;
-    const d = e.detail || {};
-    meldung.textContent = d.meldung ? t(d.meldung, d) : t("e_fehler");
+    // Umschichten ist ein Rundweg mit dem eigenen Geld -- verlieren kann man
+    // nur die Gebuehr. Ohne Bescheid trotzdem nicht wiederholen: sonst
+    // laeuft derselbe Rundweg ein zweites Mal und kostet ein zweites Mal.
+    wiederFrei = geldfehler(e, meldung, "zahlung_unklar");
   } finally {
-    knopf.disabled = false;
+    if (wiederFrei) knopf.disabled = false;
   }
 }
 
@@ -5988,11 +6047,12 @@ async function kanalSchliessen() {
   knopf.disabled = true;
   meldung.textContent = t("ks_laeuft");
   $("#ks-fertig").classList.add("hidden");
+  let wiederFrei = true;
   try {
     const d = await api("/lightning/kanal/schliessen", "POST", {
       punkt, erzwingen: $("#ks-erzwingen").checked, tempo: "normal",
       ...mitPin("#ks-pin"),
-    });
+    }, FRIST_GELD_MS);
     const fertig = $("#ks-fertig");
     fertig.textContent = t(d.erzwungen ? "ks_fertig_erzwungen" : "ks_fertig",
                            { txid: d.txid });
@@ -6003,11 +6063,9 @@ async function kanalSchliessen() {
     meldung.textContent = "";
     ladeLightningKanaele();
   } catch (e) {
-    if (e && e.abgemeldet) return;
-    const d = e.detail || {};
-    meldung.textContent = d.meldung ? t(d.meldung, d) : t("e_fehler");
+    wiederFrei = geldfehler(e, meldung, "kanal_unklar");
   } finally {
-    knopf.disabled = false;
+    if (wiederFrei) knopf.disabled = false;
   }
 }
 
@@ -7222,10 +7280,23 @@ function zeichneBlockstreifen(liste) {
     tx.className = "bk-zeile";
     // Die Zahl, die kein Explorer hat, steht direkt daneben -- nicht die
     // Gesamtzahl allein, sondern wie viele davon vorher bei uns lagen.
-    tx.textContent = t("a_kb_bekannt", { n: zahl(b.bekannte_tx || 0),
-                                         gesamt: zahl(b.txzahl || 0) });
-    tx.title = t("a_kb_bekannt_lang", { n: zahl(b.bekannte_tx || 0),
-                                        gesamt: zahl(b.txzahl || 0) });
+    // DER BEFUND VOM 22.09.2026: hier stand zahl(b.bekannte_tx || 0). Das
+    // Backend setzt dieses Feld AUSDRUECKLICH auf None, mit der Begruendung
+    // "wir waren nicht dabei, und eine Null saehe aus wie eine Messung" --
+    // und die Oberflaeche machte daraus genau diese Messung. Bei einem
+    // Block, den dieser Knoten nie live gesehen hat, stand da "0 / 2431 Tx".
+    //
+    // Nebenan wurde es richtig gemacht: verweildauer_ms, aus demselben
+    // Dict, wird mit "!= null ? ... : '—'" behandelt.
+    if (b.bekannte_tx == null) {
+      tx.textContent = t("a_kb_nur_gesamt", { gesamt: zahl(b.txzahl || 0) });
+      tx.title = t("a_kb_nicht_dabei", { gesamt: zahl(b.txzahl || 0) });
+    } else {
+      tx.textContent = t("a_kb_bekannt", { n: zahl(b.bekannte_tx),
+                                           gesamt: zahl(b.txzahl || 0) });
+      tx.title = t("a_kb_bekannt_lang", { n: zahl(b.bekannte_tx),
+                                          gesamt: zahl(b.txzahl || 0) });
+    }
 
     const fuss = document.createElement("span");
     fuss.className = "bk-fuss";
@@ -7277,9 +7348,10 @@ function zeichneBlockdetail(d) {
 
   const lead = document.createElement("p");
   lead.className = "dim small";
-  lead.textContent = t("a_bd_lead", {
-    bekannt: zahl(b.bekannte_tx || 0), gesamt: zahl(b.txzahl || 0),
-  });
+  lead.textContent = b.bekannte_tx == null
+    ? t("a_bd_lead_nicht_dabei", { gesamt: zahl(b.txzahl || 0) })
+    : t("a_bd_lead", { bekannt: zahl(b.bekannte_tx),
+                       gesamt: zahl(b.txzahl || 0) });
   ziel.append(lead);
 
   const liste = d.transaktionen || [];
@@ -7374,7 +7446,10 @@ function zeichneBloecke(liste) {
     zelle(zahl(b.txzahl || 0), "zahl");
     // Die eine Spalte, die kein Explorer hat: wie viele davon lagen VORHER
     // bei uns im Mempool.
-    zelle(zahl(b.bekannte_tx || 0), "zahl");
+    // Gedankenstrich wie in den Nachbarspalten -- "nicht gemessen" ist
+    // etwas anderes als "keine".
+    zelle(b.bekannte_tx != null ? zahl(b.bekannte_tx) : "—", "zahl",
+          b.bekannte_tx == null ? t("a_nicht_dabei_kurz") : "");
     zelle(b.verweildauer_ms != null ? dauerKurz(b.verweildauer_ms) : "—", "zahl");
     zelle(b.gebuehren_sat != null ? btc(b.gebuehren_sat) : "—", "zahl");
     tabelle.append(tr);
@@ -8686,9 +8761,14 @@ async function sendenAusloesen() {
   const meldung = $("#sd-meldung");
   knopf.disabled = true;
   meldung.textContent = "";
+  // Ob der Knopf danach wieder darf. Bei einem Abbruch OHNE Bescheid nicht:
+  // die Ueberweisung kann unterwegs sein, und ein zweiter Versuch waere eine
+  // zweite Transaktion. On-Chain schuetzt kein Protokoll davor.
+  let wiederFrei = true;
   try {
     const d = await api("/lightning/senden", "POST",
-                        { ...sendenLeib(), ...mitPin("#sd-pin") });
+                        { ...sendenLeib(), ...mitPin("#sd-pin") },
+                        FRIST_GELD_MS);
     $("#sd-txid").textContent = d.txid || "";
     $("#sd-fertig").classList.remove("hidden");
     $("#sd-kosten").classList.add("hidden");
@@ -8702,14 +8782,12 @@ async function sendenAusloesen() {
     ladeLightningKanaele();          // das Guthaben stimmt jetzt nicht mehr
     ladeBewegungen();                // und die neue Ausgabe gehoert in die Liste
   } catch (e) {
-    if (e && e.abgemeldet) return;
-    const d = e.detail || {};
-    meldung.textContent = d.meldung ? t(d.meldung, d) : t("e_fehler");
+    wiederFrei = geldfehler(e, meldung, "sendung_unklar");
     // Nach einer Abfuhr wieder zu -- was abgelehnt wurde, ist nicht
-    // geschaetzt.
+    // geschaetzt. Nach einem Abbruch erst recht.
     sendenSperren();
   } finally {
-    knopf.disabled = false;
+    if (wiederFrei) knopf.disabled = false;
   }
 }
 
@@ -8841,9 +8919,11 @@ async function rechnungZahlen() {
   // dazu sieht das aus, als haette der Knopf nichts getan -- und der
   // naechste Griff waere, ihn noch einmal zu druecken.
   meldung.textContent = t("zl_unterwegs");
+  let wiederFrei = true;
   try {
     const d = await api("/lightning/rechnung/zahlen", "POST",
-                        { ...zahlenLeib(), ...mitPin("#zl-pin") });
+                        { ...zahlenLeib(), ...mitPin("#zl-pin") },
+                        FRIST_GELD_MS);
     const fertig = $("#zl-fertig");
     fertig.textContent = t("zl_bezahlt", { betrag: zahl(d.betrag),
                                            gebuehr: zahl(d.gebuehr) });
@@ -8856,11 +8936,12 @@ async function rechnungZahlen() {
     zahlenSperren();
     ladeLightningKanaele();
   } catch (e) {
-    if (e && e.abgemeldet) return;
-    const d = e.detail || {};
-    meldung.textContent = d.meldung ? t(d.meldung, d) : t("e_fehler");
+    wiederFrei = geldfehler(e, meldung, "zahlung_unklar");
+    // Ohne Bescheid auch die Rechnung sperren: wer sie erneut einliest,
+    // sieht in der Vorschau, ob sie inzwischen bezahlt ist.
+    if (!wiederFrei) zahlenSperren();
   } finally {
-    knopf.disabled = false;
+    if (wiederFrei) knopf.disabled = false;
   }
 }
 
@@ -9275,9 +9356,11 @@ async function kanalOeffnen() {
   const meldung = $("#ko-meldung");
   knopf.disabled = true;
   meldung.textContent = t("ko_laeuft");
+  let wiederFrei = true;
   try {
     const d = await api("/lightning/kanal/oeffnen", "POST",
-                        { ...kanalLeib(), ...mitPin("#ko-pin") });
+                        { ...kanalLeib(), ...mitPin("#ko-pin") },
+                        FRIST_GELD_MS);
     const fertig = $("#ko-fertig");
     fertig.textContent = t("ko_fertig", { txid: d.txid });
     fertig.classList.remove("hidden");
@@ -9288,11 +9371,10 @@ async function kanalOeffnen() {
     kanalSperren();
     ladeLightningKanaele();
   } catch (e) {
-    if (e && e.abgemeldet) return;
-    const d = e.detail || {};
-    meldung.textContent = d.meldung ? t(d.meldung, d) : t("e_fehler");
+    wiederFrei = geldfehler(e, meldung, "kanal_unklar");
+    if (!wiederFrei) kanalSperren();
   } finally {
-    knopf.disabled = false;
+    if (wiederFrei) knopf.disabled = false;
   }
 }
 
@@ -9908,9 +9990,26 @@ function whWortfehlerZeigen(schlecht) {
   });
 }
 
+/* Die aria-label der 24 Felder nachziehen.
+
+   Dieselbe Sache wie bei den Gegenstellenwegen, nur unsichtbar: die Felder
+   werden bewusst nur EINMAL gebaut (wer schon getippt hat, soll seine
+   Eingabe behalten), ihre Beschriftung ist aber uebersetzt. Nach einem
+   Sprachwechsel las ein Vorlesewerkzeug sie in der alten Sprache vor.
+   Befund vom 22.09.2026. */
+function whBeschriften() {
+  const ziel = $("#wh-woerter");
+  if (!ziel) return;
+  [...ziel.querySelectorAll("input")].forEach((feld, i) => {
+    feld.setAttribute("aria-label", t("wl_wort_nr", { nr: i + 1 }));
+  });
+}
+
 function whFelderBauen() {
   const ziel = $("#wh-woerter");
-  if (ziel.children.length) return;          // nur einmal
+  // Vorhandene Felder bleiben stehen -- nur ihre Beschriftung wird
+  // nachgezogen, falls inzwischen die Sprache gewechselt wurde.
+  if (ziel.children.length) return whBeschriften();
   // Die Vorschlagsliste des Browsers einmal fuellen -- damit ein falsches
   // Wort gar nicht erst hineinkommt.
   const liste = $("#bip39-liste");
@@ -10982,6 +11081,9 @@ async function start() {
     // wirklich steht. Frische Daten sind hier Nebenwirkung, nicht Zweck --
     // gewollt ist der Text in der neuen Sprache.
     KARTE_STAND = LN_STAND = BEITRAG_STAND = AUSW_STAND = 0;
+    // Die Seed-Felder werden bewusst nicht neu gebaut -- wer schon getippt
+    // hat, soll seine Woerter behalten. Ihre Beschriftung muss trotzdem mit.
+    whBeschriften();
     await zeigeUebersicht();
     zeigeAnsicht(ANSICHT);
   }));

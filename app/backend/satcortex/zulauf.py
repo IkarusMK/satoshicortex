@@ -252,9 +252,20 @@ class Zulauf(threading.Thread):
             return
 
         txids = [t for t in block.get("tx") or [] if isinstance(t, str)]
-        lage = self.ablage.tx_bestaetigt(txids, block.get("height", 0), jetzt_ms)
-
         coinbase_hex = ((block.get("coinbase_tx") or {}).get("coinbase") or "")
+        # ERST die Aufrufe nach draussen, DANN schreiben.
+        #
+        # DER BEFUND VOM 22.09.2026: tx_bestaetigt() oeffnet eine
+        # Schreibtransaktion, und die Werte des folgenden Aufrufs wurden
+        # danach ausgerechnet -- darunter _gebuehren() und _pool(), zwei
+        # RPC-Aufrufe mit 30 und 20 Sekunden Zeitlimit. Die Transaktion stand
+        # also bis zu fuenfzig Sekunden offen, waehrend jeder andere
+        # Schreibende nur zwanzig Sekunden Geduld hat ("database is locked").
+        gebuehren = self._gebuehren(knoten, blockhash)
+        pool = self._pool(knoten, blockhash, txids, coinbase_hex)
+        botschaft = self._botschaft(coinbase_hex)
+
+        lage = self.ablage.tx_bestaetigt(txids, block.get("height", 0), jetzt_ms)
         self.ablage.block_eingetragen({
             "hoehe": block.get("height", 0),
             "hash": blockhash,
@@ -262,9 +273,9 @@ class Zulauf(threading.Thread):
             "empfangen_ms": jetzt_ms,
             "gewicht": block.get("weight"),
             "txzahl": block.get("nTx", len(txids)),
-            "gebuehren_sat": self._gebuehren(knoten, blockhash),
-            "pool": self._pool(knoten, blockhash, txids, coinbase_hex),
-            "botschaft": self._botschaft(coinbase_hex),
+            "gebuehren_sat": gebuehren,
+            "pool": pool,
+            "botschaft": botschaft,
             "bekannte_tx": lage["bekannt"],
             "verweildauer_ms": lage["median_ms"],
         })
