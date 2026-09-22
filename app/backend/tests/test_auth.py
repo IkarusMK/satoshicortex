@@ -629,14 +629,20 @@ def test_gleichzeitige_versuche_zaehlen_alle(verwaltung, monkeypatch):
     assert durchgelassen == 1, ergebnis
 
 
-def test_gleichzeitige_pin_versuche_zaehlen_alle(tmp_path, monkeypatch):
+def test_bei_der_pin_geht_kein_versuch_verloren(tmp_path, monkeypatch):
     """Dasselbe fuer die PIN. Dort liegt der Zaehler in einer DATEI, und
     Lesen-Aendern-Schreiben ohne Schloss VERLIERT Versuche -- bei genau dem
     Zaehler, der zwischen einer uebernommenen Sitzung und dem Geld steht.
 
-    Aus dem Ruhezustand heraus: alle fuenf duerfen die Pruefung erreichen,
-    also muessen danach auch fuenf gezaehlt sein. Ohne Schloss sind es
-    weniger, weil jeder Faden denselben Stand gelesen hat.
+    Geprueft wird nicht "alle fuenf werden gezaehlt" -- das waere falsch: nach
+    dem ersten Fehlversuch greift die Wartestaffel (PIN_WARTEN), und die
+    naechsten Versuche GEHOEREN abgewiesen, ohne gezaehlt zu werden. Geprueft
+    wird, dass keiner spurlos verschwindet: jeder der fuenf ist entweder
+    gezaehlt oder an der Sperre gescheitert.
+
+    Ohne Schloss kamen alle fuenf an der Sperre vorbei (sie war ja noch
+    leer), und beim Zuruecksschreiben blieben drei bis vier uebrig. In CI
+    gemessen: vier von fuenf.
     """
     import threading
     frei = auth.Freigabe(str(tmp_path / "pin"))
@@ -646,15 +652,23 @@ def test_gleichzeitige_pin_versuche_zaehlen_alle(tmp_path, monkeypatch):
     monkeypatch.setattr(auth, "pruefe_passwort",
                         lambda h, p: (time.sleep(0.25), echt(h, p))[1])
 
+    ergebnis = []
+
     def versuchen():
         try:
             frei.pruefe("000000")
-        except Exception:
-            pass
+        except Exception as f:
+            ergebnis.append(type(f).__name__)
 
     faeden = [threading.Thread(target=versuchen) for _ in range(5)]
     for f in faeden:
         f.start()
     for f in faeden:
         f.join()
-    assert len(frei._versuche()) == 5, len(frei._versuche())
+
+    gezaehlt = len(frei._versuche())
+    gesperrt = ergebnis.count("FreigabeGesperrt")
+    abgelehnt = ergebnis.count("FreigabeAbgelehnt")
+    assert gezaehlt + gesperrt == 5, (gezaehlt, gesperrt, abgelehnt)
+    # Und jeder gezaehlte Versuch hat auch wirklich eine Abfuhr bekommen.
+    assert abgelehnt == gezaehlt, (gezaehlt, abgelehnt)

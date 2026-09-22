@@ -351,6 +351,10 @@ class Freigabe:
         self.pfad = Path(verzeichnis)
         storage.lege_ablage_an(str(self.pfad))
         self.datei = self.pfad / "freigabe.json"
+        # Dasselbe Schloss wie bei der Anmeldung, aus demselben Grund -- hier
+        # wiegt es sogar mehr: dieser Zaehler steht zwischen einer
+        # uebernommenen Sitzung und den sechs Wegen, die Geld bewegen.
+        self._schloss = threading.Lock()
 
     # -------------------------------------------------------------- Ablage
     @property
@@ -412,13 +416,32 @@ class Freigabe:
         self._schreib({"hash": hashe(pin), "angelegt_am": time.time()})
 
     def pruefe(self, pin: str) -> bool:
-        if self.wartet_noch() > 0:
-            raise FreigabeGesperrt("zu_viele_versuche")
-        gespeichert = self._lies().get("hash") or ""
-        if not gespeichert or not pruefe_passwort(gespeichert, pin or ""):
+        """Die PIN pruefen -- und den Versuch zaehlen, bevor gerechnet wird.
+
+        DER BEFUND VOM 22.09.2026: Warten-pruefen, rechnen, zaehlen waren drei
+        Schritte ohne Schloss, und der mittlere ist scrypt -- ein langer
+        Augenblick. Mehrere gleichzeitige Versuche lasen denselben Stand und
+        schrieben ihn wieder; gemessen wurden bei fuenf Versuchen drei bis
+        vier Eintraege. Der Rest fiel unter den Tisch.
+
+        Deshalb: Sperre pruefen UND Versuch vermerken in einem Zug unter dem
+        Schloss, danach erst die teure Rechnung, und bei Erfolg wieder unter
+        dem Schloss aufraeumen.
+
+        (Die erste Behebung dieses Befundes hat nur die Anmeldung erfasst und
+        diese Klasse vergessen. Der oertliche Lauf war gruen -- ein Wettlauf
+        trifft nicht zuverlaessig --, CI hat es gefangen.)
+        """
+        with self._schloss:
+            if self.wartet_noch() > 0:
+                raise FreigabeGesperrt("zu_viele_versuche")
+            gespeichert = self._lies().get("hash") or ""
             self._merke_fehlversuch()
+
+        if not gespeichert or not pruefe_passwort(gespeichert, pin or ""):
             raise FreigabeAbgelehnt("pin_falsch")
-        self._frei()
+        with self._schloss:
+            self._frei()
         return True
 
     def aendern(self, alt: str, neu: str) -> None:
