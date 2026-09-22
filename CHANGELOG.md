@@ -4,7 +4,41 @@ All notable changes to SatoshiCortex. Format loosely after
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning after
 [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [1.0.4] — 2026-09-22
+
+The two findings from the audit that could not be proved on a laptop. Both
+needed a real build and a stack coming up, so they waited until CI could be
+watched. It could: the image built with `--require-hashes`, and the stack came
+up with every container read-only.
+
+### Added: the dependency tree is hash-locked
+
+`requirements.txt` pins its direct dependencies with `==` and said so —
+"so that a build today gives the same result in half a year". It did not.
+Everything *behind* those names — `pydantic-core`, `h11`, `anyio` and a dozen
+more — resolved fresh on every build.
+
+`requirements.lock` now holds the whole resolved tree, twenty-three packages,
+each with its checksums, resolved against **the image's** Python version
+rather than whatever the maintainer happens to run. `pip install
+--require-hashes` accepts only those exact files.
+
+This covers what `pip-audit` structurally cannot: for a package that was
+malicious when it was uploaded there is no advisory yet. `h11` sits in the
+path of every request to the wallet interface.
+
+The lock is generated, not maintained, so two guards keep it honest: every
+pinned package must appear in it at the same version, and every package must
+carry at least one checksum.
+
+### Changed: all four containers run with a read-only root
+
+Only the application did. `bitcoind`, `lnd` and `tor` had a writable root
+filesystem — `lnd` above all, being the container that holds the wallet. Their
+data lives in mounted volumes; what they need beyond that is a `/tmp`, and
+they now get it as a `tmpfs`.
+
+## [1.0.3] — 2026-09-22
 
 ### Audit of 2026-09-22 — the money paths
 
@@ -210,10 +244,6 @@ Two things came out of it:
   it undersold the work: the narrow path exists precisely so the dangerous
   fields cannot be reached. Corrected.
 
-`bitcoind`, `lnd` and `tor` now run with a read-only root filesystem and a
-`tmpfs` for `/tmp`, like `app` already did — `lnd` most of all, since that is
-the container holding the wallet.
-
 ### Audit of 2026-09-22 — the build path
 
 See SECURITY.md for the detail. In short: every GitHub Action is now pinned to
@@ -224,12 +254,6 @@ tag names no longer reach a shell (git permits backticks and `$` in tag names);
 the mining-pool list is pinned to a commit instead of a moving branch; and
 `renovate.json` was not valid JSON, so the component watching for new
 third-party versions could not read its own configuration.
-
-The Python tree is now hash-locked as well (`requirements.lock`, resolved
-against the image's own Python version). `pip install --require-hashes` accepts
-only those exact files, for the whole tree rather than the handful of names in
-`requirements.txt` — so the reproducibility claim in that file is true now. Two
-guards keep the lock from drifting away from its source.
 
 ## [1.0.2] — 2026-09-21
 
