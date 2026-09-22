@@ -1247,3 +1247,28 @@ def test_die_pruefung_hat_ihren_eigenen_socks_port_mit_erweiterten_codes():
     assert "SocksPort 0.0.0.0:9050" in wirksam
     assert "SocksPort 0.0.0.0:9052 ExtendedErrors" in wirksam
     assert settings.Einstellungen().tor_pruef_port == 9052
+
+
+def test_jeder_dienst_laeuft_mit_schreibgeschuetzter_wurzel():
+    """Befund vom 22.09.2026: nur die Anwendung hatte read_only, waehrend
+    bitcoind, lnd und tor mit schreibbarem Wurzeldateisystem liefen -- allen
+    voran LND, der Behaelter, in dem die Wallet liegt.
+
+    Ihre eigenen Daten liegen in eingehaengten Bereichen; die Wurzel braucht
+    keiner von ihnen. Was sie brauchen, ist ein /tmp, und das bekommen sie
+    als tmpfs.
+    """
+    import re
+    compose = _lies("docker-compose.yml")
+    # Jeder Dienstblock -- zwei Leerzeichen Einrueckung, Doppelpunkt.
+    bloecke = re.split(r"\n  (?=[a-z][\w-]*:\n)", compose)
+    gefunden = {}
+    for b in bloecke:
+        m = re.match(r"([a-z][\w-]*):\n", b)
+        if not m or "image:" not in b:
+            continue
+        gefunden[m.group(1)] = ("read_only: true" in b, "tmpfs:" in b)
+
+    assert set(gefunden) == {"app", "bitcoind", "lnd", "tor"}, gefunden
+    ohne = [n for n, (ro, tm) in gefunden.items() if not (ro and tm)]
+    assert not ohne, ohne

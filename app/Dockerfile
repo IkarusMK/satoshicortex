@@ -121,7 +121,11 @@ WORKDIR /opt/satcortex
 #   PermissionError: [Errno 13] Permission denied: '/opt/satcortex/satcortex/__init__.py'
 # Ein git clone legt 0644 an, deshalb faellt es in der CI nicht auf.
 COPY --chmod=0644 app/backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY --chmod=0644 app/backend/requirements.lock .
+# --require-hashes: pip nimmt nur Dateien an, deren Pruefsumme in der Sperre
+# steht -- und zwar fuer den GANZEN Baum, nicht nur fuer die Namen, die in
+# requirements.txt stehen. Siehe den Kopf von requirements.lock.
+RUN pip install --no-cache-dir --require-hashes -r requirements.lock
 
 COPY --chmod=0755 app/backend/satcortex ./satcortex
 COPY --chmod=0755 app/templates /opt/templates

@@ -210,10 +210,9 @@ Two things came out of it:
   it undersold the work: the narrow path exists precisely so the dangerous
   fields cannot be reached. Corrected.
 
-One finding is deliberately **not** fixed here: `bitcoind`, `lnd` and `tor`
-still run with a writable root filesystem while `app` does not. The change
-looks safe on paper, but the only honest proof is a full stack coming up, and
-that belongs in a change where the build can be watched.
+`bitcoind`, `lnd` and `tor` now run with a read-only root filesystem and a
+`tmpfs` for `/tmp`, like `app` already did — `lnd` most of all, since that is
+the container holding the wallet.
 
 ### Audit of 2026-09-22 — the build path
 
@@ -226,10 +225,11 @@ the mining-pool list is pinned to a commit instead of a moving branch; and
 `renovate.json` was not valid JSON, so the component watching for new
 third-party versions could not read its own configuration.
 
-One finding is deliberately **not** bundled here: the Python dependency tree has
-no hash lock, so two builds of the same commit months apart can differ. Fixing
-it properly means resolving against the image's own Python version and watching
-a full build, which belongs in its own change.
+The Python tree is now hash-locked as well (`requirements.lock`, resolved
+against the image's own Python version). `pip install --require-hashes` accepts
+only those exact files, for the whole tree rather than the handful of names in
+`requirements.txt` — so the reproducibility claim in that file is true now. Two
+guards keep the lock from drifting away from its source.
 
 ## [1.0.2] — 2026-09-21
 

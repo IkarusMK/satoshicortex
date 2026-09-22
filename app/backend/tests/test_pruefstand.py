@@ -166,3 +166,53 @@ def test_kein_hintergrundfaden_ueberlebt_seinen_testfall(tmp_path, monkeypatch):
     assert not uebrig, (
         "diese Faeden laufen nach dem Einholen weiter -- sie beachten das "
         "Haltesignal nicht: " + repr(uebrig))
+
+
+# ── Die Abhaengigkeitssperre (Befund 22.09.2026) ───────────────────────────
+
+def test_die_sperre_kennt_jede_gepinnte_abhaengigkeit():
+    """requirements.lock ist erzeugt, nicht gepflegt -- und genau deshalb
+    laeuft es auseinander, sobald jemand requirements.txt anfasst und das
+    Erzeugen vergisst. Dann baut das Abbild stillschweigend mit der ALTEN
+    Fassung weiter, waehrend pip-audit die neue prueft.
+
+    Die Wache vergleicht beide: jedes mit == gepinnte Paket muss in der
+    Sperre mit derselben Fassung stehen.
+    """
+    import re
+    wurzel = Path(__file__).resolve().parents[1]
+    quelle = (wurzel / "requirements.txt").read_text(encoding="utf-8")
+    sperre = (wurzel / "requirements.lock").read_text(encoding="utf-8")
+
+    def normal(name):
+        return re.sub(r"[-_.]+", "-", name).lower()
+
+    gesperrt = dict(re.findall(r"^([A-Za-z0-9._-]+)==([^\s\\]+)", sperre,
+                               re.M))
+    gesperrt = {normal(k): v for k, v in gesperrt.items()}
+
+    fehlt = []
+    for zeile in quelle.splitlines():
+        zeile = zeile.split("#")[0].strip()
+        treffer = re.match(r"^([A-Za-z0-9._-]+)(\[[^\]]*\])?==([^\s;]+)",
+                           zeile)
+        if not treffer:
+            continue
+        name, fassung = normal(treffer.group(1)), treffer.group(3)
+        if gesperrt.get(name) != fassung:
+            fehlt.append(f"{name}: requirements.txt {fassung}, "
+                         f"Sperre {gesperrt.get(name, 'fehlt')}")
+    assert not fehlt, fehlt
+
+
+def test_die_sperre_traegt_zu_jedem_paket_pruefsummen():
+    """Ohne Pruefsumme ist die Sperre nur eine Liste. --require-hashes
+    verlangt fuer JEDES Paket mindestens eine."""
+    import re
+    sperre = (Path(__file__).resolve().parents[1]
+              / "requirements.lock").read_text(encoding="utf-8")
+    pakete = re.findall(r"^([A-Za-z0-9._-]+)==[^\s\\]+(.*?)(?=^\S|\Z)",
+                        sperre, re.M | re.S)
+    assert len(pakete) >= 15, len(pakete)
+    ohne = [n for n, rest in pakete if "--hash=sha256:" not in rest]
+    assert not ohne, ohne

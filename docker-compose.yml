@@ -166,6 +166,9 @@ services:
           pids: 512
     security_opt:
       - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
     # bitcoind must be allowed to flush the chainstate cleanly. Docker's
     # default of 10 seconds is not enough for that — a container killed
     # mid-write costs a rebuild that takes days.
@@ -258,6 +261,9 @@ services:
           pids: 512
     security_opt:
       - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
     # LND flushes its channel database on shutdown. Docker's default of ten
     # seconds is tight for that, and money depends on it here: a damaged
     # channel database costs, in the worst case, the balances that are not in
@@ -305,6 +311,9 @@ services:
     pull_policy: always
     security_opt:
       - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
 
 networks:
   satcortex:

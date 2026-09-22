@@ -19,25 +19,27 @@ repository directly.
   ALL`, `no-new-privileges`) and with a process limit on all four. The
   application additionally runs with a read-only filesystem.
 
-  **Open, reviewed 2026-09-22:** `bitcoind`, `lnd` and `tor` still run with a
-  writable root filesystem. Their own data lives in mounted volumes, so a
-  read-only root plus a `tmpfs` for `/tmp` looks available — most of all for
-  `lnd`, which is the container holding the wallet. It is not switched on yet
-  because the only honest proof is a full stack coming up, and that has to be
-  watched rather than assumed.
+  Since 2026-09-22 this holds for **all four**: `bitcoind`, `lnd` and `tor`
+  ran with a writable root until then, `lnd` included — the container holding
+  the wallet. Their own data lives in mounted volumes; what they need beyond
+  that is a `/tmp`, and they get it as a `tmpfs`.
 - **Third-party software is signature-checked** before it enters an image:
   Bitcoin Core against at least three builder signatures from a pinned
   `guix.sigs` commit, **LND** against a pinned Lightning Labs key set with its
   extracted binaries re-checked against the signed manifest, and Tor through
   Debian's package signature. Every one of these fails the build closed.
 
-  **What is not signature-checked, stated plainly** (reviewed 2026-09-22):
-  the Python dependency tree is pinned with `==` for its direct dependencies
-  but has no lock file and no hash verification, so transitive packages
-  resolve at build time; the GeoIP city list from DB-IP is an unauthenticated
-  download whose filename is derived from the current month and therefore
-  cannot be pinned. The mining-pool list used to be fetched from a moving
-  branch and is now pinned to a commit.
+  **The Python tree is hash-locked** (`app/backend/requirements.lock`,
+  generated against the image's own Python version). `pip install
+  --require-hashes` accepts only those exact files — for the whole tree, not
+  just the names listed in `requirements.txt`. Until 2026-09-22 everything
+  behind the direct dependencies resolved fresh on every build, which made
+  the "same result in half a year" claim in that file untrue.
+
+  **What remains unverified, stated plainly:** the GeoIP city list from DB-IP
+  is an unauthenticated download whose filename is derived from the current
+  month and therefore cannot be pinned. The mining-pool list used to come
+  from a moving branch and is now pinned to a commit.
 - **Secrets never leave the machine.** The application generates the RPC
   password itself and stores it with mode 0600; only the hash goes into the
   service configuration.
@@ -261,7 +263,7 @@ as much as the pipeline that ships it.
 - **`renovate.json` was not valid JSON** — a trailing comma — so the component
   that watches for new third-party versions could not read its configuration.
 
-**Known and open:** the Python dependency tree has no hash lock, so two builds
-of the same commit months apart can differ. Fixing it properly means generating
-a hash-locked requirements file against the image's own Python version and
-watching a full build; it is deliberately not bundled with the changes above.
+- **The dependency tree is hash-locked and the last three containers got a
+  read-only root.** Both were held back from the first round because the only
+  honest proof is a full build and a stack coming up — neither can be shown on
+  a laptop without Docker. They went in once CI could be watched.
