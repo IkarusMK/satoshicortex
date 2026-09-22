@@ -2075,3 +2075,22 @@ body.ansicht-welt .weltkarte .kleine circle { cursor: pointer; }
 
 .gb-vt-teil { background: var(--stufe); }
 .gb-vt-eintrag::before { background: var(--stufe); }
+
+/* ── Gebuehr einer haengenden Ueberweisung erhoehen ──────────────────────
+   Steht unter der Bewegung, zu der sie gehoert, und sieht bewusst nicht wie
+   ein Hauptknopf aus: es ist eine Ausnahme, kein taeglicher Handgriff. */
+.nachbessern {
+  margin: 10px 0 2px;
+  padding: 10px 12px;
+  border-left: 2px solid var(--btc);
+  background: #ffffff08;
+  border-radius: 0 8px 8px 0;
+}
+.nachbessern p { margin: 0 0 8px; }
+.nachbessern-reihe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.nachbessern-reihe .feld.schmal { margin: 0; max-width: 140px; }

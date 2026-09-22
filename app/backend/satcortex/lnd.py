@@ -681,6 +681,16 @@ def bewegungen(knoten: Knoten,
                 if not ausgabe.get("is_our_address"):
                     ziel = str(ausgabe.get("address") or "")
                     break
+        # Und welcher Ausgang gehoert UNS? Das ist das Wechselgeld, und nur
+        # daran kann LND eine Kind-Transaktion haengen, um die Gebuehr
+        # nachzubessern (CPFP). Gibt es keinen -- etwa weil alles verschickt
+        # wurde --, geht das Nachbessern nicht, und dann darf die Oberflaeche
+        # den Knopf auch nicht anbieten. Befund vom 22.09.2026.
+        eigener = None
+        for ausgabe in tx.get("output_details") or []:
+            if ausgabe.get("is_our_address"):
+                eigener = _mit_vorzeichen(ausgabe.get("output_index"))
+                break
         liste.append({
             "txid": str(tx.get("tx_hash") or ""),
             "ziel": ziel,
@@ -690,6 +700,7 @@ def bewegungen(knoten: Knoten,
             "zeit_s": max(0, _mit_vorzeichen(tx.get("time_stamp"))),
             "gebuehr_sat": max(0, _mit_vorzeichen(tx.get("total_fees"))),
             "art": art,
+            "eigener_ausgang": eigener,
         })
     # Unbestaetigte zuerst -- genau die will man sehen, wenn man auf eine
     # Einzahlung wartet --, danach die juengsten Bloecke.
@@ -1342,6 +1353,108 @@ def sende(knoten: Knoten, adresse: str, betrag: int, satz_sat_vb: int,
     d = knoten.ruf("/v1/transactions", macaroon=EIGENES_MACAROON,
                    daten=daten) or {}
     return d.get("txid", "")
+
+
+def _kurz(kennung: str) -> str:
+    """Eine Knotenkennung fuers Auge: Anfang und Ende, Punkte dazwischen.
+
+    Sechsundsechzig Zeichen sagen niemandem etwas, und nebeneinander sehen
+    zwei verschiedene Kennungen gleich aus. Wer die volle braucht, findet
+    sie im Graphen.
+    """
+    k = (kennung or "").strip()
+    return k if len(k) <= 16 else f"{k[:8]}…{k[-4:]}"
+
+
+# Wieviele Paare hoechstens einzeln genannt werden. Der Rest steckt in den
+# Zaehlern darueber: ein Knoten mit Verkehr sammelt tausende, und die
+# gehoeren nicht in einen Browser.
+WEGWISSEN_HOECHSTENS = 25
+
+
+def wegwissen(knoten: Knoten,
+              hoechstens: int = WEGWISSEN_HOECHSTENS) -> Dict[str, Any]:
+    """Was LND ueber Wege gelernt hat -- Mission Control.
+
+    LND merkt sich je Gegenstellenpaar, wann zuletzt eine Weiterleitung
+    versagte und bis zu welchem Betrag eine getragen hat. Genau danach
+    waehlt es spaeter Routen aus; ein Knoten, der dort leer steht, wird
+    gemieden. Der urspruengliche Plan nennt das "den eigentlichen Engpass".
+
+    Der Nutzen sind nicht die Paare, sondern die zwei Betraege je Paar:
+    "trug bis X" und "versagte ab Y". Liegt Y knapp ueber X, ist der Weg
+    nicht kaputt, sondern LEER -- das ist eine Liquiditaetsfrage und keine
+    Stoerung, und sie ist behebbar.
+
+    Zusammengefasst wird hier, nicht im Browser: die Antwort kann tausende
+    Paare enthalten.
+    """
+    d = knoten.ruf("/v2/router/mc", macaroon=EIGENES_MACAROON) or {}
+    paare = d.get("pairs") or []
+    eintraege = []
+    mit_fehl = mit_erfolg = 0
+    for p in paare:
+        if not isinstance(p, dict):
+            continue
+        h = p.get("history") or {}
+        fehl_zeit = _mit_vorzeichen(h.get("fail_time"))
+        erfolg_zeit = _mit_vorzeichen(h.get("success_time"))
+        if fehl_zeit > 0:
+            mit_fehl += 1
+        if erfolg_zeit > 0:
+            mit_erfolg += 1
+        eintraege.append({
+            # Gekuerzt: die volle Kennung hat 66 Zeichen und sagt dem Auge
+            # nichts. Wer sie ganz braucht, sucht im Graphen.
+            "von": _kurz(str(p.get("node_from") or "")),
+            "nach": _kurz(str(p.get("node_to") or "")),
+            "zeitpunkt": max(fehl_zeit, erfolg_zeit),
+            "fehl_ab_sat": _mit_vorzeichen(h.get("fail_amt_sat")),
+            "trug_bis_sat": _mit_vorzeichen(h.get("success_amt_sat")),
+        })
+    eintraege.sort(key=lambda e: -e["zeitpunkt"])
+    return {
+        "paare": len(eintraege),
+        "mit_fehlschlag": mit_fehl,
+        "mit_erfolg": mit_erfolg,
+        "letzte": eintraege[:max(1, int(hoechstens))] if eintraege else [],
+    }
+
+
+def gebuehr_erhoehen(knoten: Knoten, txid: str, ausgang: int,
+                     satz_sat_vb: int, hoechstens_sat: int) -> Dict[str, Any]:
+    """Die Gebuehr einer noch unbestaetigten Ueberweisung nachbessern.
+
+    WAS HIER WIRKLICH PASSIERT -- und das gehoert verstanden, bevor man
+    darauf klickt: LND haengt eine KIND-Transaktion an unser Wechselgeld
+    (Child Pays For Parent). Die alte Transaktion verschwindet nicht; sie
+    wird zusammen mit dem Kind attraktiver, weil ein Miner beide nur
+    gemeinsam nehmen kann. Es entsteht also eine ZWEITE Transaktion, und die
+    kostet zusaetzlich.
+
+    Deshalb braucht es einen Ausgang, der uns gehoert. Wurde alles
+    verschickt, gibt es keinen -- dann geht es nicht, und das sagen wir,
+    statt es zu versuchen und an LNDs Abfuhr zu scheitern.
+
+    Die Obergrenze ist PFLICHT und hat keinen Vorgabewert. Ohne sie nimmt
+    LND, was es fuer noetig haelt (laut eigener Beschreibung bis zur Haelfte
+    des Ausgangs) -- dieselbe Entscheidung wie bei der Gebuehrengrenze einer
+    Lightning-Zahlung, aus demselben Grund: wer eine Gebuehr auslost, soll
+    vorher wissen, wie hoch sie hoechstens wird.
+
+    Die Feldnamen stammen aus LNDs eigener Beschreibung des gepinnten Tags
+    (walletkit.swagger.json, v0.21.3-beta), nicht aus dem Gedaechtnis.
+    """
+    if int(hoechstens_sat) <= 0:
+        raise ValueError("ohne Obergrenze wird keine Gebuehr erhoeht")
+    return knoten.ruf("/v2/wallet/bumpfee", macaroon=EIGENES_MACAROON, daten={
+        "outpoint": {"txid_str": str(txid), "output_index": int(ausgang)},
+        "sat_per_vbyte": str(int(satz_sat_vb)),
+        # Sofort anstossen statt auf den naechsten Block zu warten -- wer
+        # hier klickt, wartet ohnehin schon.
+        "immediate": True,
+        "budget": str(int(hoechstens_sat)),
+    }) or {}
 
 
 def loesche_wallet(verzeichnis: Path) -> None:

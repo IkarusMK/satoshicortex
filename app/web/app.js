@@ -1119,6 +1119,23 @@ const I18N = {
     betrag_fehlt: "Diese Rechnung nennt keinen Betrag. Trag einen ein.",
     sd_titel: "Senden",
     sd_lead: "On-Chain aus der Wallet deines Knotens heraus, an eine gewöhnliche Bitcoin-Adresse. Was in Kanälen liegt, geht so nicht — das kommt erst zurück auf die Kette, wenn ein Kanal schließt. Eine Lightning-Rechnung (lnbc…) gehört nicht hierher, sondern unter Zahlen.",
+    wg_titel: "Was dein Knoten über Wege gelernt hat",
+    wg_lead: "LND merkt sich je Gegenstellenpaar, bis zu welchem Betrag eine Weiterleitung getragen hat und ab welchem sie versagte — und wählt später danach aus. Liegt „versagte ab“ knapp über „trug bis“, ist der Weg nicht kaputt, sondern leer. Das ist eine Frage der Liquidität und behebbar.",
+    wg_zahlen: "{paare} Paare im Gedächtnis · {fehl} mit Fehlschlag · {erfolg} mit Erfolg",
+    wg_leer: "Noch nichts gelernt. Das füllt sich mit jeder Zahlung, die durch deinen Knoten läuft oder von ihm ausgeht.",
+    wg_von: "von",
+    wg_nach: "nach",
+    wg_trug: "trug bis",
+    wg_fehl: "versagte ab",
+    wg_wann: "zuletzt",
+    wg_nicht_abrufbar: "Dein Knoten gibt das Wegwissen gerade nicht heraus.",
+    wegwissen_nicht_abrufbar: "Dein Knoten gibt das Wegwissen gerade nicht heraus.",
+    nb_knopf: "Gebühr erhöhen",
+    nb_laeuft: "Wird angehängt …",
+    nb_erklaerung: "Diese Überweisung hängt noch. Erhöhen heißt hier: dein Knoten hängt eine zweite Transaktion an dein Wechselgeld, damit ein Miner beide nur zusammen nehmen kann. Die erste verschwindet nicht — und die zweite kostet zusätzlich.",
+    nb_fertig: "Angehängt mit {satz} sat/vB. Höchstens {hoechstens} Sat Gebühr. Beide Transaktionen bestätigen sich gemeinsam.",
+    nb_nicht_moeglich: "Diese Überweisung lässt sich nicht nachbessern: es ging alles raus, es liegt kein Wechselgeld dieses Knotens darin, an das sich etwas anhängen ließe.",
+    nachbessern_abgelehnt: "Dein Knoten hat das Nachbessern abgelehnt: {einzelheit}",
     sd_warnung: "Eine gesendete Transaktion lässt sich nicht zurückholen. Prüfe die Adresse Zeichen für Zeichen — Anfang UND Ende. Bleibt die Antwort einmal aus, schick NICHT noch einmal: sieh erst unter Blöcke oder Mempool nach, ob sie schon unterwegs ist.",
     sd_adresse: "Empfängeradresse",
     sd_adresse_d: "Eine Bitcoin-Adresse. Am besten aus der Zwischenablage einfügen und danach beide Enden vergleichen.",
@@ -2291,6 +2308,23 @@ const I18N = {
     betrag_fehlt: "This invoice names no amount. Enter one.",
     sd_titel: "Send",
     sd_lead: "On-chain, out of your node's wallet, to an ordinary Bitcoin address. What sits in channels cannot go this way — it returns to the chain only when a channel closes. A Lightning invoice (lnbc…) does not belong here; use Pay instead.",
+    wg_titel: "What your node has learned about routes",
+    wg_lead: "For each pair of peers LND remembers up to which amount a forward carried and from which amount it failed — and picks routes accordingly later. If “failed from” sits just above “carried up to”, the route is not broken but empty. That is a liquidity question, and it can be fixed.",
+    wg_zahlen: "{paare} pairs remembered · {fehl} with a failure · {erfolg} with a success",
+    wg_leer: "Nothing learned yet. This fills up with every payment that runs through your node or starts at it.",
+    wg_von: "from",
+    wg_nach: "to",
+    wg_trug: "carried up to",
+    wg_fehl: "failed from",
+    wg_wann: "last",
+    wg_nicht_abrufbar: "Your node is not handing out its route knowledge right now.",
+    wegwissen_nicht_abrufbar: "Your node is not handing out its route knowledge right now.",
+    nb_knopf: "Raise the fee",
+    nb_laeuft: "Attaching …",
+    nb_erklaerung: "This transfer is still waiting. Raising the fee here means: your node attaches a second transaction to your own change, so that a miner can only take both together. The first one does not go away — and the second one costs extra.",
+    nb_fertig: "Attached at {satz} sat/vB. At most {hoechstens} sat in fees. Both transactions confirm together.",
+    nb_nicht_moeglich: "This transfer cannot be bumped: everything went out, so there is no change of this node in it to attach anything to.",
+    nachbessern_abgelehnt: "Your node refused to raise the fee: {einzelheit}",
     sd_warnung: "A sent transaction cannot be called back. Check the address character by character — beginning AND end. If an answer ever fails to arrive, do NOT send again: look under Blocks or Mempool first to see whether it is already on its way.",
     sd_adresse: "Recipient address",
     sd_adresse_d: "A Bitcoin address. Best pasted from the clipboard, then compare both ends.",
@@ -5438,6 +5472,7 @@ function zeigeAnsicht(name) {
   }
   if (name === "ln-kanaele") {
     ladeLightning(true); ladeLightningKanaele(); wachtuermeLaden();
+    ladeWegwissen();
     durchgangLaden();
   }
   if (name === "ln-knoten") ladeLightningKanaele();
@@ -7852,9 +7887,146 @@ function zeichneBewegungen(d) {
       zeile.append(an);
     }
     zeile.append(txidZeile(b.txid, b.txid));
+    // Haengt sie fest? Dann der einzige Handgriff, der hilft.
+    //
+    // Nur bei einem AUSGANG ohne Bestaetigung, und nur wenn ein Ausgang uns
+    // gehoert: LND haengt die Kind-Transaktion an unser Wechselgeld. Wurde
+    // alles verschickt, gibt es keins -- dann steht hier kein Knopf, sondern
+    // der Grund. Einen Knopf anzubieten, der sicher scheitert, waere
+    // schlimmer als keiner.
+    if (b.betrag_sat < 0 && !b.bestaetigungen) {
+      zeile.append(b.eigener_ausgang == null
+        ? hinweis(t("nb_nicht_moeglich"), "")
+        : nachbesserZeile(b));
+    }
     ziel.append(zeile);
   }
   if (d.weitere) ziel.append(hinweis(t("bw_weitere", { n: zahl(d.weitere) }), ""));
+}
+
+/* Was LND ueber Wege gelernt hat.
+
+   Zusammengefasst kommt es schon aus dem Backend -- ein Knoten mit Verkehr
+   sammelt tausende Paare, und die gehoeren nicht in einen Browser. Hier
+   stehen die Zaehler und die juengsten Eintraege. */
+async function ladeWegwissen() {
+  const zahlen = $("#wg-zahlen");
+  const liste = $("#wg-liste");
+  const meldung = $("#wg-meldung");
+  if (!zahlen) return;
+  let d;
+  try {
+    d = await api("/lightning/wegwissen");
+  } catch (e) {
+    if (e && e.abgemeldet) return;
+    const f = e.detail || {};
+    zahlen.textContent = "";
+    liste.textContent = "";
+    meldung.textContent = f.meldung ? t(f.meldung, f) : t("wg_nicht_abrufbar");
+    return;
+  }
+  meldung.textContent = "";
+  zahlen.textContent = t("wg_zahlen", {
+    paare: zahl(d.paare), fehl: zahl(d.mit_fehlschlag),
+    erfolg: zahl(d.mit_erfolg) });
+  liste.textContent = "";
+  if (!d.letzte.length) {
+    meldung.textContent = t("wg_leer");
+    return;
+  }
+  const kopf = document.createElement("tr");
+  for (const k of ["wg_von", "wg_nach", "wg_trug", "wg_fehl", "wg_wann"]) {
+    const th = document.createElement("th");
+    th.textContent = t(k);
+    kopf.append(th);
+  }
+  liste.append(kopf);
+  for (const e of d.letzte) {
+    const tr = document.createElement("tr");
+    for (const [wert, klasse] of [
+        [e.von, "pool"], [e.nach, "pool"],
+        // Null heisst hier "nie getragen" bzw. "nie versagt" -- ein
+        // Gedankenstrich, keine Null. Sonst liest sich "0 sat" wie eine
+        // Messung, und das war es nicht.
+        [e.trug_bis_sat ? zahl(e.trug_bis_sat) : "—", "zahl"],
+        [e.fehl_ab_sat ? zahl(e.fehl_ab_sat) : "—", "zahl"],
+        [e.zeitpunkt ? datumZeit(e.zeitpunkt * 1000) : "—", "zahl"]]) {
+      const td = document.createElement("td");
+      td.className = klasse;
+      td.textContent = wert;
+      tr.append(td);
+    }
+    liste.append(tr);
+  }
+}
+
+/* "Gebuehr erhoehen" fuer eine haengende Ueberweisung.
+
+   Der Knopf sagt vorher, was er tut: es entsteht eine ZWEITE Transaktion,
+   die zusaetzlich kostet. Die alte verschwindet nicht -- beide werden
+   gemeinsam attraktiver (Child Pays For Parent). Wer das nicht weiss,
+   erwartet sonst, dass die Gebuehr der alten einfach steigt. */
+function nachbesserZeile(b) {
+  const kasten = document.createElement("div");
+  kasten.className = "nachbessern";
+
+  const erklaerung = document.createElement("p");
+  erklaerung.className = "dim small";
+  erklaerung.textContent = t("nb_erklaerung");
+  kasten.append(erklaerung);
+
+  const meldung = document.createElement("span");
+  meldung.className = "dim small";
+
+  const knopf = document.createElement("button");
+  knopf.type = "button";
+  knopf.className = "btn schmal";
+  knopf.textContent = t("nb_knopf");
+
+  // Die PIN-Felder der festen Formulare stehen in der Vorlage; diese Zeile
+  // entsteht erst beim Zeichnen, also baut sie ihres selbst -- und nur,
+  // wenn ueberhaupt eine PIN eingerichtet ist (PIN_DA). Wer keine hat, soll
+  // nicht vor einem Feld stehen, das es fuer ihn nicht gibt.
+  let pinEingabe = null;
+  if (PIN_DA) {
+    const feld = document.createElement("label");
+    feld.className = "feld schmal";
+    const kopf = document.createElement("b");
+    kopf.textContent = t("tg_pin");
+    pinEingabe = document.createElement("input");
+    pinEingabe.type = "password";
+    pinEingabe.inputMode = "numeric";
+    pinEingabe.autocomplete = "off";
+    pinEingabe.maxLength = 12;
+    feld.append(kopf, pinEingabe);
+    var pin = feld;
+  }
+
+  knopf.addEventListener("click", async () => {
+    knopf.disabled = true;
+    meldung.textContent = t("nb_laeuft");
+    let wiederFrei = true;
+    try {
+      const d = await api("/lightning/senden/nachbessern", "POST", {
+        txid: b.txid, ausgang: b.eigener_ausgang, tempo: "schnell",
+        ...(pinEingabe ? { pin: pinEingabe.value } : {}),
+      }, FRIST_GELD_MS);
+      meldung.textContent = t("nb_fertig", {
+        satz: zahl(d.satz_sat_vb), hoechstens: zahl(d.hoechstens_sat) });
+      ladeBewegungen();
+    } catch (e) {
+      wiederFrei = geldfehler(e, meldung, "sendung_unklar");
+    } finally {
+      if (wiederFrei) knopf.disabled = false;
+    }
+  });
+
+  const reihe = document.createElement("div");
+  reihe.className = "nachbessern-reihe";
+  if (pinEingabe) reihe.append(pin);
+  reihe.append(knopf, meldung);
+  kasten.append(reihe);
+  return kasten;
 }
 
 // Eine volle txid zum Markieren, und ein Knopf, der sie unter Bloecke verfolgt.

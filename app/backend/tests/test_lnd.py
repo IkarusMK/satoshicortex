@@ -1976,6 +1976,9 @@ AUFRUFE = [
         k, "hallo", "d" * 104)),
     ("kosten_schaetzen", lambda k: lnd.kosten_schaetzen(k, "bc1qziel", 2000)),
     ("sende", lambda k: lnd.sende(k, "bc1qziel", 2000, 5)),
+    ("wegwissen", lambda k: lnd.wegwissen(k)),
+    ("gebuehr_erhoehen", lambda k: lnd.gebuehr_erhoehen(
+        k, "a" * 64, 1, 12, hoechstens_sat=4000)),
     ("verbinde", lambda k: lnd.verbinde(k, KENNUNG_TEST + "@example.onion:9735")),
     ("verbinde_gegenstelle",
      lambda k: lnd.verbinde_gegenstelle(k, KENNUNG_TEST + "@example.onion:9735")),
@@ -2099,7 +2102,11 @@ def test_die_bewegungen_kommen_vollstaendig_und_sortiert(tmp_path, monkeypatch):
     assert kanal == {"txid": "22" * 32, "ziel": "", "betrag_sat": -100250,
                      "bestaetigungen": 6, "hoehe": 899114,
                      "zeit_s": 1757100000, "gebuehr_sat": 250,
-                     "art": "kanal_auf"}
+                     "art": "kanal_auf",
+                     # Seit dem 22.09.2026: der Ausgang, der uns gehoert --
+                     # ohne ihn laesst sich die Gebuehr nicht nachbessern.
+                     # Diese Attrappe nennt keine Ausgaenge, also None.
+                     "eigener_ausgang": None}
     # Nichts, was die Oberflaeche nicht braucht -- keine Rohdaten.
     assert "raw_tx_hex" not in d["bewegungen"][2]
     assert d["weitere"] == 0
@@ -2425,3 +2432,137 @@ def test_eine_kennung_wird_geprueft_bevor_irgendwer_gefragt_wird(falsch):
     with pytest.raises(lnd.LndFehler):
         lnd.verbinde_gegenstelle(a, falsch)
     assert a.versuche == [] and a.graph_gefragt == 0
+
+
+# ── Die Gebuehr einer haengenden Ueberweisung erhoehen (22.09.2026) ────────
+
+
+class _Mitschrift:
+    """Eine Attrappe, die auch festhaelt, WAS geschickt wurde.
+
+    Die Tests hier pruefen nicht nur das Ergebnis, sondern die Anfrage: bei
+    LND entscheidet der genaue Feldname, ob eine Gebuehr erhoeht wird oder
+    ob gar nichts passiert.
+    """
+
+    def __init__(self, antworten):
+        self.antworten = antworten
+        self.gesendet = {}
+
+    def ruf(self, pfad, macaroon="readonly", daten=None, zeitlimit=None,
+            methode=None):
+        if daten is not None:
+            self.gesendet[pfad.split("?")[0]] = daten
+        schluessel = pfad.split("?")[0]
+        if schluessel in self.antworten:
+            return self.antworten[schluessel]
+        raise AssertionError(f"unerwarteter Aufruf: {pfad}")
+
+# ── Die Gebuehr einer haengenden Ueberweisung erhoehen (22.09.2026) ────────
+#
+# Beim Abgleich unserer Oberflaeche gegen das, was LND wirklich anbietet:
+# walletrpc hat dreissig Routen, wir nutzten EINE. Darin steckt BumpFee --
+# also genau die Antwort auf die Frage, die nach der gestrigen Arbeit als
+# naechste kommt. Wir sagen jetzt ehrlich "die Ueberweisung kann unterwegs
+# sein"; was fehlt, ist "sie haengt fest, was nun".
+
+def test_die_bewegung_sagt_ob_sie_nachbesserbar_ist():
+    """Nachbessern geht nur ueber einen Ausgang, der UNS gehoert -- das
+    Wechselgeld. Ohne einen solchen kann LND nichts anhaengen, und dann darf
+    die Oberflaeche den Knopf gar nicht erst anbieten."""
+    k = _Mitschrift({"/v1/transactions": {"transactions": [
+        {"tx_hash": "a" * 64, "amount": "-50000", "num_confirmations": "0",
+         "block_height": "0", "time_stamp": "1758400000",
+         "total_fees": "300", "label": "",
+         "output_details": [
+             {"is_our_address": False, "address": "bc1qfremd"},
+             {"is_our_address": True, "address": "bc1qunser",
+              "output_index": "1"}]},
+        # Alles verschickt, kein Wechselgeld -- nicht nachbesserbar.
+        {"tx_hash": "b" * 64, "amount": "-90000", "num_confirmations": "0",
+         "block_height": "0", "time_stamp": "1758400001",
+         "total_fees": "300", "label": "",
+         "output_details": [
+             {"is_our_address": False, "address": "bc1qfremd"}]},
+    ]}})
+    liste = lnd.bewegungen(k)["bewegungen"]
+    nach = {b["txid"]: b["eigener_ausgang"] for b in liste}
+    assert nach["a" * 64] == 1
+    assert nach["b" * 64] is None
+
+
+def test_nachbessern_schickt_genau_die_felder_die_lnd_kennt():
+    """Gegen LNDs eigene Schnittstellenbeschreibung des gepinnten Tags
+    geprueft (walletkit.swagger.json, v0.21.3-beta): outpoint mit txid_str
+    und output_index, sat_per_vbyte als Zeichenkette, immediate."""
+    k = _Mitschrift({"/v2/wallet/bumpfee": {}})
+    lnd.gebuehr_erhoehen(k, "c" * 64, 1, 12, hoechstens_sat=4000)
+    daten = k.gesendet["/v2/wallet/bumpfee"]
+    assert daten["outpoint"] == {"txid_str": "c" * 64, "output_index": 1}
+    assert daten["sat_per_vbyte"] == "12"
+    assert daten["immediate"] is True
+    # Eine Obergrenze ist PFLICHT -- ohne sie nimmt LND sich, was es fuer
+    # noetig haelt. Dieselbe Entscheidung wie bei der Gebuehrengrenze einer
+    # Lightning-Zahlung.
+    assert daten["budget"] == "4000"
+
+
+def test_nachbessern_ohne_obergrenze_gibt_es_nicht():
+    k = _Mitschrift({"/v2/wallet/bumpfee": {}})
+    with pytest.raises(ValueError):
+        lnd.gebuehr_erhoehen(k, "c" * 64, 1, 12, hoechstens_sat=0)
+
+
+# ── Mission Control: was LND ueber Wege gelernt hat (22.09.2026) ───────────
+#
+# Aus dem Abgleich gegen LNDs Umfang: routerrpc hat neunzehn Routen, wir
+# nutzten zwei. Mission Control ist LNDs Gedaechtnis darueber, welche
+# Gegenstellenpaare zuletzt versagt oder getragen haben -- und der
+# urspruengliche Plan nennt es "den eigentlichen Engpass" fuers Weiterleiten.
+#
+# Die Antwort kann GROSS werden: ein Knoten mit Verkehr sammelt tausende
+# Paare. Zusammengefasst wird deshalb HIER und nicht im Browser.
+
+def test_das_wegwissen_wird_zusammengefasst_statt_durchgereicht():
+    k = _Mitschrift({"/v2/router/mc": {"pairs": [
+        {"node_from": "aa" * 33, "node_to": "bb" * 33,
+         "history": {"fail_time": "1758400000", "fail_amt_sat": "50000",
+                     "success_time": "0", "success_amt_sat": "0"}},
+        {"node_from": "aa" * 33, "node_to": "cc" * 33,
+         "history": {"fail_time": "0", "fail_amt_sat": "0",
+                     "success_time": "1758400100",
+                     "success_amt_sat": "120000"}},
+        {"node_from": "dd" * 33, "node_to": "ee" * 33,
+         "history": {"fail_time": "1758399000", "fail_amt_sat": "1000",
+                     "success_time": "1758399500",
+                     "success_amt_sat": "900"}},
+    ]}})
+    d = lnd.wegwissen(k, hoechstens=2)
+    assert d["paare"] == 3
+    assert d["mit_fehlschlag"] == 2
+    assert d["mit_erfolg"] == 2
+    # Nur die juengsten, und gedeckelt -- nicht tausende in den Browser.
+    assert len(d["letzte"]) == 2
+    assert d["letzte"][0]["zeitpunkt"] == 1_758_400_100
+
+
+def test_das_wegwissen_nennt_die_grenze_die_es_gefunden_hat():
+    """Der Nutzen der Zahl: unterhalb welchen Betrags ein Weg zuletzt trug,
+    und ab welchem er versagte. Genau das sagt einem, ob es an der
+    Liquiditaet liegt."""
+    k = _Mitschrift({"/v2/router/mc": {"pairs": [
+        {"node_from": "aa" * 33, "node_to": "bb" * 33,
+         "history": {"fail_time": "1758400000", "fail_amt_sat": "50000",
+                     "success_time": "1758399000",
+                     "success_amt_sat": "20000"}},
+    ]}})
+    e = lnd.wegwissen(k)["letzte"][0]
+    assert e["fehl_ab_sat"] == 50000
+    assert e["trug_bis_sat"] == 20000
+    assert e["von"].startswith("aa") and len(e["von"]) < 66
+
+
+def test_ohne_gedaechtnis_ist_das_wegwissen_leer_und_nicht_kaputt():
+    k = _Mitschrift({"/v2/router/mc": {}})
+    d = lnd.wegwissen(k)
+    assert d["paare"] == 0 and d["letzte"] == []

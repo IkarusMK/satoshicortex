@@ -43,6 +43,14 @@ GRENZE_RUNTER = -75.0
 # Frage ist "gleich, bald oder irgendwann".
 ZIELE = (("schnell", 1), ("normal", 3), ("guenstig", 6))
 
+# Wie gross eine Kind-Transaktion beim Nachbessern typischerweise wird: ein
+# Eingang (unser Wechselgeld), ein Ausgang. Grob 150 vByte bei P2WPKH.
+NACHBESSERN_VBYTE = 150
+# Und wieviel Luft die Obergrenze bekommt. LND darf beim Nachbessern hoeher
+# gehen als der Startsatz; ohne Luft schlaegt der Vorgang fehl, mit zuviel
+# Luft ist die Grenze keine. Das Doppelte ist die Entscheidung.
+NACHBESSERN_LUFT = 2.0
+
 # BTC je kvB -> Satoshi je vByte.
 JE_VBYTE = 100_000
 

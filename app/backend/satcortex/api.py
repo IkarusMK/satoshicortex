@@ -424,6 +424,22 @@ class Sendung(BaseModel):
     pin: str = Field("", max_length=12)
 
 
+class Nachbesserung(BaseModel):
+    """Die Gebuehr einer noch unbestaetigten Ueberweisung erhoehen.
+
+    Aus dem Abgleich unserer Oberflaeche gegen LNDs tatsaechlichen Umfang,
+    22.09.2026: walletrpc hat dreissig Routen, genutzt wurde eine. Darin
+    steckt BumpFee -- und das ist die Antwort auf die Frage, die nach
+    "deine Ueberweisung kann unterwegs sein" als naechste kommt.
+    """
+    txid: str = Field("", max_length=64)
+    # Der Ausgang, der UNS gehoert. Kommt aus der Bewegungsliste; die
+    # Oberflaeche erfindet ihn nicht.
+    ausgang: int = Field(0, ge=0, le=10_000)
+    tempo: str = Field("schnell", max_length=16)
+    pin: str = Field("", max_length=32)
+
+
 class Netzwegewahl(BaseModel):
     """Die vier Wege, auf denen dieser Knoten am Netz teilnimmt.
 
@@ -3553,6 +3569,69 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
                     "alles" if wunsch.alles else betrag, adresse, satz, txid)
         return {"ok": True, "txid": txid, "satz_sat_vb": satz,
                 "alles": wunsch.alles}
+
+    @api.get("/lightning/wegwissen", dependencies=geschuetzt)
+    def wegwissen_lesen() -> Dict:
+        """Was LND ueber Wege gelernt hat -- Mission Control. Bewegt nichts.
+
+        Aus dem Abgleich unserer Oberflaeche gegen LNDs tatsaechlichen
+        Umfang, 22.09.2026: routerrpc hat neunzehn Routen, wir nutzten zwei.
+        Diese hier ist die, die beim Weiterleiten wirklich zaehlt.
+
+        LND merkt sich je Gegenstellenpaar, bis zu welchem Betrag eine
+        Weiterleitung getragen hat und ab welchem sie versagte -- und waehlt
+        spaeter danach aus. Wer wissen will, warum eine Zahlung nicht
+        durchkommt, sieht hier nach: liegt "versagte ab" knapp ueber "trug
+        bis", ist der Weg nicht kaputt, sondern leer.
+
+        KEINE PIN: hier wird gelesen. Eine PIN, die man fuer eine Auskunft
+        tippt, tippt man irgendwann gedankenlos.
+        """
+        knoten = sendbereit()
+        try:
+            return lnd.wegwissen(knoten)
+        except (lnd.NichtErreichbar, lnd.Beschaeftigt):
+            raise HTTPException(503, {"meldung": "lnd_antwortet_nicht"})
+        except lnd.LndFehler as fehler:
+            log.debug("Wegwissen nicht abrufbar: %s", fehler)
+            raise HTTPException(503, {"meldung": "wegwissen_nicht_abrufbar"})
+
+    @api.post("/lightning/senden/nachbessern", dependencies=geschuetzt)
+    def senden_nachbessern(wunsch: Nachbesserung) -> Dict:
+        """Die Gebuehr einer haengenden Ueberweisung erhoehen. KOSTET EXTRA.
+
+        LND haengt eine Kind-Transaktion an unser Wechselgeld; die alte
+        verschwindet nicht, beide werden gemeinsam attraktiver. Es entsteht
+        also eine zweite Transaktion, und die kostet zusaetzlich -- deshalb
+        dieselbe PIN wie beim Senden, und die zuerst.
+        """
+        freigabe_pruefen(wunsch.pin)
+        txid = (wunsch.txid or "").strip().lower()
+        if len(txid) != 64 or any(z not in "0123456789abcdef" for z in txid):
+            raise HTTPException(400, {"meldung": "keine_txid"})
+        knoten = sendbereit()
+        satz = sendesatz(wunsch.tempo)
+        # Die Obergrenze ist Pflicht. Genommen wird, was eine gewoehnliche
+        # Kind-Transaktion bei diesem Satz kostet, mit Luft nach oben -- eine
+        # Zahl, die der Mensch vorher in der Schaetzung sieht.
+        hoechstens = round(kennzahlen.NACHBESSERN_VBYTE * satz
+                           * kennzahlen.NACHBESSERN_LUFT)
+        try:
+            lnd.gebuehr_erhoehen(knoten, txid, wunsch.ausgang, satz,
+                                 hoechstens_sat=hoechstens)
+        except lnd.Beschaeftigt as fehler:
+            log.warning("Nachbessern ohne Antwort im Zeitlimit: %s", fehler)
+            raise HTTPException(504, {"meldung": "sendung_unklar"})
+        except lnd.NichtErreichbar:
+            raise HTTPException(503, {"meldung": "lnd_antwortet_nicht"})
+        except lnd.LndFehler as fehler:
+            log.warning("Nachbessern abgelehnt: %s", fehler)
+            raise HTTPException(400, {"meldung": "nachbessern_abgelehnt",
+                                      "einzelheit": str(fehler)})
+        log.warning("Gebuehr nachgebessert: %s Ausgang %s auf %s sat/vB "
+                    "(hoechstens %s sat)", txid, wunsch.ausgang, satz,
+                    hoechstens)
+        return {"ok": True, "satz_sat_vb": satz, "hoechstens_sat": hoechstens}
 
     # ── Einen Kanal oeffnen, und ueber Lightning zahlen ──────────────────
     #

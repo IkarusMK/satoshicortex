@@ -59,6 +59,9 @@ _ALS_TEXT = re.compile(r'"([a-z_][a-z0-9_]*)"')
 # NEUE solche Stelle nicht stillschweigend ungeprueft bleibt -- taucht unten
 # ein t(...) auf, das hier fehlt, meldet die Pruefung das.
 ZUSAMMENGESETZT = {
+    # Die Kopfzeile der Wegwissen-Tafel wird ueber eine Schluesselliste
+    # gebaut -- fuenf Spalten, fuenf Texte. Befund vom 22.09.2026.
+    "t(k)": ["wg_von", "wg_nach", "wg_trug", "wg_fehl", "wg_wann"],
     # Was ein Geldweg meldet, wenn KEIN Bescheid kam -- der Abbruch der
     # Oberflaeche oder das 504 des Servers. Entweder nennt der Server den
     # Schluessel selbst, oder es gilt der, den der Aufrufer mitgibt: fuer

@@ -1335,6 +1335,9 @@ class FakeLnd:
         # der Auftrag kann laengst ausgefuehrt sein, nur die Antwort blieb
         # aus. Genau darum geht es in den Tests unten.
         self.beschaeftigt_auf = set()
+        # Was auf welchem Pfad ankam -- fuer Pruefungen, bei denen der
+        # genaue Feldname entscheidet.
+        self.gesendet_an = {}
         # Erst noetig, seit es Endpunkte gibt, die das eigene Macaroon
         # brauchen -- vorher kam die Attrappe nie so weit.
         self.macaroons = macaroons or Path("/nicht/vorhanden")
@@ -1342,6 +1345,8 @@ class FakeLnd:
 
     def ruf(self, pfad, macaroon="readonly", daten=None, zeitlimit=None,
             methode=None):
+        if daten is not None:
+            self.gesendet_an[pfad.split("?")[0]] = daten
         if pfad in self.beschaeftigt_auf:
             from satcortex import lnd as lnd_modul
             raise lnd_modul.Beschaeftigt("kein Wort innerhalb des Zeitlimits")
@@ -1393,6 +1398,15 @@ class FakeLnd:
                 raise lnd_modul.LndFehler(self.sendefehler)
             self.gesendet = daten
             return {"txid": "a" * 64}
+        if pfad == "/v2/wallet/bumpfee":
+            return {}
+        if pfad == "/v2/router/mc":
+            return {"pairs": [{
+                "node_from": "aa" * 33, "node_to": "bb" * 33,
+                "history": {"fail_time": "1758400000",
+                            "fail_amt_sat": "50000",
+                            "success_time": "1758399000",
+                            "success_amt_sat": "20000"}}]}
         if pfad == "/v1/balance/blockchain":
             # Fuer die Uebersicht: unbestaetigt ist der Unterschied zwischen
             # beiden Zahlen -- genau daran haengt die Anzeige.
@@ -6883,3 +6897,58 @@ def test_ohne_angabe_gilt_weiter_der_vorschlag(client, lnd_voll, monkeypatch):
         "rechnung": "lnbc15u1abc", "pin": PIN})
     assert lnd_voll.gezahlt["fee_limit_sat"] == str(
         lnd_modul.gebuehrgrenze(1500))
+
+
+# ── Eine haengende Ueberweisung nachbessern (22.09.2026) ───────────────────
+
+def test_die_pin_steht_vor_dem_nachbessern(client, lnd_voll):
+    """Es kostet zusaetzliche Gebuehr -- also dieselbe PIN wie beim Senden,
+    und die zuerst."""
+    _richte_ein(client)
+    _freigabe_ein(client)
+    a = client.post("/api/lightning/senden/nachbessern",
+                    json={"txid": "a" * 64, "ausgang": 1})
+    assert a.status_code == 403
+    assert a.json()["detail"]["meldung"] == "pin_noetig"
+
+
+def test_nachbessern_gibt_den_satz_aus_dem_eigenen_knoten(client, lnd_da,
+                                                          monkeypatch):
+    """Wie beim Senden: der Satz kommt aus estimatesmartfee des EIGENEN
+    bitcoind, nicht aus einer Zahl, die jemand tippt."""
+    _sendebereit(client, lnd_da, monkeypatch)
+    a = client.post("/api/lightning/senden/nachbessern",
+                    json={"txid": "a" * 64, "ausgang": 1, "tempo": "schnell"})
+    assert a.status_code == 200, a.text
+    gesendet = lnd_da.gesendet_an["/v2/wallet/bumpfee"]
+    assert gesendet["sat_per_vbyte"] == "12"
+    assert int(gesendet["budget"]) > 0
+
+
+def test_ein_zeitlimit_beim_nachbessern_heisst_nicht_dass_nichts_geschah(
+        client, lnd_da, monkeypatch):
+    _sendebereit(client, lnd_da, monkeypatch)
+    lnd_da.beschaeftigt_auf = {"/v2/wallet/bumpfee"}
+    a = client.post("/api/lightning/senden/nachbessern",
+                    json={"txid": "a" * 64, "ausgang": 1})
+    assert a.status_code == 504
+    assert a.json()["detail"]["meldung"] == "sendung_unklar"
+
+
+# ── Das Wegwissen in der Oberflaeche (22.09.2026) ──────────────────────────
+
+def test_das_wegwissen_braucht_keine_pin(client, lnd_voll, monkeypatch):
+    """Es wird nur gelesen. Eine PIN, die man fuer eine Auskunft tippt,
+    tippt man irgendwann gedankenlos -- und genau das soll sie nicht
+    werden."""
+    _kanalbereit(client, monkeypatch)
+    a = client.get("/api/lightning/wegwissen")
+    assert a.status_code == 200, a.text
+    d = a.json()
+    assert "paare" in d and "letzte" in d
+
+
+def test_ohne_lightning_gibt_es_kein_wegwissen(client):
+    _richte_ein(client)
+    a = client.get("/api/lightning/wegwissen")
+    assert a.status_code in (409, 503)

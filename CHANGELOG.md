@@ -4,6 +4,53 @@ All notable changes to SatoshiCortex. Format loosely after
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning after
 [SemVer](https://semver.org/).
 
+## [1.1.0] — 2026-09-22
+
+Two gaps found by measuring our own interface against what Bitcoin Core and
+LND actually offer in their containers. Of LND's 141 REST routes we used 36;
+`walletrpc` had 29 of 30 untouched and `routerrpc` 17 of 19.
+
+### Added: raise the fee on a transfer that is stuck
+
+The natural next question after "your transfer may be on its way" is "it is
+stuck, now what". LND has had the answer all along in `BumpFee`; we never
+offered it.
+
+What it really does, and the interface says so before you press: your node
+attaches a **second** transaction to your own change, so a miner can only take
+both together (child pays for parent). The first one does not go away, and the
+second one costs extra.
+
+Three decisions worth stating:
+
+- **The fee cap is mandatory**, with no default — the same call as the fee
+  limit on a Lightning payment, for the same reason. Without one, LND takes
+  what it considers necessary, which its own documentation puts at up to half
+  the output.
+- **The button only appears when it can work.** Bumping needs an output that
+  belongs to us. If everything went out there is no change to attach to, so
+  the panel states the reason instead of offering a button that is certain to
+  fail.
+- The field names come from LND's own interface description at the pinned tag,
+  not from memory.
+
+Behind the transaction PIN, checked first, like every other path that spends.
+
+### Added: what your node has learned about routes
+
+LND remembers, per pair of peers, up to which amount a forward carried and
+from which amount it failed — and picks routes by that afterwards. The
+original plan for this project called this "the real bottleneck" for routing,
+and we had never once asked for it.
+
+The useful part is not the list but the two amounts side by side: if "failed
+from" sits just above "carried up to", the route is not broken but **empty**.
+That is a liquidity question and it can be fixed.
+
+The summary is computed on the node, not in the browser — an active node
+remembers thousands of pairs. Read-only, so no PIN: a PIN you type for a piece
+of information is one you will eventually type without thinking.
+
 ## [1.0.4] — 2026-09-22
 
 The two findings from the audit that could not be proved on a laptop. Both
