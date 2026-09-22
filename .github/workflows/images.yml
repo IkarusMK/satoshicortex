@@ -298,7 +298,7 @@ jobs:
         id: ver
         env:
           # Alles, was von aussen kommt, geht ueber die Umgebung -- nicht
-          # ueber ${{ }} in den Schalentext. Siehe die Begruendung unten.
+          # als Ausdruck in den Schalentext. Begruendung unten.
           NAME: ${{ matrix.name }}
           WUNSCH_VERSION: ${{ inputs.version }}
           FUND_VERSION: ${{ matrix.version }}
@@ -329,7 +329,8 @@ jobs:
             satcortex-lnd)      TAG="$LND_VERSION" ;;
             *)                  TAG="$PROJECT" ;;
           esac
-          # NICHT ueber ${{ }} in die Schale: WUNSCH_VERSION kommt aus einem
+          # NICHT als Ausdruck in die Schale eingesetzt: WUNSCH_VERSION
+          # kommt aus einem
           # freien Eingabefeld, FUND_VERSION aus dem Namen eines fremden
           # Release-Tags (bitcoin/bitcoin, lightningnetwork/lnd). Tag-Namen
           # duerfen Backticks, $ und ; enthalten -- git verbietet sie nicht.
