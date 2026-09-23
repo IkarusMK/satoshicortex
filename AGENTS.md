@@ -22,6 +22,12 @@ This is deliberate and not a migration in progress. **Do not translate the
 source.** A rename touching hundreds of identifiers carries real regression
 risk and buys nothing for the people who run this.
 
+**Commit messages, tags and release notes are English. Always.** They are
+public-facing like the documentation: they show up in the file list on GitHub,
+in release pages and in every clone. The German of the source does not extend
+to them. Until 2026-09-23 no rule said so, and the messages followed the
+language of the source — that was a mistake, not a convention.
+
 **Comments explain *why*, at length, with dates.** Many carry a finding and
 the date it was made — `DER BEFUND VOM 17.09.2026: …`. They are not clutter;
 they are why the code looks the way it does. **Do not condense them.** If you
