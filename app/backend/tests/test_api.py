@@ -1330,6 +1330,12 @@ class FakeLnd:
         # Und was ListInvoices liefert, plus die zuletzt bestellte Rechnung.
         self.rechnungen_roh = []
         self.rechnung_bestellt = None
+        # Eine EINZELNE Rechnung: was LookupInvoiceV2 herausgibt, was der
+        # Strom nacheinander meldet, und was zuletzt storniert wurde.
+        self.rechnung_einzeln = None
+        self.rechnung_strom = []
+        self.storniert = None
+        self.abgewartet = ""
         self.sendefehler = ""
         # Pfade, auf denen LND nicht rechtzeitig antwortet. Kein Fehlschlag:
         # der Auftrag kann laengst ausgefuehrt sein, nur die Antwort blieb
@@ -1343,11 +1349,32 @@ class FakeLnd:
         self.macaroons = macaroons or Path("/nicht/vorhanden")
         self.zertifikat = type("P", (), {"exists": staticmethod(lambda: True)})()
 
+    def strom(self, pfad, daten=None, macaroon="readonly", zeitlimit=None,
+              methode=""):
+        """Nur SubscribeSingleInvoice -- mehr braucht diese Attrappe nicht.
+
+        Ohne Meldungen verhaelt sie sich wie LND bei einer Rechnung, an der
+        sich nichts tut: die Frist laeuft ab.
+        """
+        if not pfad.startswith("/v2/invoices/subscribe/"):
+            raise AssertionError(f"unerwarteter Strom: {pfad}")
+        self.abgewartet = pfad
+        if not self.rechnung_strom:
+            from satcortex import lnd as lnd_modul
+            raise lnd_modul.Beschaeftigt("keine Meldung innerhalb der Frist")
+        for r in self.rechnung_strom:
+            yield {"result": r}
+
     def ruf(self, pfad, macaroon="readonly", daten=None, zeitlimit=None,
             methode=None):
         if daten is not None:
             self.gesendet_an[pfad.split("?")[0]] = daten
-        if pfad in self.beschaeftigt_auf:
+        # Auch ohne den Abfrageteil vergleichen: gemeint ist die ROUTE, und
+        # seit /v2/invoices/lookup?payment_hash=... gibt es welche, die einen
+        # tragen. Vorher fiel so eine still durch und der Test prueffte
+        # einen ganz anderen Fehlerweg.
+        if pfad in self.beschaeftigt_auf \
+           or pfad.split("?")[0] in self.beschaeftigt_auf:
             from satcortex import lnd as lnd_modul
             raise lnd_modul.Beschaeftigt("kein Wort innerhalb des Zeitlimits")
         if pfad == "/v1/state":
@@ -1368,6 +1395,17 @@ class FakeLnd:
             return {"macaroon": "0201036c6e64"}
         if pfad == "/v1/peers":
             self.verbunden = daten
+            return {}
+        if pfad.split("?")[0] == "/v2/invoices/lookup":
+            if self.rechnung_einzeln is None:
+                from satcortex import lnd as lnd_modul
+                raise lnd_modul.LndFehler("404: invoice not found")
+            return dict(self.rechnung_einzeln)
+        if pfad == "/v2/invoices/cancel":
+            self.storniert = daten
+            if self.rechnung_einzeln is not None:
+                self.rechnung_einzeln = {**self.rechnung_einzeln,
+                                         "state": "CANCELED"}
             return {}
         if pfad.split("?")[0] == "/v1/invoices":
             # POST stellt aus, GET listet -- derselbe Pfad, zwei Vorgaenge.
@@ -1985,8 +2023,17 @@ class LndVollstaendig(FakeLnd):
         self.geoeffnet = None
         self.gezahlt = None
 
-    def strom(self, pfad, daten, macaroon="readonly", zeitlimit=None):
-        """LNDs Zahl-Endpunkt antwortet als Strom -- mehrfach."""
+    def strom(self, pfad, daten=None, macaroon="readonly", zeitlimit=None,
+              methode=""):
+        """LNDs Zahl-Endpunkt antwortet als Strom -- mehrfach.
+
+        Das Abwarten einer Rechnung ist ebenfalls ein Strom, aber ein GET
+        ohne Rumpf; das geht an die Fassung der Elternklasse.
+        """
+        if pfad.startswith("/v2/invoices/subscribe/"):
+            yield from FakeLnd.strom(self, pfad, daten, macaroon, zeitlimit,
+                                     methode)
+            return
         self.gezahlt = daten
         yield {"result": {"status": "IN_FLIGHT"}}
         yield {"result": {"status": "SUCCEEDED", "value_sat": "1500",
@@ -6037,6 +6084,215 @@ def test_die_rechnungen_brauchen_eine_anmeldung(tmp_path):
     assert c.get("/api/lightning/rechnungen").status_code == 401
     assert c.post("/api/lightning/rechnung/erstellen",
                   json={"betrag": 1}).status_code == 401
+
+
+# ── Eine EINZELNE Rechnung (23.09.2026) ───────────────────────────────────
+#
+# Bis dahin gab es nur die Liste der letzten zwanzig, im Anzeigetakt
+# nachgeladen. Wer einen QR-Code hinhaelt, will aber nicht wissen, ob unter
+# den letzten zwanzig eine bezahlte ist -- er will wissen, ob DIESE eine
+# gerade bezahlt wurde, und zwar in dem Augenblick.
+
+KENNUNG_RECHNUNG = "cd" * 32
+
+
+def _rechnung_roh(zustand="OPEN", **rest):
+    import base64 as b64
+    roh = {"r_hash": b64.b64encode(bytes.fromhex(KENNUNG_RECHNUNG)).decode(),
+           "payment_request": "lnbc1500n1pbeispiel", "memo": "Kaffee",
+           "value": "1500", "amt_paid_sat": "0", "settle_date": "0",
+           "creation_date": "1758600000", "expiry": "3600", "state": zustand}
+    roh.update(rest)
+    return roh
+
+
+def test_eine_einzelne_rechnung_laesst_sich_nachschlagen(client, lnd_da):
+    _richte_ein(client)
+    lnd_da.stand = "SERVER_ACTIVE"
+    lnd_da.rechnung_einzeln = _rechnung_roh()
+    r = client.get("/api/lightning/rechnung/stand",
+                   params={"kennung": KENNUNG_RECHNUNG})
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["kennung"] == KENNUNG_RECHNUNG
+    assert d["zustand"] == "offen" and d["betrag_sat"] == 1500
+
+
+def test_eine_unbekannte_rechnung_sagt_das_auch(client, lnd_da):
+    _richte_ein(client)
+    lnd_da.stand = "SERVER_ACTIVE"
+    lnd_da.rechnung_einzeln = None
+    r = client.get("/api/lightning/rechnung/stand",
+                   params={"kennung": KENNUNG_RECHNUNG})
+    assert r.status_code == 400
+    assert r.json()["detail"]["meldung"] == "rechnung_unbekannt"
+
+
+def test_das_abwarten_meldet_die_bezahlte_rechnung(client, lnd_da):
+    """Der eigentliche Gewinn: kein Nachladen im Sekundentakt, sondern LND
+    sagt selbst Bescheid, sobald das Geld da ist."""
+    _richte_ein(client)
+    lnd_da.stand = "SERVER_ACTIVE"
+    lnd_da.rechnung_strom = [
+        _rechnung_roh("OPEN"),
+        _rechnung_roh("SETTLED", amt_paid_sat="1500",
+                      settle_date="1758600030"),
+    ]
+    r = client.get("/api/lightning/rechnung/abwarten",
+                   params={"kennung": KENNUNG_RECHNUNG})
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["zustand"] == "bezahlt" and d["bezahlt_sat"] == 1500
+    assert lnd_da.abgewartet.startswith("/v2/invoices/subscribe/")
+
+
+def test_ein_abwarten_ohne_ereignis_ist_kein_fehler(client, lnd_da):
+    """Niemand hat bezahlt. Das ist der Normalfall -- und muss mit 200 und
+    dem Stand von jetzt zurueckkommen, nicht mit einer Stoerungsmeldung, die
+    bei jeder Runde einmal aufblitzt."""
+    _richte_ein(client)
+    lnd_da.stand = "SERVER_ACTIVE"
+    lnd_da.rechnung_strom = []                 # die Frist laeuft ab
+    lnd_da.rechnung_einzeln = _rechnung_roh()
+    r = client.get("/api/lightning/rechnung/abwarten",
+                   params={"kennung": KENNUNG_RECHNUNG})
+    assert r.status_code == 200, r.text
+    assert r.json()["zustand"] == "offen"
+
+
+def test_eine_offene_rechnung_laesst_sich_zurueckziehen(client, lnd_da):
+    import base64 as b64
+    _richte_ein(client)
+    lnd_da.stand = "SERVER_ACTIVE"
+    lnd_da.rechnung_einzeln = _rechnung_roh()
+    r = client.post("/api/lightning/rechnung/stornieren",
+                    json={"kennung": KENNUNG_RECHNUNG})
+    assert r.status_code == 200, r.text
+    assert r.json()["zustand"] == "storniert"
+    assert b64.urlsafe_b64decode(
+        lnd_da.storniert["payment_hash"]) == bytes.fromhex(KENNUNG_RECHNUNG)
+
+
+def test_eine_rechnung_mit_geld_darin_wird_nicht_angefasst(client, lnd_da):
+    """"unterwegs" heisst: der Zahlende haelt bereits Geld fest. Ein Storno
+    gaebe es ihm zurueck -- das ist die Bauart einer Halterechnung und keine
+    Entscheidung, die hier nebenbei fallen soll."""
+    _richte_ein(client)
+    lnd_da.stand = "SERVER_ACTIVE"
+    lnd_da.rechnung_einzeln = _rechnung_roh("ACCEPTED")
+    r = client.post("/api/lightning/rechnung/stornieren",
+                    json={"kennung": KENNUNG_RECHNUNG})
+    assert r.status_code == 409
+    assert r.json()["detail"]["meldung"] == "rechnung_nicht_offen"
+    assert r.json()["detail"]["zustand"] == "unterwegs"
+    assert lnd_da.storniert is None, "es darf nichts hinausgegangen sein"
+
+
+def test_eine_schon_bezahlte_rechnung_wird_nicht_storniert(client, lnd_da):
+    _richte_ein(client)
+    lnd_da.stand = "SERVER_ACTIVE"
+    lnd_da.rechnung_einzeln = _rechnung_roh("SETTLED")
+    r = client.post("/api/lightning/rechnung/stornieren",
+                    json={"kennung": KENNUNG_RECHNUNG})
+    assert r.status_code == 409
+    assert lnd_da.storniert is None
+
+
+def test_das_zuruecknehmen_braucht_keine_pin(client, lnd_da):
+    """Wie das Ausstellen: es bewegt kein Geld, es nimmt eine Forderung
+    zurueck."""
+    _richte_ein(client)
+    _freigabe_ein(client)
+    lnd_da.stand = "SERVER_ACTIVE"
+    lnd_da.rechnung_einzeln = _rechnung_roh()
+    r = client.post("/api/lightning/rechnung/stornieren",
+                    json={"kennung": KENNUNG_RECHNUNG})
+    assert r.status_code == 200, r.text
+
+
+def test_eine_kennung_falscher_laenge_kommt_nicht_durch(client, lnd_da):
+    _richte_ein(client)
+    lnd_da.stand = "SERVER_ACTIVE"
+    r = client.post("/api/lightning/rechnung/stornieren",
+                    json={"kennung": "cd" * 10})
+    assert r.status_code == 422
+    assert lnd_da.storniert is None
+
+
+def test_ohne_laufendes_lightning_gibt_es_keinen_rechnungsstand(client,
+                                                                lnd_da):
+    _richte_ein(client)
+    lnd_da.stand = "LOCKED"
+    for pfad in ("/api/lightning/rechnung/stand",
+                 "/api/lightning/rechnung/abwarten"):
+        r = client.get(pfad, params={"kennung": KENNUNG_RECHNUNG})
+        assert r.status_code == 409, pfad
+        assert r.json()["detail"]["meldung"] == "lightning_nicht_bereit"
+
+
+def test_ein_schweigendes_lnd_meldet_sich_als_solches(client, lnd_da):
+    """Nicht "Rechnung unbekannt" -- das waere eine Aussage ueber die
+    Rechnung, und die hat hier niemand geprueft."""
+    _richte_ein(client)
+    lnd_da.stand = "SERVER_ACTIVE"
+    lnd_da.rechnung_strom = []
+    lnd_da.rechnung_einzeln = _rechnung_roh()    # da waere sie ja
+    lnd_da.beschaeftigt_auf = {"/v2/invoices/lookup"}
+    for pfad in ("/api/lightning/rechnung/stand",
+                 "/api/lightning/rechnung/abwarten"):
+        r = client.get(pfad, params={"kennung": KENNUNG_RECHNUNG})
+        assert r.status_code == 503, pfad
+        assert r.json()["detail"]["meldung"] == "lnd_antwortet_nicht"
+    r = client.post("/api/lightning/rechnung/stornieren",
+                    json={"kennung": KENNUNG_RECHNUNG})
+    assert r.status_code == 503
+    assert lnd_da.storniert is None
+
+
+def test_das_abwarten_einer_unbekannten_rechnung_sagt_das_auch(client, lnd_da):
+    """Der Strom schweigt, das Nachschlagen findet nichts -- dann ist die
+    Kennung falsch und nicht der Knoten kaputt."""
+    _richte_ein(client)
+    lnd_da.stand = "SERVER_ACTIVE"
+    lnd_da.rechnung_strom = []
+    lnd_da.rechnung_einzeln = None
+    r = client.get("/api/lightning/rechnung/abwarten",
+                   params={"kennung": KENNUNG_RECHNUNG})
+    assert r.status_code == 400
+    assert r.json()["detail"]["meldung"] == "rechnung_unbekannt"
+
+
+def test_ein_storno_das_lnd_ablehnt_wird_gemeldet(client, lnd_da):
+    """LND kann nein sagen, auch wenn der Zustand eben noch "offen" war --
+    zwischen Nachsehen und Handeln liegt ein Augenblick, in dem bezahlt
+    worden sein kann."""
+    _richte_ein(client)
+    lnd_da.stand = "SERVER_ACTIVE"
+    lnd_da.rechnung_einzeln = _rechnung_roh()
+    from satcortex import lnd as lnd_modul
+    echt = lnd_da.ruf
+
+    def ruf(pfad, macaroon="readonly", daten=None, zeitlimit=None,
+            methode=None):
+        if pfad == "/v2/invoices/cancel":
+            raise lnd_modul.LndFehler("invoice already settled")
+        return echt(pfad, macaroon, daten, zeitlimit, methode)
+    lnd_da.ruf = ruf
+
+    r = client.post("/api/lightning/rechnung/stornieren",
+                    json={"kennung": KENNUNG_RECHNUNG})
+    assert r.status_code == 400
+    assert r.json()["detail"]["meldung"] == "rechnung_nicht_storniert"
+
+
+def test_die_einzelne_rechnung_braucht_eine_anmeldung(tmp_path):
+    c = _client(tmp_path, anmelden=False)
+    assert c.get("/api/lightning/rechnung/stand",
+                 params={"kennung": KENNUNG_RECHNUNG}).status_code == 401
+    assert c.get("/api/lightning/rechnung/abwarten",
+                 params={"kennung": KENNUNG_RECHNUNG}).status_code == 401
+    assert c.post("/api/lightning/rechnung/stornieren",
+                  json={"kennung": KENNUNG_RECHNUNG}).status_code == 401
 
 
 # ── Die Uebersicht braucht Guthaben, ohne die teure Kanal-Antwort ──────────

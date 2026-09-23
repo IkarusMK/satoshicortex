@@ -3095,3 +3095,24 @@ def test_das_wiederherstellungsfenster_stimmt_mit_dem_backend_ueberein(js):
                      if not z.lstrip().startswith("//"))
     stelle = code.index('t("wh_dauer"')
     assert str(echt) in code[stelle:stelle + 120], code[stelle:stelle + 120]
+
+
+def test_jeder_angefasste_bezeichner_steht_auch_in_der_vorlage(html, js):
+    """Ein Tippfehler in einem Bezeichner ist kein kleiner Fehler.
+
+    $("#gibts-nicht") liefert null. Steht das im Verdrahten der Knoepfe, wirft
+    die Zeile -- und ALLES, was danach verdrahtet worden waere, bleibt tot.
+    Der Nutzer sieht eine Seite, die aussieht wie immer und auf der die
+    Haelfte der Knoepfe nichts tut. Im Protokoll steht nichts, denn der Fehler
+    passierte einmal beim Start.
+
+    Aufgefallen beim Einbau des Zuruecknehmens am 23.09.2026: der Knopf wurde
+    im Skript angefasst, bevor er in der Vorlage stand.
+    """
+    import re
+    vorhanden = set(re.findall(r'id="([^"]+)"', html))
+    angefasst = set(re.findall(r'\$\("#([A-Za-z0-9_-]+)"\)', js))
+    assert angefasst, "die Suche hat gar nichts gefunden -- Muster pruefen"
+    fehlt = sorted(angefasst - vorhanden)
+    assert not fehlt, ("im Skript angefasst, in der Vorlage nicht vorhanden: "
+                       + ", ".join(fehlt))

@@ -755,6 +755,14 @@ const I18N = {
     rq_zustand_unterwegs: "unterwegs",
     rq_zustand_verfallen: "abgelaufen",
     rq_weitere: "Ältere, hier nicht gezeigt: {n}",
+    rq_storno: "Zurückziehen",
+    rq_wartet: "Warte auf die Zahlung. Du kannst das Fenster offen lassen — sobald das Geld da ist, steht es hier.",
+    rq_bezahlt: "Bezahlt. {n} sat sind angekommen.",
+    rq_zurueckgezogen: "Zurückgezogen. Diese Rechnung lässt sich nicht mehr bezahlen.",
+    rq_verfallen_hinweis: "Diese Rechnung ist abgelaufen. Stell eine neue aus, wenn du das Geld noch erwartest.",
+    rechnung_unbekannt: "Diese Rechnung kennt dein Knoten nicht: {einzelheit}",
+    rechnung_nicht_offen: "Diese Rechnung ist nicht mehr offen. Zurückziehen lässt sie sich nur, solange niemand sie bezahlt hat und sie kein Geld festhält.",
+    rechnung_nicht_storniert: "Die Rechnung ließ sich nicht zurückziehen: {einzelheit}",
     rq_fehler: "Deine Rechnungen ließen sich gerade nicht abrufen.",
     rq_kein_raum: "Dir kann über Lightning gerade niemand zahlen: auf der Gegenseite deiner Kanäle liegt nichts. Empfangen kannst du nur, was dort liegt — also erst, wenn du einen Kanal hast und über ihn etwas bezahlt oder eingehende Liquidität besorgt hast.",
     rq_qr_zu_lang: "Diese Rechnung ist zu lang für einen QR-Code. Kopiere sie stattdessen.",
@@ -1944,6 +1952,14 @@ const I18N = {
     rq_zustand_unterwegs: "in flight",
     rq_zustand_verfallen: "expired",
     rq_weitere: "Older ones not shown here: {n}",
+    rq_storno: "Withdraw",
+    rq_wartet: "Waiting for the payment. You can leave this window open — the moment the money arrives, it says so here.",
+    rq_bezahlt: "Paid. {n} sat arrived.",
+    rq_zurueckgezogen: "Withdrawn. This invoice can no longer be paid.",
+    rq_verfallen_hinweis: "This invoice has expired. Issue a new one if you are still expecting the money.",
+    rechnung_unbekannt: "Your node does not know this invoice: {einzelheit}",
+    rechnung_nicht_offen: "This invoice is no longer open. It can only be withdrawn while nobody has paid it and it is not holding any money.",
+    rechnung_nicht_storniert: "The invoice could not be withdrawn: {einzelheit}",
     rq_fehler: "Your invoices could not be fetched just now.",
     rq_kein_raum: "Nobody can pay you over Lightning right now: there is nothing on the far side of your channels. You can only receive what sits there — so first you need a channel, and then either pay something through it or obtain inbound liquidity.",
     rq_qr_zu_lang: "This invoice is too long for a QR code. Copy it instead.",
@@ -8099,7 +8115,9 @@ async function rechnungErstellen() {
     zeichneQr($("#rq-qr"), d.rechnung.toUpperCase(), "rq_qr_zu_lang",
               "#rq-meldung");
     $("#rq-ergebnis").classList.remove("hidden");
+    $("#rq-storno").classList.remove("hidden");
     ladeRechnungen();
+    rechnungBeobachten(d.kennung);
   } catch (e) {
     if (e && e.abgemeldet) return;
     const f = e.detail || {};
@@ -8111,6 +8129,101 @@ async function rechnungErstellen() {
 
 async function rechnungKopieren() {
   return kopiere($("#rq-rechnung"), $("#rq-meldung"), "rq_kopiert");
+}
+
+/* ── Auf DIESE eine Rechnung warten ────────────────────────────────────────
+
+   Bis zum 23.09.2026 war die einzige Antwort auf "ist sie schon bezahlt?"
+   ein Nachladen der Liste der letzten zwanzig. Jetzt haengt sich der Server
+   an LNDs SubscribeSingleInvoice: er sagt Bescheid, sobald sich an dieser
+   einen etwas tut.
+
+   Der Aufruf bleibt dabei stehen -- bis zu 45 Sekunden, das ist der Sinn der
+   Sache. Deshalb eine eigene, laengere Frist; mit den ueblichen 25 Sekunden
+   braeche der Browser jede Runde mittendrin ab.
+
+   Gewartet wird nur, solange auch jemand hinsieht: eine andere Ansicht, eine
+   neue Rechnung oder eine abgelaufene beenden die Runde. */
+const FRIST_WARTEN_MS = 60000;
+const RQ_ABRISS_MS = 5000;
+let RQ_KENNUNG = "";
+
+function rqSagen(text, art) {
+  const ziel = $("#rq-warten");
+  ziel.textContent = text;
+  ziel.className = "note" + (art ? " " + art : "");
+}
+
+async function rechnungBeobachten(kennung) {
+  RQ_KENNUNG = kennung;
+  if (!kennung) return rqSagen("");
+  rqSagen(t("rq_wartet"));
+  while (RQ_KENNUNG === kennung && ANSICHT === "ln-wallet") {
+    let d;
+    try {
+      d = await api("/lightning/rechnung/abwarten?kennung="
+                    + encodeURIComponent(kennung), "GET", null,
+                    FRIST_WARTEN_MS);
+    } catch (e) {
+      if (e && e.abgemeldet) return;
+      if (!(e && e.netzfehler)) {
+        // Eine richtige Absage -- LND ist zu oder die Rechnung unbekannt.
+        // Weiterzufragen brächte nur dieselbe Absage.
+        rqSagen("");
+        return;
+      }
+      // Ein Abriss beendet das Warten NICHT. Sonst machte ein einziges
+      // Zucken im Netz aus dem lebenden Kasten einen toten, und der Nutzer
+      // saehe seine Zahlung nicht, obwohl sie ankam.
+      await new Promise((r) => setTimeout(r, RQ_ABRISS_MS));
+      continue;
+    }
+    if (RQ_KENNUNG !== kennung) return;        // inzwischen eine neue
+    if (d.zustand === "bezahlt") {
+      rqSagen(t("rq_bezahlt", { n: zahl(d.bezahlt_sat || d.betrag_sat) }), "ok");
+      $("#rq-storno").classList.add("hidden");
+      RQ_KENNUNG = "";
+      ladeRechnungen();
+      return;
+    }
+    if (d.zustand === "storniert") {
+      rqSagen(t("rq_zurueckgezogen"), "warn");
+      $("#rq-storno").classList.add("hidden");
+      RQ_KENNUNG = "";
+      ladeRechnungen();
+      return;
+    }
+    if (d.laeuft_ab_s && d.laeuft_ab_s < Date.now() / 1000) {
+      rqSagen(t("rq_verfallen_hinweis"), "warn");
+      $("#rq-storno").classList.add("hidden");
+      RQ_KENNUNG = "";
+      ladeRechnungen();
+      return;
+    }
+  }
+}
+
+/* Eine Rechnung zurueckziehen. Keine PIN: es bewegt kein Geld, es nimmt
+   eine Forderung zurueck. Danach kann sie niemand mehr bezahlen -- auch
+   nicht, wer den QR-Code noch offen hat. */
+async function rechnungZurueckziehen(kennung, knopf, meldung) {
+  if (!kennung) return;
+  knopf.disabled = true;
+  try {
+    await api("/lightning/rechnung/stornieren", "POST", { kennung });
+  } catch (e) {
+    if (e && e.abgemeldet) return;
+    const f = (e && e.detail) || {};
+    knopf.disabled = false;
+    meldung.textContent = f.meldung ? t(f.meldung, f) : t("e_fehler");
+    return;
+  }
+  if (RQ_KENNUNG === kennung) {
+    RQ_KENNUNG = "";
+    rqSagen(t("rq_zurueckgezogen"), "warn");
+    $("#rq-storno").classList.add("hidden");
+  }
+  ladeRechnungen();
 }
 
 async function ladeRechnungen() {
@@ -8155,6 +8268,7 @@ function zeichneRechnungen(d) {
     const stand = document.createElement("span");
     stand.className = "dim small";
     const teile = [];
+    let offen = false;
     if (r.zustand === "bezahlt") {
       teile.push(t("rq_zustand_bezahlt"));
       if (r.bezahlt_s) teile.push(datumZeit(r.bezahlt_s * 1000));
@@ -8166,6 +8280,7 @@ function zeichneRechnungen(d) {
     } else if (r.laeuft_ab_s && r.laeuft_ab_s < jetzt) {
       teile.push(t("rq_zustand_verfallen"));
     } else {
+      offen = true;
       teile.push(t("rq_zustand_offen"));
       if (r.laeuft_ab_s) {
         teile.push(t("rq_gueltig", { zeit: datumZeit(r.laeuft_ab_s * 1000) }));
@@ -8174,6 +8289,18 @@ function zeichneRechnungen(d) {
     if (r.zweck) teile.push(r.zweck);
     stand.textContent = teile.join(" · ");
     kopf.append(betrag, stand);
+    // Zurueckziehen gibt es nur, solange es etwas zurueckzuziehen gibt:
+    // bei einer bezahlten waere der Knopf eine Luege, bei einer
+    // verfallenen ueberfluessig.
+    if (offen && r.kennung) {
+      const weg = document.createElement("button");
+      weg.type = "button";
+      weg.className = "btn ghost klein";
+      weg.textContent = t("rq_storno");
+      weg.addEventListener("click", () => rechnungZurueckziehen(
+        r.kennung, weg, $("#rq-meldung")));
+      kopf.append(weg);
+    }
     zeile.append(kopf);
     ziel.append(zeile);
   }
@@ -11172,6 +11299,8 @@ async function start() {
   $("#sd-senden").addEventListener("click", sendenAusloesen);
   $("#rq-erstellen").addEventListener("click", rechnungErstellen);
   $("#rq-kopieren").addEventListener("click", rechnungKopieren);
+  $("#rq-storno").addEventListener("click", () => rechnungZurueckziehen(
+    RQ_KENNUNG, $("#rq-storno"), $("#rq-meldung")));
   $("#sd-kopieren").addEventListener("click", () => kopiere(
     $("#sd-txid"), $("#sd-kopiert"), "lgi_kopiert"));
   // Jede Aenderung nimmt die Freigabe zurueck. Sonst schaetzte man das eine

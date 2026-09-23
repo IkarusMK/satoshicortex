@@ -386,6 +386,16 @@ class Rechnungsanfrage(BaseModel):
     gueltig_min: int = Field(60, ge=1, le=1440)
 
 
+class Rechnungskennung(BaseModel):
+    """Eine einzelne Rechnung, benannt ueber ihre Zahlungskennung.
+
+    64 Zeichen Hex -- der 32-Byte-Hash. Die Laenge steht hier, das Alphabet
+    prueft lnd._kennung_b64: eine Stelle, an der entschieden wird, was eine
+    gueltige Kennung ist.
+    """
+    kennung: str = Field("", min_length=64, max_length=64)
+
+
 class Rechnungswunsch(BaseModel):
     """Eine Lightning-Rechnung lesen oder bezahlen."""
     rechnung: str = Field("", max_length=2048)
@@ -4055,6 +4065,87 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
             return {"bereit": True, "rechnungen": [], "weitere": 0,
                     "fehler": True}
         return {"bereit": True, **d}
+
+    @api.get("/lightning/rechnung/stand", dependencies=geschuetzt)
+    def rechnung_stand(kennung: str = "") -> Dict:
+        """Der Stand EINER Rechnung. Nur lesend, keine PIN.
+
+        Die Liste reicht bis zu den letzten zwanzig zurueck; wer eine aeltere
+        im Auge hat, kommt hier an sie heran.
+        """
+        knoten = lndverbindung()
+        if lnd.zustand(knoten)["stand"] != "bereit":
+            raise HTTPException(409, {"meldung": "lightning_nicht_bereit"})
+        try:
+            return lnd.rechnung_nachsehen(knoten, kennung)
+        except lnd.NichtErreichbar:
+            raise HTTPException(503, {"meldung": "lnd_antwortet_nicht"})
+        except lnd.LndFehler as fehler:
+            raise HTTPException(400, {"meldung": "rechnung_unbekannt",
+                                      "einzelheit": str(fehler)})
+
+    @api.get("/lightning/rechnung/abwarten", dependencies=geschuetzt)
+    def rechnung_abwarten(kennung: str = "") -> Dict:
+        """Warten, bis sich an DIESER Rechnung etwas tut. Nur lesend.
+
+        Der Aufruf bleibt stehen, hoechstens lnd.RECHNUNG_WARTEN_S lang. Tut
+        sich in der Zeit nichts, kehrt er mit dem Stand von jetzt zurueck und
+        der Browser fragt erneut. So steht "bezahlt" in dem Augenblick da, in
+        dem es geschieht -- ohne dass die Oberflaeche im Sekundentakt klopft.
+
+        Keine PIN und kein Schreibrecht: es wird zugehoert, mehr nicht.
+        """
+        knoten = lndverbindung()
+        if lnd.zustand(knoten)["stand"] != "bereit":
+            raise HTTPException(409, {"meldung": "lightning_nicht_bereit"})
+        try:
+            return lnd.rechnung_abwarten(knoten, kennung)
+        except lnd.NichtErreichbar:
+            raise HTTPException(503, {"meldung": "lnd_antwortet_nicht"})
+        except lnd.LndFehler as fehler:
+            raise HTTPException(400, {"meldung": "rechnung_unbekannt",
+                                      "einzelheit": str(fehler)})
+
+    @api.post("/lightning/rechnung/stornieren", dependencies=geschuetzt)
+    def rechnung_stornieren(wunsch: Rechnungskennung) -> Dict:
+        """Eine offene Rechnung zurueckziehen.
+
+        Keine PIN, aus demselben Grund wie beim Ausstellen: es bewegt kein
+        Geld. Es nimmt eine Forderung zurueck -- das Schwerste, was eine
+        uebernommene Sitzung damit anrichtet, ist, dass eine Zahlung nicht
+        mehr ankommt, die noch niemand geleistet hat.
+
+        Erst nachsehen, dann handeln -- wie beim Zahlen. Eine Rechnung, die
+        schon Geld festhaelt ("unterwegs"), wird NICHT angefasst: sie zu
+        stornieren gaebe dieses Geld zurueck, und das ist keine Entscheidung,
+        die hier jemand nebenbei treffen soll.
+        """
+        knoten = sendbereit()
+        if not macaroon_sicherstellen(knoten):
+            raise HTTPException(503, {"meldung": "kein_macaroon"})
+        try:
+            stand = lnd.rechnung_nachsehen(knoten, wunsch.kennung)
+        except lnd.NichtErreichbar:
+            raise HTTPException(503, {"meldung": "lnd_antwortet_nicht"})
+        except lnd.LndFehler as fehler:
+            raise HTTPException(400, {"meldung": "rechnung_unbekannt",
+                                      "einzelheit": str(fehler)})
+        if stand["zustand"] != "offen":
+            raise HTTPException(409, {"meldung": "rechnung_nicht_offen",
+                                      "zustand": stand["zustand"]})
+        try:
+            lnd.rechnung_stornieren(knoten, wunsch.kennung)
+        except lnd.NichtErreichbar:
+            raise HTTPException(503, {"meldung": "lnd_antwortet_nicht"})
+        except lnd.LndFehler as fehler:
+            log.info("Rechnung nicht storniert: %s", fehler)
+            raise HTTPException(400, {"meldung": "rechnung_nicht_storniert",
+                                      "einzelheit": str(fehler)})
+        try:
+            return lnd.rechnung_nachsehen(knoten, wunsch.kennung)
+        except (lnd.NichtErreichbar, lnd.LndFehler):
+            # Storniert ist storniert -- nur das Nachsehen danach misslang.
+            return {**stand, "zustand": "storniert"}
 
     @api.post("/lightning/rechnung/lesen", dependencies=geschuetzt)
     def rechnung_lesen(wunsch: Rechnungswunsch) -> Dict:

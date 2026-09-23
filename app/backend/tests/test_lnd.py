@@ -1925,6 +1925,7 @@ def _mit_eigenem(tmp_path):
     (knoten.macaroons / f"{lnd.EIGENES_MACAROON}.macaroon").write_bytes(b"\x00\x01\xff")
     return knoten
 KANALPUNKT_TEST = "cd" * 32 + ":0"
+KENNUNG_ZAHLUNG = "ab" * 32      # 32 Byte Zahlungshash, in Hex
 
 
 def _routen():
@@ -1997,6 +1998,10 @@ AUFRUFE = [
     ("rechnung_ausstellen", lambda k: lnd.rechnung_ausstellen(k, 1000)),
     ("rechnung_erstellen", lambda k: lnd.rechnung_erstellen(k, 1000, "Test")),
     ("rechnungen", lambda k: lnd.rechnungen(k)),
+    ("rechnung_nachsehen", lambda k: lnd.rechnung_nachsehen(k, KENNUNG_ZAHLUNG)),
+    ("rechnung_abwarten", lambda k: lnd.rechnung_abwarten(k, KENNUNG_ZAHLUNG)),
+    ("rechnung_stornieren",
+     lambda k: lnd.rechnung_stornieren(k, KENNUNG_ZAHLUNG)),
     ("umschichten", lambda k: lnd.umschichten(
         k, "123456789", KENNUNG_TEST, 1000, 10)),
     ("htlc_strom", lambda k: next(iter(lnd.htlc_strom(k)))),
@@ -2566,3 +2571,255 @@ def test_ohne_gedaechtnis_ist_das_wegwissen_leer_und_nicht_kaputt():
     k = _Mitschrift({"/v2/router/mc": {}})
     d = lnd.wegwissen(k)
     assert d["paare"] == 0 and d["letzte"] == []
+
+
+# ── Eine EINZELNE Rechnung: nachsehen, abwarten, zuruecknehmen ────────────
+#
+# Der Punkt, an dem das lautlos schiefgeht, ist die KENNUNG. Ueberall sonst
+# in dieser Anwendung reist sie als Hex; diese drei Routen nehmen sie als
+# bytes-Feld, und LNDs REST-Tor liest bytes als base64. Hex kaeme als Unsinn
+# an -- und die Routenpruefung merkte davon NICHTS, denn Pfad und Methode
+# waeren tadellos. Genau diese Klasse Fehler (richtige Route, falscher
+# Inhalt) hat am 15.09.2026 das Senden am echten Knoten unmoeglich gemacht.
+# Deshalb hier die Gegenprobe auf den Inhalt.
+
+B64_KENNUNG = base64.b64encode(bytes.fromhex(KENNUNG_ZAHLUNG)).decode()
+
+
+class Stromzeilen:
+    """Ein urlopen-Ergebnis, das sich Zeile fuer Zeile lesen laesst."""
+
+    def __init__(self, meldungen):
+        self._zeilen = [json.dumps(m).encode("utf-8") + b"\n"
+                        for m in meldungen]
+
+    def __iter__(self):
+        return iter(self._zeilen)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        return False
+
+
+class Zaehlstrom:
+    """Zaehlt mit, wie viele Meldungen wirklich gelesen wurden."""
+
+    def __init__(self, meldungen):
+        self.meldungen = meldungen
+        self.gelesen = 0
+        self.pfad = ""
+        self.methode = ""
+
+    def strom(self, pfad, daten=None, macaroon="readonly", zeitlimit=None,
+              methode=""):
+        self.pfad, self.methode = pfad, methode
+        for m in self.meldungen:
+            self.gelesen += 1
+            yield m
+
+
+def _aufzeichnen(monkeypatch, nutzlast=None):
+    """Jede Anfrage mitschreiben, statt sie zu beantworten."""
+    gesehen = []
+
+    def urlopen(anfrage, timeout=None, context=None):
+        gesehen.append({"methode": anfrage.get_method(),
+                        "url": anfrage.full_url, "rumpf": anfrage.data})
+        return Antwort(nutzlast if nutzlast is not None else {})
+    monkeypatch.setattr(lnd.urllib.request, "urlopen", urlopen)
+    return gesehen
+
+
+def test_die_zahlungskennung_reist_als_base64_und_nicht_als_hex(tmp_path,
+                                                                monkeypatch):
+    """grpc-gateway v2.16.0, runtime/convert.go: bytes kommen ueber base64
+    herein -- erst das Standard-Alphabet, dann das URL-sichere, beide MIT
+    Fuellzeichen. Eine ungefuellte Form scheitert dort, Hex erst recht."""
+    _ohne_tls(monkeypatch)
+    knoten = _knoten(tmp_path, mit_macaroon=True)
+    gesehen = _aufzeichnen(monkeypatch)
+
+    lnd.rechnung_nachsehen(knoten, KENNUNG_ZAHLUNG)
+
+    from urllib.parse import parse_qs, urlsplit
+    teile = urlsplit(gesehen[0]["url"])
+    assert gesehen[0]["methode"] == "GET"
+    assert teile.path == "/v2/invoices/lookup"
+    roh = parse_qs(teile.query)["payment_hash"][0]
+    assert roh != KENNUNG_ZAHLUNG
+    assert roh.endswith("="), "ohne Fuellzeichen scheitert Gos Decoder"
+    assert base64.urlsafe_b64decode(roh) == bytes.fromhex(KENNUNG_ZAHLUNG)
+
+
+def test_im_pfad_steht_die_url_sichere_form(tmp_path, monkeypatch):
+    """Im PFAD ist sie Pflicht, nicht Geschmackssache: ein "/" aus dem
+    Standard-Alphabet wuerde /v2/invoices/subscribe/{r_hash} zerschneiden und
+    auf eine Route zeigen, die es nicht gibt. Die Kennung hier ist mit Absicht
+    eine, deren Standard-Form voller Schraegstriche steckt."""
+    _ohne_tls(monkeypatch)
+    schraeg = "ff" * 32
+    assert "/" in base64.b64encode(bytes.fromhex(schraeg)).decode()
+    knoten = _knoten(tmp_path, mit_macaroon=True)
+    gesehen = []
+
+    # Der Strom MUSS hier etwas sagen. Schweigt er, faellt rechnung_abwarten
+    # auf das Nachschlagen zurueck -- und dann prueft dieser Test eine Route,
+    # die er gar nicht meint.
+    def urlopen(anfrage, timeout=None, context=None):
+        gesehen.append({"methode": anfrage.get_method(),
+                        "url": anfrage.full_url, "rumpf": anfrage.data})
+        return Stromzeilen([{"result": {
+            "r_hash": base64.b64encode(bytes.fromhex(schraeg)).decode(),
+            "state": "SETTLED", "value": "1000", "amt_paid_sat": "1000"}}])
+    monkeypatch.setattr(lnd.urllib.request, "urlopen", urlopen)
+
+    assert lnd.rechnung_abwarten(knoten, schraeg)["zustand"] == "bezahlt"
+    assert len(gesehen) == 1, "nach einer endgueltigen Meldung folgt kein Abruf"
+
+    # Gepruefte Form ist die ENTSCHLUESSELTE. Ein "/" als %2F zu schreiben
+    # rettet nichts: Gos net/http entschluesselt den Pfad, bevor
+    # grpc-gateway ihn an den Schraegstrichen in Abschnitte zerlegt. Ein
+    # Test, der nur die rohe Zeichenkette ansieht, waere gruen und der
+    # Aufruf trotzdem auf einer Route, die es nicht gibt.
+    from urllib.parse import unquote, urlsplit
+    vorspann = "/v2/invoices/subscribe/"
+    pfad = unquote(urlsplit(gesehen[0]["url"]).path)
+    assert pfad.startswith(vorspann)
+    rest = pfad[len(vorspann):]
+    assert "/" not in rest, "Go macht aus %2F wieder / und zerschneidet die Route"
+    assert "+" not in rest
+    assert base64.urlsafe_b64decode(rest) == bytes.fromhex(schraeg)
+    assert _trifft_route("GET", unquote(gesehen[0]["url"]))
+
+
+def test_das_abwarten_kehrt_zurueck_sobald_bezahlt_ist():
+    """SubscribeSingleInvoice schickt sofort den Stand von jetzt und danach
+    jede Aenderung. Gewartet wird bis zur ersten endgueltigen -- und keine
+    Zeile laenger, sonst haengt der Aufruf an einem Strom, der nie endet."""
+    a = Zaehlstrom([
+        {"result": {}},                     # leere Zwischenmeldung
+        {"result": {"r_hash": B64_KENNUNG, "state": "OPEN", "value": "1000",
+                    "creation_date": "1758600000", "expiry": "3600"}},
+        {"result": {"r_hash": B64_KENNUNG, "state": "SETTLED", "value": "1000",
+                    "amt_paid_sat": "1000", "settle_date": "1758600030",
+                    "creation_date": "1758600000", "expiry": "3600"}},
+        {"result": {"r_hash": B64_KENNUNG, "state": "OPEN"}},
+    ])
+    d = lnd.rechnung_abwarten(a, KENNUNG_ZAHLUNG)
+    assert d["zustand"] == "bezahlt" and d["bezahlt_sat"] == 1000
+    assert d["bezahlt_s"] == 1758600030
+    assert a.gelesen == 3, "die letzte Meldung haette niemand mehr lesen duerfen"
+    assert a.methode == "GET"
+
+
+def test_eine_abgelaufene_frist_beim_abwarten_ist_kein_fehler():
+    """Niemand hat bezahlt -- das ist der Normalfall, kein Zwischenfall. Wer
+    die Ausnahme hier durchliesse, machte aus "noch nichts" ein "kaputt", und
+    die Oberflaeche sagte bei jeder Runde einmal Fehler."""
+    class Stillstand:
+        pfad = ""
+
+        def strom(self, *_a, **_k):
+            raise lnd.Beschaeftigt("keine Meldung innerhalb von 45 s")
+            yield {}                       # macht daraus einen Generator
+
+        def ruf(self, pfad, **_k):
+            self.pfad = pfad
+            return {"r_hash": B64_KENNUNG, "state": "OPEN", "value": "1000",
+                    "creation_date": "1758600000", "expiry": "3600"}
+
+    a = Stillstand()
+    d = lnd.rechnung_abwarten(a, KENNUNG_ZAHLUNG)
+    assert d["zustand"] == "offen" and d["betrag_sat"] == 1000
+    assert a.pfad.startswith("/v2/invoices/lookup")
+
+
+def test_eine_unsinnige_kennung_geht_gar_nicht_erst_hinaus(tmp_path,
+                                                           monkeypatch):
+    """Geprueft wird VOR dem Aufruf. Was kein 32-Byte-Hash ist, hat bei LND
+    nichts zu suchen -- und eine Fehlermeldung von LND ueber etwas, das wir
+    selbst haetten sehen koennen, ist eine schlechte Fehlermeldung."""
+    _ohne_tls(monkeypatch)
+    knoten = _knoten(tmp_path, mit_macaroon=True)
+    (knoten.macaroons / f"{lnd.EIGENES_MACAROON}.macaroon").write_bytes(b"\x00")
+    gesehen = _aufzeichnen(monkeypatch)
+
+    for falsch in ("", "abc", "zz" * 32, KENNUNG_ZAHLUNG + "00", None):
+        for aufruf in (lnd.rechnung_nachsehen, lnd.rechnung_abwarten,
+                       lnd.rechnung_stornieren):
+            with pytest.raises(lnd.LndFehler):
+                aufruf(knoten, falsch)
+    assert gesehen == [], "eine unsinnige Kennung darf LND nie erreichen"
+
+
+def test_grosse_buchstaben_in_der_kennung_sind_dieselbe_kennung(tmp_path,
+                                                                monkeypatch):
+    """Ein Hash aus einer fremden Oberflaeche kommt oft in Grossbuchstaben.
+    Dasselbe Geschaeft zweimal zu fuehren, nur weil die Schreibweise
+    abweicht, waere eine Falle ohne jeden Gegenwert."""
+    _ohne_tls(monkeypatch)
+    knoten = _knoten(tmp_path, mit_macaroon=True)
+    gesehen = _aufzeichnen(monkeypatch)
+    lnd.rechnung_nachsehen(knoten, KENNUNG_ZAHLUNG.upper() + "  ")
+    lnd.rechnung_nachsehen(knoten, KENNUNG_ZAHLUNG)
+    assert gesehen[0]["url"] == gesehen[1]["url"]
+
+
+def test_das_stornieren_schickt_die_kennung_im_rumpf(tmp_path, monkeypatch):
+    """CancelInvoice nimmt sie im Rumpf, nicht in der URL -- und auch dort als
+    base64. LNDs eigene Beschreibung von CancelInvoiceMsg, v0.21.3-beta:
+    "When using REST, this field must be encoded as base64"."""
+    _ohne_tls(monkeypatch)
+    knoten = _knoten(tmp_path, mit_macaroon=True)
+    (knoten.macaroons / f"{lnd.EIGENES_MACAROON}.macaroon").write_bytes(b"\x00")
+    gesehen = _aufzeichnen(monkeypatch)
+
+    lnd.rechnung_stornieren(knoten, KENNUNG_ZAHLUNG)
+
+    assert len(gesehen) == 1 and gesehen[0]["methode"] == "POST"
+    assert gesehen[0]["url"].endswith("/v2/invoices/cancel")
+    rumpf = json.loads(gesehen[0]["rumpf"])
+    assert base64.urlsafe_b64decode(
+        rumpf["payment_hash"]) == bytes.fromhex(KENNUNG_ZAHLUNG)
+
+
+def test_das_stornieren_braucht_das_eigene_macaroon(tmp_path, monkeypatch):
+    """invoices:write -- dasselbe Recht wie das Ausstellen. Mit readonly
+    ginge es nicht, und das soll hier auffallen, nicht bei der Betreiber."""
+    _ohne_tls(monkeypatch)
+    knoten = _knoten(tmp_path, mit_macaroon=True)
+    (knoten.macaroons / f"{lnd.EIGENES_MACAROON}.macaroon").write_bytes(b"\x07")
+    gesehen = []
+
+    def urlopen(anfrage, timeout=None, context=None):
+        gesehen.append(anfrage.headers.get("Grpc-metadata-macaroon"))
+        return Antwort({})
+    monkeypatch.setattr(lnd.urllib.request, "urlopen", urlopen)
+
+    lnd.rechnung_stornieren(knoten, KENNUNG_ZAHLUNG)
+    assert gesehen == ["07"]
+
+
+def test_liste_und_nachschlagen_beschreiben_dieselbe_rechnung(tmp_path,
+                                                              monkeypatch):
+    """Beide Wege muessen dieselben Felder liefern. Sonst zeigt die
+    Oberflaeche ueber denselben Vorgang zweierlei, je nachdem woher sie ihn
+    gerade hat -- und niemand faende je heraus, welches stimmt."""
+    _ohne_tls(monkeypatch)
+    knoten = _knoten(tmp_path, mit_macaroon=True)
+    roh = {"r_hash": B64_KENNUNG, "state": "SETTLED", "value": "2500",
+           "amt_paid_sat": "2500", "memo": "Kaffee", "settle_date": "1758600030",
+           "creation_date": "1758600000", "expiry": "3600",
+           "payment_request": "lnbc25u1pbeispiel"}
+
+    _aufzeichnen(monkeypatch, {"invoices": [roh]})
+    aus_liste = lnd.rechnungen(knoten)["rechnungen"][0]
+    _aufzeichnen(monkeypatch, roh)
+    nachgesehen = lnd.rechnung_nachsehen(knoten, KENNUNG_ZAHLUNG)
+
+    assert aus_liste == nachgesehen
+    assert nachgesehen["kennung"] == KENNUNG_ZAHLUNG
+    assert nachgesehen["zustand"] == "bezahlt"
+    assert nachgesehen["laeuft_ab_s"] == 1758603600

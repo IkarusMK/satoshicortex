@@ -528,6 +528,17 @@ amount, purpose, validity. Out comes a BOLT11 invoice with a QR image that you
 pass on. Below it are the most recently issued invoices with their state —
 open, paid, cancelled.
 
+**You do not have to reload anything.** Since 1.2.0 the panel waits on that one
+invoice: your node reports by itself the moment it is paid, and the line under
+the QR code says so. Leave the window open and hold out the code; you will see
+the payment arrive. If nothing happens, nothing happens — no error, no blinking.
+
+**Withdrawing an invoice.** *Withdraw* next to a still-open invoice makes it
+unpayable. Worth knowing, because an invoice otherwise stays payable until it
+expires — including by someone who still has the QR code on screen. It moves no
+money and needs no PIN. It only works while the invoice is open: one that is
+already holding a payer's money is left alone.
+
 **What this requires and what is often overlooked:** an invoice can only be paid
 if there is enough balance on the FAR SIDE of your channels. A freshly opened
 channel has everything on your side — you can pay, but not receive. The

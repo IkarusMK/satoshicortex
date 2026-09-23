@@ -4,6 +4,80 @@ All notable changes to SatoshiCortex. Format loosely after
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning after
 [SemVer](https://semver.org/).
 
+## [1.2.0] — 2026-09-23
+
+The last of the three gaps from that measurement. LND has a second invoice
+interface, `invoicesrpc`, with six REST routes — and we used **none** of them.
+Invoices were issued through `/v1/invoices` and the answer to "has it been
+paid?" came from reloading the list of the last twenty.
+
+That answers the wrong question. Someone holding out a QR code does not want
+to know whether one of their last twenty invoices is paid. They want to know
+whether **this one** just was, at the moment it happens.
+
+### Added: the invoice tells you itself when it is paid
+
+After you create an invoice, the panel now waits on it. The server attaches to
+LND's `SubscribeSingleInvoice`; LND reports by itself the moment anything
+changes, and the line under the QR code turns into "Paid. 1,500 sat arrived."
+No polling, no switching views and back.
+
+The request deliberately stands still for up to 45 seconds and then returns
+with the state as it is — an expired deadline here is the normal case, not a
+fault, and the interface does not flash an error every round. A torn
+connection does not end the wait either: it pauses five seconds and reattaches,
+because a single twitch in the network must not make a live panel look dead.
+
+### Added: look up a single invoice
+
+`LookupInvoiceV2`, for the invoice that has already dropped out of the list of
+the last twenty.
+
+### Added: withdraw an invoice
+
+`CancelInvoice`, on the freshly created one and on every open one in the list.
+A mistyped amount, a wrong purpose, or a deal that fell through — an invoice
+otherwise stays payable until it expires, including by someone who still has
+the QR code on screen.
+
+No PIN, for the same reason as issuing one: it moves no money, it withdraws a
+claim. But **only while the invoice is open**. One that is already holding the
+payer's money is left alone — cancelling that would hand the money back, which
+is how a hold invoice is meant to work and not a decision anyone should make in
+passing.
+
+### Not built, on purpose
+
+Three of the six routes stay out, and the reasons are in the source next to the
+ones that are in:
+
+- **`AddHoldInvoice` / `SettleInvoice`** — a hold invoice accepts the payer's
+  money and holds it without taking it. Whoever fails to settle holds someone
+  else's money in an HTLC until its timelock runs out, and then the peer force
+  closes the channel. A button for that in an interface with no shop behind it
+  is a trap, not a tool.
+- **`HtlcModifier`** — an interceptor for incoming HTLCs, as a bidirectional
+  stream. It only works while something is listening at the other end: if it
+  attaches and dies, incoming payments stall. A service that occasionally
+  restarts would break receiving rather than improve it.
+
+### Verified, not assumed
+
+The payment hash travels as **base64** on these routes, not as hex the way it
+does everywhere else in this codebase — they take it as a `bytes` field, and
+LND's REST gateway decodes those with base64. Read out of the source for the
+pinned versions rather than remembered: lnd v0.21.3-beta pins
+grpc-gateway/v2 v2.16.0, whose `runtime/convert.go` tries standard base64 and
+then the URL-safe alphabet, both **with** padding. The URL-safe form is
+mandatory in the path — a `/` from the standard alphabet would cut
+`/v2/invoices/subscribe/{r_hash}` in two, and writing it as `%2F` saves
+nothing, because Go decodes the path before splitting it.
+
+That is a class of defect the route guard cannot see: right path, right method,
+unusable content — the same shape as the failure of 2026-09-15. There are
+tests against the content now, each one proven red against a deliberately
+broken version first.
+
 ## [1.1.0] — 2026-09-22
 
 Two gaps found by measuring our own interface against what Bitcoin Core and

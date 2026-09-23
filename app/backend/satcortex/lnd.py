@@ -2207,6 +2207,32 @@ RECHNUNGSZUSTAENDE = {
     "ACCEPTED": "unterwegs",
 }
 
+# Welche davon endgueltig sind. "unterwegs" gehoert NICHT dazu: eine
+# angenommene Rechnung kann noch abgerechnet oder storniert werden.
+RECHNUNG_ENDZUSTAENDE = ("bezahlt", "storniert")
+
+
+def _rechnung_auslesen(r: Dict[str, Any]) -> Dict[str, Any]:
+    """Eine Rechnung von LND in unsere Form -- eine Stelle fuer alle Wege.
+
+    Die Liste, das Nachschlagen und das Abwarten liefern dieselbe Rechnung.
+    Also muss sie ueberall gleich aussehen, sonst zeigt die Oberflaeche je
+    nach Weg etwas anderes ueber denselben Vorgang.
+    """
+    erstellt = _mit_vorzeichen(r.get("creation_date"))
+    zustand = str(r.get("state") or "OPEN").upper()
+    return {
+        "kennung": _hex_aus_b64(r.get("r_hash")),
+        "rechnung": str(r.get("payment_request") or ""),
+        "zweck": str(r.get("memo") or ""),
+        "betrag_sat": _mit_vorzeichen(r.get("value")),
+        "bezahlt_sat": _mit_vorzeichen(r.get("amt_paid_sat")),
+        "erstellt_s": erstellt,
+        "bezahlt_s": _mit_vorzeichen(r.get("settle_date")),
+        "laeuft_ab_s": erstellt + _mit_vorzeichen(r.get("expiry")),
+        "zustand": RECHNUNGSZUSTAENDE.get(zustand, "offen"),
+    }
+
 
 def rechnungen(knoten: Knoten,
                hoechstens: int = RECHNUNGEN_HOECHSTENS) -> Dict[str, Any]:
@@ -2218,24 +2244,146 @@ def rechnungen(knoten: Knoten,
     """
     d = knoten.ruf("/v1/invoices?reversed=true&num_max_invoices="
                    + str(int(hoechstens))) or {}
-    liste = []
-    for r in d.get("invoices") or []:
-        erstellt = _mit_vorzeichen(r.get("creation_date"))
-        zustand = str(r.get("state") or "OPEN").upper()
-        liste.append({
-            "kennung": _hex_aus_b64(r.get("r_hash")),
-            "rechnung": str(r.get("payment_request") or ""),
-            "zweck": str(r.get("memo") or ""),
-            "betrag_sat": _mit_vorzeichen(r.get("value")),
-            "bezahlt_sat": _mit_vorzeichen(r.get("amt_paid_sat")),
-            "erstellt_s": erstellt,
-            "bezahlt_s": _mit_vorzeichen(r.get("settle_date")),
-            "laeuft_ab_s": erstellt + _mit_vorzeichen(r.get("expiry")),
-            "zustand": RECHNUNGSZUSTAENDE.get(zustand, "offen"),
-        })
+    liste = [_rechnung_auslesen(r) for r in d.get("invoices") or []]
     liste.sort(key=lambda r: -r["erstellt_s"])
     return {"rechnungen": liste[:hoechstens],
             "weitere": max(0, len(liste) - hoechstens)}
+
+
+# ── Eine EINZELNE Rechnung: nachsehen, abwarten, zuruecknehmen ────────────
+#
+# LNDs zweite Rechnungsschnittstelle (invoicesrpc) lag bis zum 23.09.2026
+# vollstaendig brach -- sechs Routen, keine einzige benutzt. Ausgestellt wurde
+# ueber /v1/invoices, und ob bezahlt wurde, stand in der nachgeladenen Liste
+# der letzten zwanzig. Das beantwortet "sind meine letzten zwanzig bezahlt?",
+# nicht "ist DIESE eine gerade bezahlt worden?". Wer einen QR-Code hinhaelt,
+# will genau das zweite wissen, und zwar in dem Augenblick, in dem es
+# geschieht.
+#
+# ACHTUNG, Hex gilt hier NICHT. Ueberall sonst in dieser Datei reist eine
+# Kennung als Hex; diese Routen nehmen die Zahlungskennung als bytes-Feld,
+# und LNDs REST-Tor setzt bytes ueber base64 um. Nachgeschlagen, nicht
+# geraten: lnd v0.21.3-beta haengt laut seiner go.mod an grpc-gateway/v2
+# v2.16.0, und dort steht in runtime/convert.go:
+#
+#     func Bytes(val string) ([]byte, error) {
+#         b, err := base64.StdEncoding.DecodeString(val)
+#         if err != nil { b, err = base64.URLEncoding.DecodeString(val) }
+#
+# Erst das Standard-Alphabet, dann das URL-sichere -- beide MIT Fuellzeichen,
+# eine ungefuellte Form scheitert. Hex kaeme als Unsinn an. Genommen wird die
+# URL-sichere Form, denn im Pfad von /v2/invoices/subscribe/{r_hash} wuerde
+# ein "/" aus dem Standard-Alphabet die Route zerschneiden. Im Rumpf des
+# Stornos ist beides recht (protojson liest beide Alphabete) -- eine Form
+# fuer alle drei ist trotzdem die, die man nicht verwechseln kann.
+
+ZAHLUNGSKENNUNG_ZEICHEN = 64      # 32 Byte Hash, in Hex geschrieben
+
+# Wie lange ein Abwarten hoechstens stillsteht, bevor es ohne Ergebnis
+# zurueckkehrt. Keine Ewigkeit: hinter dem Aufruf steht ein Browser, der
+# irgendwann von selbst aufgibt, und ein Arbeitsfaden, der solange gebunden
+# ist. Wer weiterwarten will, fragt noch einmal.
+RECHNUNG_WARTEN_S = 45
+
+
+def _kennung_b64(kennung: str) -> str:
+    """Eine Zahlungskennung so, wie LNDs REST-Tor sie annimmt."""
+    sauber = (kennung or "").strip().lower()
+    if len(sauber) != ZAHLUNGSKENNUNG_ZEICHEN or any(
+            z not in "0123456789abcdef" for z in sauber):
+        raise LndFehler("Das ist keine gueltige Zahlungskennung.")
+    return base64.urlsafe_b64encode(bytes.fromhex(sauber)).decode()
+
+
+def rechnung_nachsehen(knoten: Knoten, kennung: str) -> Dict[str, Any]:
+    """Der Stand EINER Rechnung -- LookupInvoiceV2.
+
+    Die Liste reicht bis zu den letzten zwanzig; was aelter ist, faellt aus
+    ihr heraus. Hier gibt es die eine, nach der gefragt wird, gleichgueltig
+    wie viele seither dazugekommen sind.
+
+    Braucht invoices:read -- Lesen, mehr nicht.
+    """
+    d = knoten.ruf("/v2/invoices/lookup?payment_hash="
+                   + urllib.parse.quote(_kennung_b64(kennung), safe="")) or {}
+    return _rechnung_auslesen(d)
+
+
+def rechnung_abwarten(knoten: Knoten, kennung: str,
+                      frist_s: int = RECHNUNG_WARTEN_S) -> Dict[str, Any]:
+    """Auf DIESE eine Rechnung warten -- SubscribeSingleInvoice.
+
+    Ein Strom, kein Abruf: LND meldet sich von selbst, sobald sich an der
+    Rechnung etwas tut. Die erste Meldung kommt sofort und traegt den Stand
+    von jetzt; danach kommt nur noch etwas, wenn wirklich etwas geschieht.
+
+    Kehrt zurueck, sobald der Stand endgueltig ist -- oder wenn die Frist um
+    ist, dann mit dem zuletzt bekannten. Eine abgelaufene Frist ist hier KEIN
+    Fehler, sondern der Normalfall: es hat eben noch niemand bezahlt.
+    """
+    pfad = "/v2/invoices/subscribe/" + urllib.parse.quote(
+        _kennung_b64(kennung), safe="")
+    letzte: Dict[str, Any] = {}
+    try:
+        for meldung in knoten.strom(pfad, methode="GET", zeitlimit=frist_s):
+            r = meldung.get("result") or {}
+            if not r:
+                continue
+            letzte = _rechnung_auslesen(r)
+            if letzte["zustand"] in RECHNUNG_ENDZUSTAENDE:
+                return letzte
+    except Beschaeftigt:
+        # Frist um, ohne dass sich etwas getan hat. Genau dafuer ist sie da.
+        pass
+    # Hat der Strom gar nichts gesagt -- etwa weil LND gerade erst hochkam --
+    # bleibt der Abruf. Lieber ein Stand als eine leere Antwort.
+    return letzte or rechnung_nachsehen(knoten, kennung)
+
+
+def rechnung_stornieren(knoten: Knoten, kennung: str) -> None:
+    """Eine Rechnung unbezahlbar machen -- CancelInvoice.
+
+    Wofuer: ein Betrag vertippt, ein falscher Zweck, oder die Sache hat sich
+    erledigt. Eine Rechnung laeuft sonst bis zu ihrem Ablauf weiter und kann
+    bis dahin jederzeit bezahlt werden -- auch von jemandem, der den QR-Code
+    noch offen hat. Geld bewegt das keines, es nimmt nur die Forderung
+    zurueck.
+
+    NUR fuer eine offene Rechnung gedacht. Eine angenommene ("unterwegs")
+    haelt bereits Geld des Zahlenden fest; sie zu stornieren gaebe es zurueck
+    -- das ist der Sinn einer Halterechnung, und die stellt diese Anwendung
+    nicht aus. Geprueft wird das eine Stelle hoeher, dort wo auch die Antwort
+    dafuer steht.
+
+    Braucht invoices:write -- dasselbe Recht wie das Ausstellen.
+    """
+    knoten.ruf("/v2/invoices/cancel", macaroon=EIGENES_MACAROON,
+               daten={"payment_hash": _kennung_b64(kennung)})
+
+
+# ── Halterechnungen und der HTLC-Eingriff: mit Absicht nicht gebaut ───────
+#
+# invoicesrpc hat sechs Routen. Drei stehen oben, drei bleiben draussen --
+# und das ist eine Entscheidung, kein Vergessen:
+#
+#   POST /v2/invoices/hodl     AddHoldInvoice
+#   POST /v2/invoices/settle   SettleInvoice
+#       Eine Halterechnung nimmt das Geld des Zahlenden an und haelt es fest,
+#       ohne es zu vereinnahmen -- bis jemand abrechnet oder storniert. Der
+#       Baustein fuer "erst die Ware, dann das Geld". Wer nicht abrechnet,
+#       haelt fremdes Geld in einem HTLC fest, bis dessen Sperrfrist ablaeuft;
+#       dann erzwingt die Gegenstelle das Schliessen des Kanals. Ein Knopf
+#       dafuer in einer Oberflaeche, hinter der kein Laden steht, ist kein
+#       Werkzeug, sondern eine Falle -- es gibt hier nichts zu liefern,
+#       worauf jemand warten muesste.
+#
+#   POST /v2/invoices/htlcmodifier   HtlcModifier
+#       Ein Eingriff in hereinkommende HTLCs, und zwar als zweiseitiger
+#       Strom. Er wirkt nur, solange am anderen Ende jemand zuhoert -- und
+#       darin liegt das Problem: haengt sich ein Eingriff an und stirbt,
+#       bleiben hereinkommende Zahlungen stehen. Ein Dienst, der sich
+#       gelegentlich neu startet, wuerde damit das Empfangen kaputtmachen
+#       statt es zu verbessern.
 
 
 def rechnung_ausstellen(knoten: Knoten, betrag_sat: int,

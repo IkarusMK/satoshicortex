@@ -764,8 +764,14 @@
             <div style="display:flex;gap:12px;align-items:center;margin-top:8px">
               <button type="button" class="btn ghost" id="rq-kopieren"
                       data-i18n="ez_kopieren"></button>
+              <button type="button" class="btn ghost" id="rq-storno"
+                      data-i18n="rq_storno"></button>
               <span class="dim small" id="rq-gueltig"></span>
             </div>
+            <!-- Sagt live, was mit DIESER Rechnung geschieht. Leer heisst
+                 unsichtbar (.note:empty), es steht also nie ein leerer
+                 Kasten herum. -->
+            <div class="note" id="rq-warten"></div>
           </div>
 
           <p class="dim small" style="margin-top:18px" data-i18n="rq_liste"></p>
