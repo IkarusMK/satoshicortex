@@ -4,6 +4,43 @@ All notable changes to SatoshiCortex. Format loosely after
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning after
 [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+### Added: signed build provenance for every image
+
+Until now, whoever pulled `ghcr.io/ikarusmk/satcortex` had to trust that it was
+built from this repository — there was no way to check. That sat oddly with a
+project that verifies the signatures of Bitcoin Core and LND before using them.
+
+Every image built from a release now carries a signed SLSA build provenance
+("built by this workflow, from this commit"), created with `actions/attest`
+v4.2.2 and signed through Sigstore — no long-lived key to manage or leak. It is
+stored next to the image in the registry:
+
+```sh
+gh attestation verify oci://ghcr.io/ikarusmk/satcortex:<version> --owner IkarusMK
+```
+
+What is attested is the image **digest**, not a tag — a tag can move, a digest
+cannot. Only the job that pushes images may mint the signing token. Storage
+records are left off: GitHub offers them only for organization-owned
+repositories, and asking for one would mean granting a permission that
+achieves nothing here.
+
+Three new tests guard it: the provenance step exists, follows the build and
+attests its digest; no other job may mint a signing token; and every
+third-party action in both workflows is pinned to a full commit hash. The
+pinning came in with the audit of 2026-09-22, but nothing checked it until
+now. Each test was shown to fail against a deliberately broken workflow first.
+
+### Changed: commit messages are English
+
+Commit messages, tags and release notes are English from now on, like the rest
+of the public-facing project. `AGENTS.md` fixed the language of the source and
+of the documentation, but said nothing about commits, and they followed the
+German of the source. The GitHub releases for 1.0.0 to 1.2.1 were created on
+2026-09-23 from this changelog.
+
 ## [1.2.1] — 2026-09-23
 
 ### Fixed: the update box offered an old version — and a line that pins you to it

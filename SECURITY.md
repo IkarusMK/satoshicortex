@@ -43,6 +43,13 @@ repository directly.
 - **Secrets never leave the machine.** The application generates the RPC
   password itself and stores it with mode 0600; only the hash goes into the
   service configuration.
+- **Our own images can be verified, not just trusted.** Since 2026-09-23 every
+  image built from a release carries a signed SLSA build provenance
+  (`actions/attest`, pinned to a commit), stored next to the image in the
+  registry. `gh attestation verify oci://ghcr.io/ikarusmk/satcortex:<version>
+  --owner IkarusMK` checks it. Only the job that pushes images may mint the
+  signing token; a test enforces that, and that every third-party action in
+  both workflows is pinned to a full commit hash.
 
 ## What is reachable from outside — and what is not
 

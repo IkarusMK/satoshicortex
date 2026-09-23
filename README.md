@@ -507,6 +507,22 @@ for a few seconds. Only an **LND** update restarts the Lightning node itself
 (a minute or two, longer on a database migration), and only a **Bitcoin Core**
 update restarts the chain node. The guide has a table of what costs what.
 
+### Verifying what you pull
+
+This project verifies the signatures of Bitcoin Core and LND before it uses
+them. You can do the same with ours: every image built from a release carries
+a **signed build provenance** — "built by this workflow, from this commit" —
+signed through GitHub and Sigstore, with no long-lived key that could leak.
+
+```sh
+gh attestation verify oci://ghcr.io/ikarusmk/satcortex:<version> --owner IkarusMK
+```
+
+The same works for `satcortex-bitcoind`, `satcortex-lnd` and `satcortex-tor`.
+It fails loudly if the image was not built by this repository's workflow.
+Releases up to and including 1.2.1 were built before this was in place and
+carry no provenance.
+
 ## License
 
 Apache-2.0 — see [LICENSE](LICENSE).

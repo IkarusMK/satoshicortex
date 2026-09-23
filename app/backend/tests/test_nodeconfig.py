@@ -1404,3 +1404,70 @@ def test_ohne_tag_liste_scheitert_der_bau_laut(tmp_path):
     ankommt."""
     lauf, _w = _latest_nach(tmp_path, ref_name="v1.2.0", tags=())
     assert lauf.returncode != 0
+
+
+# ── Herkunftsnachweis und festgenagelte Aktionen ──────────────────────────
+#
+# Seit dem 23.09.2026 bekommt jedes gebaute Abbild einen signierten
+# Herkunftsnachweis ("gebaut von diesem Ablauf, aus diesem Commit"). Das
+# Projekt prueft die Signaturen von Bitcoin Core und LND, bevor es sie
+# benutzt -- dasselbe soll jeder mit unseren Abbildern tun koennen.
+
+def _ablauf(name):
+    import yaml
+
+    return yaml.safe_load(_lies(f".github/workflows/{name}"))
+
+
+def test_jedes_gebaute_abbild_bekommt_einen_herkunftsnachweis():
+    ablauf = _ablauf("images.yml")
+    job = ablauf["jobs"]["images"]
+    schritte = job["steps"]
+    namen = [s.get("name") for s in schritte]
+    bau = next(s for s in schritte if s.get("name") == "Build and push")
+    nachweis = next((s for s in schritte
+                     if str(s.get("uses", "")).startswith("actions/attest@")),
+                    None)
+    assert nachweis, "kein Herkunftsnachweis im Bauablauf"
+    assert namen.index(nachweis["name"]) > namen.index("Build and push"), (
+        "der Nachweis steht vor dem Bau -- es gibt noch nichts zu bezeugen")
+    mit = nachweis["with"]
+    # Bezeugt wird der DIGEST des eben gebauten Abbilds, kein Tag: ein Tag
+    # kann wandern, der Digest nicht.
+    assert mit["subject-digest"] == "${{ steps.%s.outputs.digest }}" % bau["id"]
+    assert mit["subject-name"].endswith("/${{ matrix.name }}")
+    assert ":" not in mit["subject-name"].rsplit("/", 1)[-1]
+    assert mit["push-to-registry"] is True
+    assert job["permissions"].get("id-token") == "write"
+    assert job["permissions"].get("attestations") == "write"
+
+
+def test_nur_der_bauauftrag_darf_signaturtoken_praegen():
+    """id-token: write gehoert genau dorthin, wo signiert wird. Oben im
+    Ablauf gaelte es auch fuer den Testauftrag, und der fuehrt mit pip
+    install fremde Installationshaken aus -- derselbe Befund wie beim
+    Schreibrecht auf die Registry am 22.09.2026."""
+    for datei in ("images.yml", "check.yml"):
+        ablauf = _ablauf(datei)
+        assert "id-token" not in (ablauf.get("permissions") or {}), datei
+        for name, job in ablauf["jobs"].items():
+            if (datei, name) == ("images.yml", "images"):
+                continue
+            assert "id-token" not in (job.get("permissions") or {}), (
+                f"{datei}: {name} darf keine Signaturtoken praegen")
+
+
+def test_jede_fremde_aktion_ist_auf_eine_pruefsumme_genagelt():
+    """Ein Tag wie "@v4" kann der Herausgeber jederzeit auf anderen Code
+    zeigen lassen -- eine volle Commit-Pruefsumme nicht. Eingefuehrt mit dem
+    Audit vom 22.09.2026; bis heute bewachte es kein Test."""
+    import re
+
+    for datei in ("images.yml", "check.yml"):
+        for job in _ablauf(datei)["jobs"].values():
+            for schritt in job.get("steps", []):
+                aktion = schritt.get("uses")
+                if not aktion or aktion.startswith("./"):
+                    continue
+                assert re.fullmatch(r"[\w.-]+/[\w./-]+@[0-9a-f]{40}", aktion), (
+                    f"{datei}: {aktion} ist nicht auf eine Pruefsumme genagelt")
