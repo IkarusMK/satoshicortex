@@ -642,6 +642,7 @@ const I18N = {
     a_kx_d: "Eine Spalte je Block, darin jede Transaktion als Fläche nach ihrer Größe. So siehst du, was in welchen Block passt — und beim Darüberfahren, wann DEIN Knoten sie zuerst gesehen hat. Das holt der größte Aufruf, den diese Anwendung kennt, deshalb erst auf Knopfdruck.",
     a_kx_holen: "Kacheln holen",
     a_kx_laedt: "Wird geholt — bei vollem Mempool dauert das einen Moment …",
+    a_kx_zu_lang: "Dein Knoten hat zu lange gebraucht, um den Mempool herauszugeben. Versuch es gleich noch einmal — ein laufender Abruf wird dabei nicht doppelt gestartet.",
     a_kx_stand: "{n} Transaktionen im Mempool, {gezeigt} davon gezeichnet.",
     a_kx_naechster: "nächster Block",
     a_kx_spaeter: "Block {n}",
@@ -841,7 +842,7 @@ const I18N = {
     e_adresse_aktuell: "Angekündigt wird zurzeit: {liste}",
     e_adresse_keine: "Zurzeit kündigt dein Knoten keine Adresse an — deshalb findet ihn niemand von außen.",
     e_gespeichert: "Gespeichert. Der Knoten startet gleich neu und kündigt die Adresse dann an.",
-    e_fehler: "Konnte nicht gespeichert werden.",
+    e_fehler: "Das hat nicht geklappt.",
     konfiguration_fehlt: "Es gibt noch keine Konfiguration, die sich ändern ließe.",
     noch_nicht_eingerichtet: "Der Knoten ist noch nicht eingerichtet.",
     n_forward: "im Router weiterleiten, IPv4 und IPv6",
@@ -1844,6 +1845,7 @@ const I18N = {
     a_kx_d: "One column per block, and inside it every transaction as an area sized by its weight. That shows what fits into which block — and on hover, when YOUR node first saw it. This needs the largest call this application makes, so it runs on request only.",
     a_kx_holen: "Fetch tiles",
     a_kx_laedt: "Fetching — with a full mempool this takes a moment …",
+    a_kx_zu_lang: "Your node took too long to hand over the mempool. Try again in a moment — a fetch that is still running is not started twice.",
     a_kx_stand: "{n} transactions in the mempool, {gezeigt} of them drawn.",
     a_kx_naechster: "next block",
     a_kx_spaeter: "block {n}",
@@ -2043,7 +2045,7 @@ const I18N = {
     e_adresse_aktuell: "Currently announced: {liste}",
     e_adresse_keine: "Your node currently announces no address — which is why nobody finds it from outside.",
     e_gespeichert: "Saved. The node restarts shortly and will announce the address then.",
-    e_fehler: "Could not be saved.",
+    e_fehler: "That did not work.",
     konfiguration_fehlt: "There is no configuration yet that could be changed.",
     noch_nicht_eingerichtet: "The node is not set up yet.",
     n_forward: "forward on your router, IPv4 and IPv6",
@@ -2480,6 +2482,18 @@ const FRIST_MS = 25000;
    Die Wache dazu steht in test_oberflaeche.py und vergleicht diese Zahl mit
    der des Servers. */
 const FRIST_GELD_MS = 95000;
+
+/* Die Frist fuer die Kacheln -- den groessten Abruf der Anwendung.
+
+   DER BEFUND VOM 23.09.2026 aus dem Betrieb: "brauch ich immer 5 mal klicken
+   im schnitt damit was geht". Bei 83.000 wartenden Transaktionen brauchte der
+   Server laenger als die 25 Sekunden oben; Core bekommt fuer den Strom bis zu
+   KACHEL_RPC_ZEITLIMIT_S (45 s) Schweigen zugestanden. Der Browser gab auf und
+   zeigte den Sammeltext, der Server rechnete weiter -- und jeder neue Klick
+   stellte einen zweiten Abruf daneben.
+
+   Die Wache dazu steht in test_oberflaeche.py, neben der fuer das Geld. */
+const FRIST_KACHELN_MS = 120000;
 
 /* Was ein misslungener Geldweg anzeigt -- und ob der Knopf wieder darf.
 
@@ -7264,11 +7278,14 @@ async function ladeKacheln() {
   knopf.disabled = true;
   meldung.textContent = t("a_kx_laedt");
   try {
-    KACHEL_DATEN = await api("/auswertung/mempool/kacheln");
+    KACHEL_DATEN = await api("/auswertung/mempool/kacheln", "GET", null,
+                             FRIST_KACHELN_MS);
   } catch (e) {
     if (e && e.abgemeldet) return;
     const d = e.detail || {};
-    meldung.textContent = d.meldung ? t(d.meldung) : t("e_fehler");
+    meldung.textContent = d.meldung ? t(d.meldung)
+      : (e.zeitlimit || e.netzfehler) ? t("a_kx_zu_lang")
+      : t("e_fehler");
     return;
   } finally {
     knopf.disabled = false;

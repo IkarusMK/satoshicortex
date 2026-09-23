@@ -3116,3 +3116,36 @@ def test_jeder_angefasste_bezeichner_steht_auch_in_der_vorlage(html, js):
     fehlt = sorted(angefasst - vorhanden)
     assert not fehlt, ("im Skript angefasst, in der Vorlage nicht vorhanden: "
                        + ", ".join(fehlt))
+
+
+def test_die_frist_fuer_die_kacheln_ist_laenger_als_die_des_servers(js):
+    """DER BEFUND VOM 23.09.2026 aus dem Betrieb: "brauch ich immer 5 mal
+    klicken im schnitt damit was geht".
+
+    Der Browser gab nach 25 Sekunden auf, der Server gestand Core 45 zu --
+    und das gilt fuer jedes SCHWEIGEN im Strom, nicht fuer den ganzen Abruf;
+    danach wird noch gerechnet. Deshalb mindestens das Doppelte.
+    """
+    import re
+    quelle = (WEB_BACKEND / "api.py").read_text(encoding="utf-8")
+    server_s = float(re.search(r"KACHEL_RPC_ZEITLIMIT_S = ([\d.]+)",
+                               quelle).group(1))
+    frist_ms = int(re.search(r"const FRIST_KACHELN_MS = (\d+)", js).group(1))
+    assert frist_ms >= 2 * server_s * 1000, (
+        "die Oberflaeche gibt auf, bevor der Server fertig sein kann")
+    stelle = js.index('api("/auswertung/mempool/kacheln"')
+    assert "FRIST_KACHELN_MS" in js[stelle:stelle + 200], (
+        "der Abruf nimmt die eigene Frist nicht")
+
+
+def test_der_sammeltext_behauptet_kein_speichern(js):
+    """Der Ersatztext fuer jeden Fehler ohne eigene Meldung lautete "Konnte
+    nicht gespeichert werden" -- und diente an 36 Stellen als Ersatz, fast
+    immer dort, wo nichts gespeichert wird: beim Holen der Kacheln, beim
+    Zurueckziehen einer Rechnung, bei Messungen. Am 13.09.2026 wurde das an
+    EINER Stelle geflickt (Wachturm-Pruefung); der Text selbst blieb."""
+    import re
+    texte = re.findall(r'e_fehler: "([^"]*)"', js)
+    assert len(texte) == 2, "je Sprache genau einer"
+    for text in texte:
+        assert not re.search(r"gespeichert|saved", text, re.I), text

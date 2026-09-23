@@ -3854,6 +3854,43 @@ def test_die_kacheln_kommen_aus_dem_eigenen_knoten(client, monkeypatch):
         "12 kB passen alle in den ersten Block"
 
 
+def test_gleichzeitige_kachelabrufe_fragen_den_knoten_nur_einmal(client,
+                                                                monkeypatch):
+    """DER BEFUND VOM 23.09.2026 aus dem Betrieb: "brauch ich immer 5 mal
+    klicken im schnitt damit was geht".
+
+    Jeder Klick stellte einen eigenen Abruf des ganzen Mempools daneben,
+    solange der vorige noch lief -- und die bremsten einander. Drei Klicks,
+    waehrend der Knoten noch liefert, sind hier EIN Abruf; die beiden anderen
+    warten und bekommen dasselbe Ergebnis.
+    """
+    import threading
+    import time as zeit
+    from satcortex import rpc as rpc_modul
+    _richte_ein(client)
+    gefragt = []
+    echt = _mempool_strom(monkeypatch, rpc_modul, gefragt)
+
+    def langsam(self, methode, *p, **kw):
+        zeit.sleep(0.5)                  # ein Knoten, der Zeit braucht
+        yield from echt(self, methode, *p, **kw)
+    monkeypatch.setattr(rpc_modul.Knoten, "brocken", langsam)
+
+    antworten = []
+
+    def klicken():
+        r = client.get("/api/auswertung/mempool/kacheln")
+        antworten.append((r.status_code, r.json().get("gesamt")))
+
+    faeden = [threading.Thread(target=klicken) for _ in range(3)]
+    for f in faeden:
+        f.start()
+    for f in faeden:
+        f.join(timeout=30)
+    assert antworten == [(200, 30)] * 3
+    assert gefragt == ["getrawmempool"], "drei Klicks, ein einziger Abruf"
+
+
 def test_die_kacheln_werden_auf_bloecke_verteilt(client, monkeypatch):
     from satcortex import rpc as rpc_modul
     _richte_ein(client)

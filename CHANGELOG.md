@@ -33,6 +33,32 @@ third-party action in both workflows is pinned to a full commit hash. The
 pinning came in with the audit of 2026-09-22, but nothing checked it until
 now. Each test was shown to fail against a deliberately broken workflow first.
 
+### Fixed: fetching the mempool tiles took five clicks
+
+Reported from operation: "Fetch tiles" under *Mempool* needed five clicks on
+average before anything appeared, and each failure said "Could not be saved".
+
+With 83,000 waiting transactions and an app container capped at one CPU, the
+fetch took longer than the 25 seconds the browser waited — the server allows
+Bitcoin Core 45 seconds of silence in the stream. The browser gave up, the
+server kept working, and every new click started a **second** full fetch next
+to the first, so they slowed each other down. Only when one finished and
+cached its result for 20 seconds did a click land in that window and "work".
+
+- The server now runs **one** fetch at a time; a second request waits for the
+  running one and gets its result.
+- The browser waits two minutes for this one call, not 25 seconds. A test
+  keeps that at least twice the server's limit, like the one for payments.
+- If it still takes too long, the message says so — instead of claiming that
+  something could not be saved.
+
+### Fixed: the generic error message claimed that saving had failed
+
+"Could not be saved" was the fallback text for every error without a message
+of its own — used in 36 places, almost all of them fetching, measuring or
+withdrawing, where nothing is saved. It was patched in one place on
+2026-09-13, but the text itself stayed. It now reads "That did not work."
+
 ### Changed: commit messages are English
 
 Commit messages, tags and release notes are English from now on, like the rest

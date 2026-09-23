@@ -65,6 +65,11 @@ KACHEL_BLOECKE = 8
 # ohne Gegenwert -- der Mempool aendert sich in Sekunden kaum sichtbar.
 KACHEL_FRIST_S = 20.0
 
+# Wie lange Core fuer den Strom der Mempool-Eintraege hoechstens schweigen darf.
+# Die Oberflaeche wartet mit FRIST_KACHELN_MS bewusst deutlich laenger; ein
+# Test haelt beide auseinander. Siehe mempool_kacheln().
+KACHEL_RPC_ZEITLIMIT_S = 45.0
+
 # Wie lange eine geholte Kettenlage weiterverwendet werden darf.
 #
 # Die Oberflaeche fragt im Zehn-Sekunden-Takt und ruft dabei mehrere
@@ -2017,14 +2022,32 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
     #    deutlich mehr. Deshalb NUR auf Anforderung, mit Zwischenspeicher --
     #    und nicht im Takt des Waechters.
     kachelspeicher: Dict = {"wert": None, "zeit": 0.0}
+    # EIN Abruf zur Zeit. Der Befund vom 23.09.2026 aus dem Betrieb: "wenn ich
+    # da auf kacheln holen druecke brauch ich immer 5 mal klicken im schnitt
+    # damit was geht".
+    #
+    # Bei 83.000 Transaktionen und einem App-Container mit einer CPU dauerte
+    # der Abruf laenger als die 25 Sekunden, die der Browser wartete. Der gab
+    # auf -- der Server rechnete aber weiter. Der naechste Klick startete einen
+    # ZWEITEN Abruf daneben, beide bremsten einander. Erst wenn einer fertig
+    # war und sein Ergebnis fuer KACHEL_FRIST_S ablegte, traf ein Klick in
+    # dieses Fenster und "ging". Daher die fuenf Klicks.
+    #
+    # Jetzt wartet ein zweiter Aufruf auf den laufenden und bekommt dessen
+    # Ergebnis, statt einen eigenen daneben zu stellen.
+    kachelschloss = threading.Lock()
 
     @api.get("/auswertung/mempool/kacheln", dependencies=geschuetzt)
     def mempool_kacheln() -> Dict:
         """Jede wartende Transaktion als Flaeche, gruppiert nach Block."""
-        if (kachelspeicher["wert"] is not None
-                and time.monotonic() - kachelspeicher["zeit"] < KACHEL_FRIST_S):
-            return kachelspeicher["wert"]
+        with kachelschloss:
+            if (kachelspeicher["wert"] is not None
+                    and time.monotonic() - kachelspeicher["zeit"] < KACHEL_FRIST_S):
+                return kachelspeicher["wert"]
+            return kacheln_holen()
 
+    def kacheln_holen() -> Dict:
+        """Der eigentliche Abruf. Nur unter kachelschloss aufrufen."""
         # IM STROM, nicht am Stueck. Der Befund vom 21.09.2026 aus dem
         # Betrieb: "wenn der mempool voll ist oder fast voll ist kann ich
         # keine kacheln mehr holen".
@@ -2041,7 +2064,7 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         try:
             eintraege = mempoolstrom.auswerten(mempoolstrom.begrenzt(
                 knotenverbindung().brocken("getrawmempool", True,
-                                           zeitlimit=45.0)))
+                                           zeitlimit=KACHEL_RPC_ZEITLIMIT_S)))
         except (rpc.NichtErreichbar, rpc.RpcFehler,
                 mempoolstrom.MempoolAbgerissen) as fehler:
             log.info("Mempool nicht abrufbar: %s", fehler)
