@@ -53,6 +53,12 @@ services:
       # The same number as the network below. The application needs it for
       # Tor's forwards and for bitcoind's RPC allow-list.
       NETWORK_PREFIX: ${NETWORK_PREFIX:-10.83.33}
+      # Which tag this installation FOLLOWS: "latest" or a fixed number. The
+      # version baked into the image says what runs; this says what the next
+      # pull brings. The update box needs both -- whoever follows latest
+      # simply pulls again, and must never be handed a line that pins them.
+      # Same default as the image line above, on purpose.
+      SATCORTEX_ABBILD_TAG: ${SATCORTEX_VERSION:-latest}
     ports:
       # LAN_BIND controls which interface the web interface listens on.
       # 0.0.0.0 means: reachable from the whole home network — that is

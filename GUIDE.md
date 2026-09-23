@@ -369,6 +369,26 @@ image.
 survives outages — that is part of the design. Only longer absence costs
 reputation: Lightning nodes prefer peers that are reachable.
 
+### Following `latest` — or a fixed number
+
+`SATCORTEX_VERSION=latest` is the default in `example.env`, and it is the
+comfortable way: updating the app is then `docker compose pull && docker
+compose up -d`, and your `.env` never changes.
+
+The update box under *Settings* knows which of the two you follow and says the
+matching thing: with `latest` it tells you to pull again and **never** hands you
+a line with a number in it — copying one would pin you to that version, and
+from then on no update would ever arrive. With a fixed number it shows the line
+to raise, and mentions that `latest` would spare you that in future.
+
+It learns this from the compose file (`SATCORTEX_ABBILD_TAG`, since 2026-09-23).
+A compose file from before that does not pass it on; the box then names both
+ways instead of guessing. Take over the current `docker-compose.yml` to get the
+exact advice.
+
+The box also shows **when** it last looked. It checks for a new SatoshiCortex
+version every six hours, for Bitcoin Core and LND once a day.
+
 ## Applying a new version of Bitcoin Core, LND or Tor
 
 The third-party versions live in your `.env`, **once** each:

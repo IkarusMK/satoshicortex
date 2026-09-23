@@ -560,6 +560,103 @@ def test_die_tor_pause_schaltet_die_versionsabfrage_nicht_ab(client, monkeypatch
     assert gefragt[0].startswith("http://"), gefragt[0]
 
 
+def _mit_fassung(tmp_path, monkeypatch, version, abbild_tag=""):
+    """Ein Client, der sich fuer eine veroeffentlichte Fassung haelt."""
+    _platz(monkeypatch, 4000)
+    bulk = tmp_path / "bulk"; fast = tmp_path / "fast"
+    bulk.mkdir(exist_ok=True); fast.mkdir(exist_ok=True)
+    konf = settings.Einstellungen(bulk=str(bulk), fast=str(fast),
+                                  config_dir=str(tmp_path / "config"),
+                                  version=version, abbild_tag=abbild_tag)
+    return _client(tmp_path, konf=konf)
+
+
+def _versionen_und_kette(monkeypatch, gefragt):
+    from satcortex import rpc as rpc_modul
+    from satcortex import updates as updates_modul
+
+    def hole(proxy=None, projekt=None):
+        gefragt.append(projekt.name)
+        if projekt.name == "satcortex":
+            return [(1, 0, 2), (1, 0, 3), (1, 0, 4), (1, 1, 0), (1, 2, 0)]
+        if projekt.name == "lnd":
+            return [(0, 21, 3)]          # LND traegt immer drei Stellen
+        return [(31, 1)]
+    monkeypatch.setattr(updates_modul, "hole_versionen", hole)
+    monkeypatch.setattr(rpc_modul, "kettenlage", lambda _k, *_a: {
+        "kette": "main", "hoehe": 964_000, "kopfzeilen": 964_000,
+        "fortschritt": 1.0, "im_erstsync": False, "belegt_bytes": 1,
+        "kennung": "/Satoshi:31.1.0/",
+        "verbindungen_ein": 0, "verbindungen_aus": 10, "erreichbar": False,
+        "blockzeit": 1_758_600_000, "adressen": [], "netze": {},
+        "empfangen_bytes": 0, "gesendet_bytes": 0})
+
+
+def test_der_kasten_weiss_wem_die_installation_folgt(tmp_path, monkeypatch):
+    """Aus dem Betrieb, 23.09.2026: "ich will ja immer latest! und nicht
+    gepinnt auf eine version!" -- und der Kasten reichte ihm eine Zeile zum
+    Festnageln. Er muss wissen, wem die Installation folgt, sonst kann er
+    nicht den richtigen Weg nennen."""
+    c = _mit_fassung(tmp_path, monkeypatch, "1.0.2", abbild_tag="latest")
+    _richte_ein(c)
+    gefragt = []
+    _versionen_und_kette(monkeypatch, gefragt)
+    c.app.state.einmal_nachsehen()
+
+    eigen = c.get("/api/neuerungen").json()["neuerungen"]["satcortex"]
+    assert eigen["folgt"] == "latest"
+    assert eigen["laufend"] == "1.0.2"
+    # Die neueste, nicht die neueste 1.0.x -- das war der Befund.
+    assert eigen["gefunden"]["version"] == "1.2.0"
+    assert eigen["gefunden"]["art"] == "neuer"
+
+
+def test_ohne_angabe_ist_unbekannt_wem_sie_folgt(client):
+    """Eine Compose-Datei von vor dem 23.09.2026 reicht den Wert nicht
+    durch. Dann ist es UNBEKANNT -- nicht "latest" und nicht eine Nummer,
+    denn beides waere geraten."""
+    eigen = client.get("/api/neuerungen").json()["neuerungen"]["satcortex"]
+    assert eigen["folgt"] is None
+
+
+def test_die_eigene_fassung_wird_oefter_nachgesehen_als_core(tmp_path,
+                                                             monkeypatch):
+    """"Einmal am Tag genuegt" stand als Begruendung fuer ZWEI Projekte da,
+    die ein paar Mal im Jahr erscheinen. SatoshiCortex hatte in neunzehn
+    Stunden vier Fassungen -- und der Kasten zeigte einen Tag lang eine
+    Auskunft von vor dreien davon."""
+    from satcortex import updates as updates_modul
+    c = _mit_fassung(tmp_path, monkeypatch, "1.0.2", abbild_tag="latest")
+    _richte_ein(c)
+    gefragt = []
+    _versionen_und_kette(monkeypatch, gefragt)
+    uhr = [1_758_600_000.0]
+    monkeypatch.setattr(api.time, "time", lambda: uhr[0])
+
+    c.app.state.einmal_nachsehen()
+    assert gefragt.count("satcortex") == 1 and gefragt.count("bitcoind") == 1
+
+    uhr[0] += updates_modul.INTERVALL_EIGENE_SEKUNDEN + 1
+    c.app.state.einmal_nachsehen()
+    assert gefragt.count("satcortex") == 2, "die eigene Fassung ist faellig"
+    assert gefragt.count("bitcoind") == 1, "Core bleibt bei einmal am Tag"
+
+    uhr[0] += updates_modul.INTERVALL_SEKUNDEN
+    c.app.state.einmal_nachsehen()
+    assert gefragt.count("bitcoind") == 2
+
+
+def test_der_kasten_nennt_den_zeitpunkt_der_auskunft(tmp_path, monkeypatch):
+    """"Neueste bekannte" heisst: bekannt SEIT WANN. Ohne den Zeitpunkt sah
+    eine Auskunft von gestern aus wie eine von eben."""
+    c = _mit_fassung(tmp_path, monkeypatch, "1.0.2", abbild_tag="latest")
+    _richte_ein(c)
+    _versionen_und_kette(monkeypatch, [])
+    c.app.state.einmal_nachsehen()
+    eigen = c.get("/api/neuerungen").json()["neuerungen"]["satcortex"]
+    assert isinstance(eigen["stand"], (int, float)) and eigen["stand"] > 0
+
+
 def test_karte_antwortet_auch_ohne_knoten(client):
     """Ohne bitcoind bleibt die Karte leer -- aber sie antwortet. Ein Fehler
     hier wuerde die halbe Uebersicht mitreissen."""

@@ -4,6 +4,50 @@ All notable changes to SatoshiCortex. Format loosely after
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning after
 [SemVer](https://semver.org/).
 
+## [1.2.1] — 2026-09-23
+
+### Fixed: the update box offered an old version — and a line that pins you to it
+
+Reported from operation: the box under *Settings* offered **1.0.3** while
+**1.2.0** had been out for hours. Three faults added up.
+
+**It recommended the newest version of your own branch, not the newest.** For
+Bitcoin Core and LND that is right: older branches are maintained there, and a
+maintenance release in your branch is the safer step. SatoshiCortex has no such
+branches — 1.0.3 and 1.0.4 are simply older steps on the way to 1.2.0, nothing
+is carried back to them. A node on 1.0.2 was told "1.0.4, a maintenance
+release, safe to apply", with 1.2.0 pushed into an "also available" below.
+Core and LND keep their branch logic; only SatoshiCortex now always names the
+newest.
+
+**It handed out a line that pins you.** Under the number stood
+`SATCORTEX_VERSION=1.0.x` to copy into the `.env`. Whoever follows `latest` —
+the default — and copies it is pinned from then on and never gets another
+update. The box now knows which tag the installation follows (the compose file
+passes it on as `SATCORTEX_ABBILD_TAG`): with `latest` it says "pull again" and
+shows no number to copy; with a fixed number it shows the line; if it cannot
+know, it names both ways. The explanation below it was also the one for Core
+and LND, including "docker compose build lnd" — SatoshiCortex now has its own.
+
+**Its answer was up to a day old and did not say so.** "Once a day is enough"
+was written for two projects that release a few times a year. SatoshiCortex had
+four releases in nineteen hours. It is now checked every six hours, and the box
+shows when it last looked.
+
+### Fixed: an older tag pushed again would have moved `latest` backwards
+
+The image workflow claimed to set `latest` "only when it really is the newest".
+Only the manual start was guarded. A tag push set `latest` every time — also for
+an older tag that was merely moved or rebuilt. Every installation following
+`latest` would have been downgraded on its next pull, silently; that concerned
+every image in such a run, Tor included. On a tag push, `latest` now goes only
+to the highest release tag, and if the list of tags cannot be read the build
+fails loudly instead of quietly leaving `latest` where it was.
+
+The tests for it do not read the workflow text — they **execute** the real step
+from the YAML file, in the same shell GitHub uses, against a stand-in `gh`.
+Against the old workflow they fail; against the new one they pass.
+
 ## [1.2.0] — 2026-09-23
 
 The last of the three gaps from that measurement. LND has a second invoice

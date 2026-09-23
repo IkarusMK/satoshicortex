@@ -381,3 +381,52 @@ def test_ein_riesiger_feed_wird_nicht_ganz_gelesen(monkeypatch):
                         lambda self, a, timeout=None: Antwort())
     updates.hole_versionen()
     assert gelesen and gelesen[0] == updates.HOECHSTLAENGE
+
+
+# ── Die eigene Fassung hat EINE Linie, keine Wartungszweige ────────────────
+#
+# Befund aus dem Betrieb, 23.09.2026: der Fassungskasten bot "1.0.3" an,
+# waehrend 1.2.0 laengst veroeffentlicht war. Zwei Fehler, die sich
+# addierten -- hier der erste und schwerere:
+#
+# Die Auswahl bevorzugt eine neuere Fassung im EIGENEN Zweig. Fuer Bitcoin
+# Core und LND ist das richtig: dort werden aeltere Zweige gepflegt, 30.x
+# bekommt Sicherheitskorrekturen, waehrend 31.x schon laeuft. SatoshiCortex
+# hat so etwas nicht. 1.0.3 und 1.0.4 sind keine gepflegte Linie, sondern
+# schlicht aeltere Stufen auf demselben Weg zu 1.2.0 -- nichts wird dorthin
+# zurueckgetragen. Wer auf 1.0.2 lief, bekam "1.0.4, Wartungsversion,
+# gefahrlos" empfohlen, samt fertiger Zeile SATCORTEX_VERSION=1.0.4 zum
+# Abschreiben. Wer ihr folgte, landete auf einer veralteten Fassung und hielt
+# sich fuer aktuell.
+
+VEROEFFENTLICHT = [(1, 0, 0), (1, 0, 1), (1, 0, 2), (1, 0, 3), (1, 0, 4),
+                   (1, 1, 0), (1, 2, 0)]
+
+
+def test_die_eigene_fassung_empfiehlt_immer_die_neueste():
+    ergebnis = updates.waehle((1, 0, 2), VEROEFFENTLICHT, updates.SATCORTEX)
+    assert ergebnis["version"] == "1.2.0"
+    assert ergebnis["tag"] == "1.2.0", "die Zeile zum Abschreiben muss stimmen"
+    assert ergebnis["auch_verfuegbar"] == "", "es gibt nichts Hoeheres daneben"
+
+
+def test_die_eigene_fassung_nennt_sich_nicht_wartung():
+    """"gefahrlos, derselbe Zweig" waere eine Behauptung ueber eine Pflege,
+    die es nicht gibt -- und "Zweigwechsel, kann das Regelwerk aendern" ist
+    die Sprache von Bitcoin Core, nicht die einer Oberflaeche."""
+    for laufend in ((1, 0, 2), (1, 1, 0)):
+        art = updates.waehle(laufend, VEROEFFENTLICHT, updates.SATCORTEX)["art"]
+        assert art == "neuer"
+
+
+def test_wer_die_neueste_hat_bekommt_nichts_angeboten():
+    assert updates.waehle((1, 2, 0), VEROEFFENTLICHT, updates.SATCORTEX) is None
+
+
+def test_core_behaelt_seine_wartungszweige():
+    """Die Gegenprobe: fuer Bitcoin Core bleibt es, wie es war. Dort IST
+    30.2 eine gepflegte Wartungsversion, und die geht vor dem Zweigwechsel."""
+    ergebnis = updates.waehle((30, 1), [(30, 1), (30, 2), (31, 1)],
+                              updates.BITCOIN_CORE)
+    assert ergebnis["version"] == "30.2" and ergebnis["art"] == "wartung"
+    assert ergebnis["auch_verfuegbar"] == "31.1"

@@ -65,6 +65,11 @@ class Einstellungen:
     # Setzt das Abbild beim Bauen. "dev" heisst: aus dem Arbeitsverzeichnis
     # gestartet, nicht aus einem veroeffentlichten Abbild.
     version: str = os.environ.get("SATCORTEX_VERSION", "dev")
+    # Welchem Abbild-Tag diese Installation FOLGT -- "latest" oder eine feste
+    # Nummer. Kommt aus der Compose. Leer heisst: unbekannt, etwa bei einer
+    # Compose-Datei von vor dem 23.09.2026. Dann nennt der Fassungskasten
+    # beide Wege, statt einen zu raten.
+    abbild_tag: str = os.environ.get("SATCORTEX_ABBILD_TAG", "").strip()
     # Verschluesselung ist FREIWILLIG und ausdruecklich nicht die Vorgabe.
     # Ein selbstsigniertes Zertifikat wuerde beim ersten Aufruf eine
     # Sicherheitswarnung erzeugen -- ausgerechnet auf der Seite, auf der man

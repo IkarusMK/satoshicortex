@@ -304,6 +304,10 @@ jobs:
           FUND_VERSION: ${{ matrix.version }}
           OWNER_ROH: ${{ github.repository_owner }}
           EREIGNIS: ${{ github.event_name }}
+          # Fuer die Frage, ob dieser Tag der neueste ist -- siehe unten.
+          REF_TYP: ${{ github.ref_type }}
+          REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # The single source for the third-party versions is example.env. The
           # text there always said so ("raise the number here"); until
@@ -368,10 +372,34 @@ jobs:
           # "latest" only when it really is the newest. A manual run with an
           # older version would otherwise move the tag backwards -- and whoever
           # uses it would silently get a downgrade.
+          #
+          # FINDING OF 2026-09-23: the sentence above was true only for the
+          # manual start. A TAG push set latest always, whatever the tag.
+          # Pushing an older tag again -- to move it, or to rebuild a release
+          # -- would have put latest back on that older build, and every
+          # installation that follows latest (the default in example.env)
+          # would have been downgraded on its next pull, without a word.
+          # That concerns every image built in such a run, Tor included.
+          #
+          # So on a tag push: latest only for the HIGHEST release tag. If the
+          # list cannot be read, the step fails -- loudly, instead of quietly
+          # leaving latest where it was.
           if [ "$EREIGNIS" = "workflow_dispatch" ] \
              && [ -n "$WUNSCH_VERSION" ]; then
             echo "also_latest=" >> "$GITHUB_OUTPUT"
             echo "On demand with a fixed version: latest stays where it is."
+          elif [ "$REF_TYP" = "tag" ]; then
+            HOECHSTE="$(gh api --paginate "repos/$REPO/git/matching-refs/tags/v" \
+                          --jq '.[].ref' \
+                        | sed 's#^refs/tags/v##' \
+                        | grep -E '^[0-9]+(\.[0-9]+)*$' | sort -V | tail -1)"
+            test -n "$HOECHSTE" || { echo "Newest release tag unknown"; exit 1; }
+            if [ "${GITHUB_REF_NAME#v}" = "$HOECHSTE" ]; then
+              echo "also_latest=ghcr.io/$OWNER/$NAME:latest" >> "$GITHUB_OUTPUT"
+            else
+              echo "also_latest=" >> "$GITHUB_OUTPUT"
+              echo "$GITHUB_REF_NAME is not the newest release (v$HOECHSTE): latest stays where it is."
+            fi
           else
             echo "also_latest=ghcr.io/$OWNER/$NAME:latest" >> "$GITHUB_OUTPUT"
           fi

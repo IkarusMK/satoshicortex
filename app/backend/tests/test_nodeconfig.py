@@ -1272,3 +1272,135 @@ def test_jeder_dienst_laeuft_mit_schreibgeschuetzter_wurzel():
     assert set(gefunden) == {"app", "bitcoind", "lnd", "tor"}, gefunden
     ohne = [n for n, (ro, tm) in gefunden.items() if not (ro and tm)]
     assert not ohne, ohne
+
+
+def test_die_app_erfaehrt_denselben_tag_den_die_compose_zieht():
+    """Die Abbildzeile zieht ${SATCORTEX_VERSION:-latest}. Die App muss
+    DENSELBEN Wert erfahren, mit derselben Vorgabe -- sonst zieht die NAS
+    latest, und der Fassungskasten haelt die Installation fuer festgenagelt
+    oder umgekehrt. Genau das zu unterscheiden ist sein Zweck seit dem
+    23.09.2026."""
+    import re
+
+    compose = _lies("docker-compose.yml")
+    abbild = re.search(r"ghcr\.io/ikarusmk/satcortex:(\$\{[^}]+\})", compose)
+    weiter = re.search(r"^\s+SATCORTEX_ABBILD_TAG: (\$\{[^}]+\})", compose,
+                       re.MULTILINE)
+    assert abbild and weiter, "eine der beiden Zeilen fehlt"
+    assert abbild.group(1) == weiter.group(1) == "${SATCORTEX_VERSION:-latest}"
+
+
+# ── Wann ein Bau "latest" setzen darf ─────────────────────────────────────
+#
+# BEFUND VOM 23.09.2026. Der Ablauf behauptete: "latest only when it really is
+# the newest". Geschuetzt war davon aber nur der Handstart. Ein Tag-Push setzte
+# latest IMMER -- auch fuer einen aelteren Tag, der nur verschoben oder neu
+# gebaut wurde. Jede Installation, die latest folgt, und das ist die Vorgabe in
+# example.env, waere beim naechsten Ziehen still zurueckgestuft worden.
+#
+# Diese Tests pruefen nicht den Text des Ablaufs, sondern fuehren den
+# Schalenblock AUS -- mit derselben Schale wie GitHub (bash -eo pipefail) und
+# einem nachgebauten gh, das eine vorgegebene Tag-Liste liefert.
+
+def _ablaufschritt(name):
+    import yaml
+
+    ablauf = yaml.safe_load(_lies(".github/workflows/images.yml"))
+    for schritt in ablauf["jobs"]["images"]["steps"]:
+        if schritt.get("name") == name:
+            return schritt["run"]
+    raise AssertionError(f"Schritt {name!r} fehlt im Ablauf")
+
+
+def _latest_nach(tmp_path, *, ref_typ="tag", ref_name="v1.2.0",
+                 ereignis="push", wunsch="", tags=("v1.2.0",)):
+    import os
+    import shutil
+    import subprocess
+
+    arbeit = tmp_path / "arbeit"
+    arbeit.mkdir()
+    shutil.copy(_wurzel() / "example.env", arbeit / "example.env")
+    fach = tmp_path / "bin"
+    fach.mkdir()
+    gh = fach / "gh"
+    # Genau das, was GitHubs matching-refs nach --jq '.[].ref' liefert.
+    gh.write_text("#!/bin/sh\n" + "".join(f"echo refs/tags/{t}\n" for t in tags))
+    gh.chmod(0o755)
+    ausgabe = tmp_path / "ausgabe"
+    ausgabe.write_text("")
+    umgebung = {
+        "PATH": f"{fach}{os.pathsep}{os.environ['PATH']}",
+        "GITHUB_OUTPUT": str(ausgabe), "GITHUB_REF_NAME": ref_name,
+        "NAME": "satcortex", "WUNSCH_VERSION": wunsch, "FUND_VERSION": "",
+        "OWNER_ROH": "IkarusMK", "EREIGNIS": ereignis, "REF_TYP": ref_typ,
+        "REPO": "IkarusMK/satoshicortex", "GH_TOKEN": "nicht-echt",
+    }
+    lauf = subprocess.run(
+        ["bash", "-eo", "pipefail", "-c",
+         _ablaufschritt("Determine the image version")],
+        cwd=arbeit, env=umgebung, capture_output=True, text=True, timeout=30)
+    werte = dict(z.split("=", 1) for z in ausgabe.read_text().splitlines()
+                 if "=" in z)
+    return lauf, werte
+
+
+LATEST = "ghcr.io/ikarusmk/satcortex:latest"
+
+
+def test_der_neueste_tag_setzt_latest(tmp_path):
+    lauf, w = _latest_nach(tmp_path, ref_name="v1.2.0",
+                           tags=("v1.0.0", "v1.1.0", "v1.2.0"))
+    assert lauf.returncode == 0, lauf.stderr
+    assert w["tag"] == "1.2.0" and w["also_latest"] == LATEST
+
+
+def test_ein_aelterer_tag_laesst_latest_stehen(tmp_path):
+    """Der Fall, um den es ging. Gebaut wird trotzdem -- unter seiner eigenen
+    Nummer. Nur latest bleibt, wo es ist."""
+    lauf, w = _latest_nach(tmp_path, ref_name="v1.1.0",
+                           tags=("v1.0.0", "v1.1.0", "v1.2.0"))
+    assert lauf.returncode == 0, lauf.stderr
+    assert w["tag"] == "1.1.0"
+    assert w["also_latest"] == "", "ein aelterer Tag darf latest nicht bewegen"
+    assert "not the newest" in lauf.stdout
+
+
+def test_die_reihenfolge_ist_nach_zahlen_nicht_nach_buchstaben(tmp_path):
+    """Nach Buchstaben kaeme 1.10.0 vor 1.9.0 -- und die neueste Fassung
+    bekaeme latest nie."""
+    lauf, w = _latest_nach(tmp_path, ref_name="v1.10.0",
+                           tags=("v1.9.0", "v1.10.0", "v1.2.0"))
+    assert lauf.returncode == 0, lauf.stderr
+    assert w["also_latest"] == LATEST
+
+
+def test_eine_vorabfassung_zaehlt_nicht_als_neueste(tmp_path):
+    lauf, w = _latest_nach(tmp_path, ref_name="v1.2.0",
+                           tags=("v1.2.0", "v1.3.0-rc1"))
+    assert lauf.returncode == 0, lauf.stderr
+    assert w["also_latest"] == LATEST
+
+
+def test_der_handstart_mit_nummer_laesst_latest_stehen(tmp_path):
+    lauf, w = _latest_nach(tmp_path, ref_typ="branch", ref_name="main",
+                           ereignis="workflow_dispatch", wunsch="1.0.4")
+    assert lauf.returncode == 0, lauf.stderr
+    assert w["tag"] == "1.0.4" and w["also_latest"] == ""
+
+
+def test_eine_neue_fremdfassung_auf_main_setzt_latest(tmp_path):
+    """Push auf main heisst: example.env hat eine neue Fremdfassung. Die ist
+    per Bauart die neueste -- daran aendert der Befund nichts."""
+    lauf, w = _latest_nach(tmp_path, ref_typ="branch", ref_name="main")
+    assert lauf.returncode == 0, lauf.stderr
+    assert w["also_latest"] == LATEST
+
+
+def test_ohne_tag_liste_scheitert_der_bau_laut(tmp_path):
+    """Laesst sich nicht feststellen, welcher Tag der neueste ist, bricht der
+    Schritt ab. Ein stilles "latest bleibt" waere derselbe Fehler in
+    freundlicher Verkleidung: niemand merkte, dass die neueste Fassung nie
+    ankommt."""
+    lauf, _w = _latest_nach(tmp_path, ref_name="v1.2.0", tags=())
+    assert lauf.returncode != 0

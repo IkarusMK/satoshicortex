@@ -57,9 +57,21 @@ ZEITSPERRE_SEKUNDEN = 45
 # drei waeren Trotz: dann liegt es nicht am Kreis.
 VERSUCHE = 3
 
-# Einmal am Tag genuegt. Beide Projekte erscheinen ein paar Mal im Jahr;
-# haeufiger nachzufragen bringt nichts und faellt bei der Gegenseite nur auf.
+# Einmal am Tag genuegt -- fuer Bitcoin Core und LND. Beide erscheinen ein
+# paar Mal im Jahr; haeufiger nachzufragen bringt nichts und faellt bei der
+# Gegenseite nur auf.
 INTERVALL_SEKUNDEN = 24 * 60 * 60
+
+# Fuer die EIGENE Fassung nicht. Die Begruendung oben stand hier, als nur
+# Core und LND geprueft wurden -- "ein paar Mal im Jahr". Seit dem 21.09.2026
+# ist SatoshiCortex das dritte Projekt, und das hatte in neunzehn Stunden vier
+# Fassungen. Befund aus dem Betrieb, 23.09.2026: der Kasten bot 1.0.3 an, als
+# schon 1.2.0 da war. Die Auskunft stammte von einer Abfrage, die zwischen
+# zwei Tags gelaufen war, und hielt sich danach einen ganzen Tag.
+#
+# Sechs Stunden: viermal am Tag eine Anfrage ueber Tor, ohne Kennzeichen --
+# das faellt niemandem auf, und eine neue Fassung steht am selben Tag da.
+INTERVALL_EIGENE_SEKUNDEN = 6 * 60 * 60
 
 # Wie lange DERSELBE Fehlgrund nicht erneut auf WARNING gemeldet wird.
 #
@@ -189,6 +201,15 @@ class Projekt:
     zweigtiefe: int
     zerlege_tag: Callable[[str], Optional[Tuple[int, ...]]]
     beschrifte: Callable[[Tuple[int, ...]], str]
+    # Ob aeltere Zweige GEPFLEGT werden. Bei Core und LND ja: 30.x bekommt
+    # Sicherheitskorrekturen, waehrend 31.x schon laeuft -- dort ist eine
+    # neuere Fassung im eigenen Zweig die richtige Empfehlung. Bei
+    # SatoshiCortex nein: eine einzige Linie, nichts wird zurueckgetragen.
+    # 1.0.4 ist dort keine Wartungsversion, sondern eine aeltere Stufe auf
+    # dem Weg zu 1.2.0. Siehe waehle().
+    wartungszweige: bool = True
+    # Wie lange eine gelungene Abfrage gilt. Siehe INTERVALL_EIGENE_SEKUNDEN.
+    intervall_sekunden: int = INTERVALL_SEKUNDEN
 
 
 BITCOIN_CORE = Projekt(
@@ -234,6 +255,8 @@ SATCORTEX = Projekt(
     zweigtiefe=2,
     zerlege_tag=zerlege,
     beschrifte=_satcortex_beschriftung,
+    wartungszweige=False,
+    intervall_sekunden=INTERVALL_EIGENE_SEKUNDEN,
 )
 
 PROJEKTE = (SATCORTEX, BITCOIN_CORE, LND)
@@ -276,6 +299,25 @@ def waehle(laufend: Tuple[int, ...], verfuegbar: List[Tuple[int, ...]],
     if not neuere:
         return None
     beste = max(neuere)
+
+    # Eine einzige Linie: die neueste ist die Empfehlung, sonst nichts.
+    #
+    # Befund aus dem Betrieb, 23.09.2026: der Kasten bot "1.0.3" an, als
+    # 1.2.0 laengst da war. Der Zweigvorrang unten hatte die neueste 1.0.x
+    # zur "gefahrlosen Wartungsversion" erklaert und 1.2.0 in ein
+    # "Ausserdem verfuegbar" darunter geschoben -- mit der fertigen Zeile
+    # SATCORTEX_VERSION=1.0.x zum Abschreiben. Wer ihr folgte, landete auf
+    # einer veralteten Fassung und hielt sich fuer aktuell.
+    if not projekt.wartungszweige:
+        return {
+            "version": projekt.beschrifte(beste),
+            "tag": projekt.tag_praefix + projekt.beschrifte(beste),
+            # Weder "wartung" (eine Pflege, die es nicht gibt) noch
+            # "zweigwechsel" (dessen Text vom Regelwerk spricht -- die
+            # Sprache von Bitcoin Core, nicht die einer Oberflaeche).
+            "art": "neuer",
+            "auch_verfuegbar": "",
+        }
 
     # Gibt es im EIGENEN Zweig noch etwas, ist das die dringlichere Meldung:
     # eine Wartungsversion laesst sich gefahrlos einspielen, ein Zweigwechsel

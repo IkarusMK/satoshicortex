@@ -823,6 +823,11 @@ const I18N = {
     e_akt_wartung: "Version {v} ist verfügbar — eine Wartungsversion im selben Zweig. Sie lässt sich gefahrlos einspielen.",
     e_akt_zweig: "Version {v} ist verfügbar — ein Zweigwechsel. Der kann Regelwerk und Datenbankformat ändern; lies vorher die Anmerkungen zur Veröffentlichung.",
     e_akt_auch: "Außerdem verfügbar: {v}.",
+    e_akt_neuer: "Version {v} ist verfügbar. Was sich geändert hat, steht im Changelog des Projekts.",
+    e_akt_nachgesehen: "Zuletzt nachgesehen: {zeit}",
+    e_akt_eigen_latest: "Du folgst „latest“ — neu ziehen genügt, die .env bleibt, wie sie ist. In der Docker-Oberfläche deines NAS das Abbild neu laden und den Dienst neu starten, oder: „docker compose pull app“ und „docker compose up -d app“.",
+    e_akt_eigen_fest: "In deiner .env steht eine feste Nummer ({folgt}). Setz die Zeile oben ein und stell den Dienst neu bereit — oder schreib „latest“ hinein, dann genügt künftig das Neuziehen.",
+    e_akt_eigen_unklar: "Steht in deiner .env SATCORTEX_VERSION=latest, genügt es, das Abbild neu zu ziehen. Steht dort eine Nummer, setz sie auf {v} — oder auf „latest“, dann bleibst du künftig von selbst aktuell.",
     e_akt_wie: "In der .env die Zeile hochsetzen (BITCOIN_VERSION= bzw. LND_VERSION=), dann neu bereitstellen. Haben wir das Abbild noch nicht gebaut, findet das Ziehen nichts — dann baust du es selbst: „docker compose build lnd“ und „docker compose up -d“. Das dauert etwa eine Minute: geladen, Signatur gegen die gepinnten Herausgeberschlüssel geprüft, ausgepackt. Übersetzt wird nichts.",
     e_akt_fassung_unbekannt: "Der Dienst läuft — seine Fassungsnummer ließ sich gerade nur nicht abfragen. Sie kommt aus derselben Auskunft, die während des Erstabgleichs regelmäßig wartet. Beim nächsten Durchgang steht sie wieder da.",
     e_akt_laeuft_nicht: "Der Dienst läuft noch nicht — es gibt keine laufende Fassung, mit der sich vergleichen ließe. Sobald er läuft, wird nachgesehen.",
@@ -2020,6 +2025,11 @@ const I18N = {
     e_akt_wartung: "Version {v} is available — a maintenance release on the same branch. Safe to apply.",
     e_akt_zweig: "Version {v} is available — a branch change. It may alter consensus rules and database format; read the release notes first.",
     e_akt_auch: "Also available: {v}.",
+    e_akt_neuer: "Version {v} is available. What changed is in the project's changelog.",
+    e_akt_nachgesehen: "Last checked: {zeit}",
+    e_akt_eigen_latest: "You follow “latest” — pulling again is enough, your .env stays as it is. Re-pull the image in your NAS's Docker interface and restart the service, or: “docker compose pull app” and “docker compose up -d app”.",
+    e_akt_eigen_fest: "Your .env holds a fixed number ({folgt}). Put in the line above and redeploy — or write “latest” there, then pulling again will be enough from now on.",
+    e_akt_eigen_unklar: "If your .env says SATCORTEX_VERSION=latest, pulling the image again is enough. If it holds a number, set it to {v} — or to “latest”, then you stay current on your own from now on.",
     e_akt_wie: "Raise the line in your .env (BITCOIN_VERSION= or LND_VERSION=), then redeploy. If we have not built that image yet, the pull finds nothing — then build it yourself: “docker compose build lnd” and “docker compose up -d”. That takes about a minute: downloaded, signature checked against the pinned publisher keys, unpacked. Nothing is compiled.",
     e_akt_fassung_unbekannt: "The service is running — its version number just could not be queried. It comes from the same call that regularly waits during the initial sync. It will be back on the next round.",
     e_akt_laeuft_nicht: "The service is not running yet — there is no running version to compare against. It will be checked once it runs.",
@@ -8614,11 +8624,13 @@ function zeichneNeuerungen(alle) {
    ["bitcoind", "Bitcoin Core"],
    ["lnd", "Lightning (LND)"]].forEach(
     ([schluessel, titel]) => {
-      if (alle[schluessel]) ziel.append(neuerungsBlock(alle[schluessel], titel));
+      if (alle[schluessel]) {
+        ziel.append(neuerungsBlock(alle[schluessel], titel, schluessel));
+      }
     });
 }
 
-function neuerungsBlock(n, titel) {
+function neuerungsBlock(n, titel, schluessel) {
   const block = document.createElement("div");
   block.style.cssText = "margin-bottom:18px";
 
@@ -8647,6 +8659,16 @@ function neuerungsBlock(n, titel) {
     neu: n.neueste || t("e_akt_unbekannt"),
   });
   block.append(zahlen);
+  // "Neueste bekannte" heisst: bekannt SEIT WANN. Ohne diese Zeile sah eine
+  // Auskunft von gestern aus wie eine von eben -- genau so stand am
+  // 23.09.2026 "1.0.3" da, als laengst 1.2.0 veroeffentlicht war.
+  if (n.stand) {
+    const wann = document.createElement("p");
+    wann.className = "dim small";
+    wann.style.cssText = "margin:-4px 0 8px";
+    wann.textContent = t("e_akt_nachgesehen", { zeit: datumZeit(n.stand * 1000) });
+    block.append(wann);
+  }
 
   if (!n.stand && !n.grund) {
     block.append(hinweis(t("e_akt_wartet"), ""));
@@ -8677,11 +8699,24 @@ function neuerungsBlock(n, titel) {
   }
   if (nurAbbild) block.append(hinweis(t("e_akt_nur_abbild"), ""));
 
-  const zweig = n.gefunden.art === "zweigwechsel";
-  block.append(hinweis(t(zweig ? "e_akt_zweig" : "e_akt_wartung",
-    { v: n.gefunden.version }), zweig ? "warn" : ""));
+  // Drei Arten, drei Saetze. "neuer" gibt es seit dem 23.09.2026, fuer
+  // SatoshiCortex selbst: eine Linie, keine gepflegten Zweige. Dort war
+  // "Wartungsversion, gefahrlos" eine Behauptung ueber eine Pflege, die es
+  // nicht gibt, und "Zweigwechsel, kann das Regelwerk aendern" die Sprache
+  // von Bitcoin Core.
+  const art = n.gefunden.art;
+  const v = { v: n.gefunden.version };
+  const satz = art === "zweigwechsel" ? t("e_akt_zweig", v)
+    : art === "neuer" ? t("e_akt_neuer", v)
+    : t("e_akt_wartung", v);
+  block.append(hinweis(satz, art === "zweigwechsel" ? "warn" : ""));
   if (n.gefunden.auch_verfuegbar)
     block.append(hinweis(t("e_akt_auch", { v: n.gefunden.auch_verfuegbar }), ""));
+
+  if (schluessel === "satcortex") {
+    block.append(eigeneFassungWie(n));
+    return block;
+  }
 
   // Die fertige Zeile zum Uebernehmen -- Abtippen erzeugt Tippfehler, und
   // ein Tippfehler im Abbildnamen sieht aus wie ein kaputtes Update.
@@ -8703,6 +8738,51 @@ function neuerungsBlock(n, titel) {
   wie.textContent = t("e_akt_wie");
   block.append(wie);
   return block;
+}
+
+/* Wie man an die neue SatoshiCortex-Fassung kommt -- je nachdem, welchem Tag
+   die Installation folgt.
+
+   Aus dem Betrieb, 23.09.2026: "ich will ja immer latest! und nicht gepinnt
+   auf eine version!" Der Kasten reichte ihm trotzdem SATCORTEX_VERSION=1.0.3
+   zum Abschreiben -- dieselbe Zeile wie fuer Core und LND. Wer latest folgt
+   und sie uebernimmt, ist danach festgenagelt und bekommt nie wieder ein
+   Update. Darunter stand zudem der Erklaertext fuer Core und LND, samt
+   "docker compose build lnd".
+
+   Drei Lagen:
+   - "latest": neu ziehen genuegt. KEINE Zeile zum Abschreiben.
+   - eine feste Nummer: die Zeile hochsetzen -- oder auf latest umstellen.
+   - unbekannt (Compose-Datei von vor dem 23.09.2026): beide Wege nennen,
+     aber keine Zeile, die einen davon still festlegt. */
+function eigeneFassungWie(n) {
+  const teil = document.createElement("div");
+  const folgt = n.folgt || "";
+  const v = { v: n.gefunden.version, folgt };
+  const text = document.createElement("p");
+  text.className = "dim";
+  text.style.cssText = "font-size:12px;line-height:1.5;margin:8px 0 0";
+
+  if (folgt === "latest") {
+    text.textContent = t("e_akt_eigen_latest", v);
+    teil.append(text);
+    return teil;
+  }
+  if (folgt) {
+    const zeile = document.createElement("pre");
+    zeile.className = "dim";
+    zeile.style.cssText =
+      "margin-top:12px;padding:10px 12px;border-radius:8px;overflow-x:auto;"
+      + "background:rgba(10,8,5,.55);border:1px solid var(--border);font-size:13px";
+    zeile.textContent = n.variable + "=" + (n.gefunden.tag || n.gefunden.version);
+    teil.append(zeile);
+    text.textContent = t("e_akt_eigen_fest", v);
+    teil.append(text);
+    return teil;
+  }
+  text.textContent = t("e_akt_eigen_unklar", v);
+  teil.append(text);
+  return teil;
 }
 
 // Was beim Laden in den Feldern stand. Ohne diesen Vergleich laesst sich

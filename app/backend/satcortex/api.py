@@ -832,6 +832,11 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
                  "fehlversuche": 0}
         for p in updates.PROJEKTE
     }
+    # Welchem Tag diese Installation folgt. Aus dem Betrieb, 23.09.2026: "ich
+    # will ja immer latest! und nicht gepinnt auf eine version!" -- und der
+    # Kasten reichte ihm SATCORTEX_VERSION=1.0.3 zum Abschreiben. Wer das
+    # uebernimmt, ist danach festgenagelt und bekommt nie wieder ein Update.
+    neuerungen[updates.SATCORTEX.name]["folgt"] = konf.abbild_tag or None
     # Was der Knoten zuletzt als seine Fassung gemeldet hat. Siehe
     # nach_updates_sehen(): eine ausgefallene Abfrage darf sie nicht loeschen.
     kennungsspeicher: Dict[str, str] = {"wert": ""}
@@ -6013,7 +6018,7 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
                       tor_an: bool, jetzt: float) -> None:
         """Ein Projekt nachschlagen -- und den Befund festhalten."""
         eintrag = neuerungen[projekt.name]
-        if eintrag["stand"] and jetzt - eintrag["stand"] < updates.INTERVALL_SEKUNDEN:
+        if eintrag["stand"] and jetzt - eintrag["stand"] < projekt.intervall_sekunden:
             return
         # Nach einem Fehlschlag nicht sofort wieder. Der Waechter laeuft alle
         # zehn Minuten -- mal drei Versuche, mal zwei Projekte waeren das
