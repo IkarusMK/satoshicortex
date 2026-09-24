@@ -4,6 +4,22 @@ All notable changes to SatoshiCortex. Format loosely after
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning after
 [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed: "Lightning can be set up" on a node that is set up
+
+The *Lightning* box on the overview, and the header under *Wallet*, said
+"Blockchain: complete — Lightning can be set up" as long as the chain was
+complete, even with the wallet created, unlocked and channels open. The line
+knew only the chain, never the wallet — the same kind of mistake that was
+fixed in the hint below it on 2026-09-09.
+
+It now says "can be set up" only while there is demonstrably nothing set up:
+LND reports no wallet, or Lightning has not been configured at all. If LND does
+not answer, nobody here knows whether a wallet exists, and the line just says
+"complete". Both boxes share one function now, and a test runs it in Node
+against every wallet state.
+
 ## [1.2.4] — 2026-09-24
 
 ### Fixed: the channel backup always reported "behind"

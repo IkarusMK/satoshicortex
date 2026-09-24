@@ -1890,6 +1890,65 @@ def test_jede_lage_des_servers_hat_ihren_satz(js):
         assert f"{lage}: " in tabelle or f'"{lage}"' in tabelle, lage
 
 
+# ── Die Kettenzeile im Lightning-Kasten (24.09.2026) ───────────────────────
+#
+# Aus dem Betrieb: "bei lightning rechts im kasten steht immer noch kann
+# eingerichtet werden .. stimmt ja nicht ist ja eingerichtet und laeuft sogar".
+
+def _kettentext_ausfuehren(js, faelle):
+    import json
+    import shutil
+    import subprocess
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node nicht vorhanden -- die CI prueft es trotzdem")
+    stelle = js.index("function kettenText(")
+    quelle = js[stelle:js.index("\n}\n", stelle) + 2]
+    programm = (
+        "const t = (k, w) => w && w.h ? k + '@' + w.h : k;\n"
+        "const zahl = (n) => String(n);\n" + quelle +
+        "\nconst faelle = " + json.dumps(faelle) + ";\n"
+        "console.log(JSON.stringify(faelle.map(kettenText)));\n")
+    lauf = subprocess.run([node, "-e", programm], capture_output=True,
+                          text=True)
+    assert lauf.returncode == 0, lauf.stderr
+    return json.loads(lauf.stdout)
+
+
+def test_mit_wallet_heisst_es_nicht_mehr_kann_eingerichtet_werden(js):
+    """Dieselbe Fehlerklasse wie am 09.09.2026 beim Satz darunter: die Zeile
+    kannte nur die Kette, nie die Wallet."""
+    fertig = {"kette_bereit": True, "dienst": {"zustand": "freigegeben"}}
+    ergebnis = _kettentext_ausfuehren(js, [
+        {**fertig, "knoten": {"stand": "bereit"}},
+        {**fertig, "knoten": {"stand": "gesperrt"}},
+        {**fertig, "knoten": {"stand": "startet"}},
+        {**fertig, "knoten": {"stand": "keine_wallet"}},
+        {"kette_bereit": True, "dienst": {"zustand": "unkonfiguriert"},
+         "knoten": {"stand": "aus"}},
+        {**fertig, "knoten": {"stand": "aus"}},
+        {"kette_bereit": False, "hoehe": 900000,
+         "knoten": {"stand": "keine_wallet"}},
+    ])
+    assert ergebnis == [
+        "ln_k_vollstaendig", "ln_k_vollstaendig", "ln_k_vollstaendig",
+        "ln_k_bereit", "ln_k_bereit",
+        # LND antwortet nicht: ob es eine Wallet gibt, weiss hier niemand --
+        # dann auch nichts behaupten.
+        "ln_k_vollstaendig",
+        "ln_k_sync@900000"]
+
+
+def test_beide_kaesten_nehmen_dieselbe_kettenzeile(js):
+    """Die Uebersicht und die Wallet-Kopfzeile -- zwei Stellen, die bisher
+    denselben Ausdruck je fuer sich hatten."""
+    for name in ("function zeichneLightning(", "function zeichneLightningKurz("):
+        stelle = js.index(name)
+        block = _ohne_js_kommentare(js[stelle:js.index("\n}\n", stelle)])
+        assert "kettenText(d)" in block, name
+        assert 't("ln_k_bereit")' not in block, name
+
+
 # ── Kanaele im Aufbau und im Abbau (24.09.2026) ────────────────────────────
 #
 # Aus dem Betrieb: "ich habe ja jetzt einen kanal geoeffnet zu den anderen

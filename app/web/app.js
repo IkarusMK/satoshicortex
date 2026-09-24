@@ -619,6 +619,7 @@ const I18N = {
     ln_w_wartet: "wartet auf den Start",
     ln_w_unbekannt: "unbekannter Zustand",
     ln_k_bereit: "vollständig — Lightning kann eingerichtet werden",
+    ln_k_vollstaendig: "vollständig",
     ln_k_sync: "wird noch abgeglichen (Block {h})",
     ln_hinweis_sync: "Lightning braucht die vollständige Kette. Solange sie abgeglichen wird, wartet der Dienst — das ist gewollt und kostet nichts. Sobald die Kette steht, richtet SatoshiCortex ihn von allein ein; du musst nichts anstoßen.",
     tun_weg: "Nicht mehr erinnern",
@@ -1840,6 +1841,7 @@ const I18N = {
     ln_w_wartet: "waiting to start",
     ln_w_unbekannt: "unknown state",
     ln_k_bereit: "complete — Lightning can be set up",
+    ln_k_vollstaendig: "complete",
     ln_k_sync: "still syncing (block {h})",
     ln_hinweis_sync: "Lightning needs the complete chain. While it is syncing the service waits — that is intended and costs nothing. Once the chain is complete SatoshiCortex configures it by itself; there is nothing for you to start.",
     tun_weg: "Do not remind me",
@@ -5600,6 +5602,28 @@ async function ladeLightning(erzwingen) {
   }
 }
 
+/* Die Zeile "Blockkette" -- fuer beide Kaesten dieselbe.
+
+   DER BEFUND VOM 24.09.2026, aus dem Betrieb: "bei lightning rechts im kasten
+   steht immer noch kann eingerichtet werden .. stimmt ja nicht ist ja
+   eingerichtet und laeuft sogar". Dieselbe Fehlerklasse wie am 09.09.2026
+   beim Satz darunter: die Zeile kannte nur die Kette, nie die Wallet.
+
+   "Kann eingerichtet werden" stimmt nur, solange es nachweislich nichts
+   einzurichten gab: LND meldet "keine Wallet", oder Lightning ist noch gar
+   nicht eingerichtet. Antwortet LND nicht, weiss hier niemand, ob es eine
+   Wallet gibt -- dann steht nur "vollstaendig" da, und behauptet wird
+   nichts. */
+function kettenText(d) {
+  if (!d.kette_bereit) return t("ln_k_sync", { h: zahl(d.hoehe || 0) });
+  const stand = (d.knoten || {}).stand;
+  const dienst = (d.dienst || {}).zustand;
+  if (stand === "keine_wallet" || dienst === "unkonfiguriert") {
+    return t("ln_k_bereit");
+  }
+  return t("ln_k_vollstaendig");
+}
+
 function zeichneLightning(d) {
   zeichneLightningKurz(d);
   const dienst = $("#d-ln-dienst");
@@ -5612,9 +5636,7 @@ function zeichneLightning(d) {
   // Erstabgleich fuer immer "wird noch abgeglichen" gesagt, und der Hinweis
   // darunter genauso. Gefunden am 03.09.2026 im Pruefstand, an einem Knoten,
   // dessen Kette nachweislich stand.
-  $("#d-ln-kette").textContent = d.kette_bereit
-    ? t("ln_k_bereit")
-    : t("ln_k_sync", { h: zahl(d.hoehe || 0) });
+  $("#d-ln-kette").textContent = kettenText(d);
 
   // Der Satz darunter sagt, was als Naechstes zu tun ist -- und was gerade
   // NICHT zu tun ist. Ohne ihn liest man drei Zeilen und weiss danach immer
@@ -8572,9 +8594,7 @@ function zeichneLightningKurz(d) {
            t("ln_d_" + ((d.dienst || {}).zustand || "unkonfiguriert")));
   kennzahl(ziel, "wallet", t("ln_wallet"),
            t("ln_w_" + ((d.knoten || {}).stand || "aus")));
-  kennzahl(ziel, "kette", t("ln_kette"),
-           d.kette_bereit ? t("ln_k_bereit")
-                          : t("ln_k_sync", { h: zahl(d.hoehe || 0) }));
+  kennzahl(ziel, "kette", t("ln_kette"), kettenText(d));
   raeumeAuf(ziel);
 
   // Guthaben gibt es nur bei offener Wallet. Nullen waeren hier gelogen:
