@@ -4354,9 +4354,16 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         grenze = (lnd.gebuehrgrenze(wunsch.betrag)
                   if wunsch.gebuehrengrenze is None
                   else int(wunsch.gebuehrengrenze))
+        umschichten_pruefe_grenze(knoten, wunsch, grenze)
         try:
             d = lnd.umschichten(knoten, wunsch.von, wunsch.nach,
                                 wunsch.betrag, grenze)
+        except lnd.ZahlungUnterwegs as fehler:
+            # Losgeschickt, kein Ergebnis in der Frist. Die Kennung geht mit:
+            # damit verfolgt die Oberflaeche die Zahlung selbst weiter, statt
+            # den Knopf zu sperren und niemandem zu sagen, wie es ausging.
+            raise HTTPException(504, {"meldung": "umschichten_unklar",
+                                      "kennung": fehler.kennung})
         except lnd.Beschaeftigt:
             raise HTTPException(504, {"meldung": "zahlung_unklar"})
         except lnd.NichtErreichbar:
@@ -4368,6 +4375,58 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         log.info("Umgeschichtet: %s sat, Gebuehr %s sat",
                  d["betrag"], d["gebuehr"])
         return {"ok": True, **d}
+
+    def umschichten_pruefe_grenze(knoten: lnd.Knoten, wunsch: Umschichtung,
+                                  grenze: int) -> None:
+        """Passt der Betrag ueberhaupt durch den Ausgangskanal?
+
+        DER BEFUND VOM 24.09.2026: ein Umschichten ueber einen Kanal zu einem
+        LDK-Knoten, der nur 25 % seiner Kapazitaet gleichzeitig annimmt, mit
+        mehr als diesem Anteil. LND teilte auf, der zweite Teil kam nie los, und nach 80 Sekunden stand "keine Antwort"
+        da -- mit gesperrtem Knopf. Ein Versuch, der sicher scheitert, ist
+        schlechter als eine klare Absage vorher.
+
+        Erst NACH der PIN (AGENTS.md). Ist die Kanalliste nicht zu haben,
+        wird nicht blockiert: dann entscheidet LND wie bisher.
+        """
+        try:
+            kanal = next((k for k in lnd.kanaele(knoten)
+                          if k.get("nummer") == str(wunsch.von).strip()), None)
+        except (lnd.NichtErreichbar, lnd.LndFehler) as fehler:
+            log.info("Grenze fuers Umschichten nicht pruefbar: %s", fehler)
+            return
+        if not kanal or kanal.get("hinaus_hoechstens") is None:
+            return
+        obergrenze = kanal["hinaus_hoechstens"]
+        if wunsch.betrag + grenze <= obergrenze:
+            return
+        hoechstens = (lnd.umschichten_hoechstens(obergrenze)
+                      if wunsch.gebuehrengrenze is None
+                      else max(0, obergrenze - int(wunsch.gebuehrengrenze)))
+        raise HTTPException(400, {
+            "meldung": "umschichten_ueber_grenze",
+            "name": kanal.get("gegenstelle") or kanal.get("kennung", "")[:12],
+            "grenze": obergrenze,
+            "hoechstens": hoechstens})
+
+    @api.get("/lightning/umschichten/abwarten", dependencies=geschuetzt)
+    def umschichten_abwarten(kennung: str = "") -> Dict:
+        """Wie ist ein Umschichten ausgegangen, das keine Antwort bekam?
+
+        Nur lesend und deshalb ohne PIN: es wird zugehoert, bewegt wird
+        nichts. Der Aufruf steht hoechstens lnd.ZAHLUNG_WARTEN_S still und
+        kehrt dann mit "unterwegs" zurueck -- der Browser fragt erneut.
+        """
+        knoten = lndverbindung()
+        if lnd.zustand(knoten)["stand"] != "bereit":
+            raise HTTPException(409, {"meldung": "lightning_nicht_bereit"})
+        try:
+            return lnd.zahlung_abwarten(knoten, kennung)
+        except lnd.NichtErreichbar:
+            raise HTTPException(503, {"meldung": "lnd_antwortet_nicht"})
+        except lnd.LndFehler as fehler:
+            raise HTTPException(400, {"meldung": "zahlung_unbekannt",
+                                      "einzelheit": str(fehler)})
 
     @api.post("/lightning/gebuehren", dependencies=geschuetzt)
     def gebuehren_setzen(wahl: Gebuehren) -> Dict:

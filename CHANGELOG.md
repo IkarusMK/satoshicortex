@@ -4,6 +4,34 @@ All notable changes to SatoshiCortex. Format loosely after
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning after
 [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+### Improved: rebalancing knows the peer's limit and follows up by itself
+
+A rebalance through a channel to an LDK node, for more than a quarter of that
+channel's capacity, could never succeed: LDK accepts at most 25 % of a channel
+in flight at a time. LND split the payment, the second part never left, and
+after 80 seconds the interface said "no answer" and locked the button until the
+page was reloaded. How it ended was only in LND's log.
+
+- **The limit is shown before you press.** LND reports per channel how much
+  the peer accepts at once (`local_constraints.max_pending_amt_msat` —
+  checked in v0.21.3-beta: that is where the peer's `max_htlc_value_in_flight`
+  ends up, and LND checks our own HTLCs against it). The rebalance box names
+  it and the largest amount that fits into one round including fees, and
+  nothing is sent that is bound to fail. The server checks the same, after
+  the PIN.
+- **No answer no longer means "reload and guess".** The server passes on the
+  payment's identifier; the interface then follows the payment itself
+  (`TrackPaymentV2`) and reports "moved" or "not moved" with the reason. The
+  button stays locked while the payment is still in flight and unlocks as soon
+  as the outcome is known.
+
+### Fixed: test data taken from a real node
+
+Some test fixtures added in 1.2.3 and 1.2.4 used values from a real node
+instead of made-up ones. They are replaced with synthetic values.
+
 ## [1.2.5] — 2026-09-24
 
 ### Fixed: "Lightning can be set up" on a node that is set up

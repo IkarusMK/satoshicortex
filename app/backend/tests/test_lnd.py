@@ -228,6 +228,29 @@ def test_betraege_kommen_als_zahlen_heraus():
     assert kanal["anteil_hier"] == 0.4
 
 
+def test_ein_kanal_nennt_was_die_gegenstelle_gleichzeitig_annimmt():
+    """DER BEFUND VOM 24.09.2026: LDK nimmt je Kanal nur 25 % der Kapazitaet
+    gleichzeitig an. Das steht in LOCAL_constraints -- nachgelesen, nicht
+    geraten: funding/manager.go gibt das max_htlc_value_in_flight der
+    Gegenstelle an CommitConstraints, das legt es in UNSERE Konfiguration,
+    und lnwallet/channel.go prueft unsere eigenen HTLCs gegen genau die
+    (v0.21.3-beta)."""
+    k = FakeRuf({"/v1/channels": {"channels": [{
+        "active": True, "capacity": "200000", "local_balance": "180000",
+        "local_constraints": {"max_pending_amt_msat": "50000000"},
+        "remote_constraints": {"max_pending_amt_msat": "190000000"}},
+        {"active": True, "capacity": "150000", "local_balance": "0"}]}})
+    mit, ohne = sorted(lnd.kanaele(k), key=lambda x: -x["kapazitaet"])
+    assert mit["hinaus_hoechstens"] == 50_000
+    # Was in EINEN Durchgang passt: Betrag plus Gebuehrengrenze darunter.
+    b = mit["umschichten_hoechstens"]
+    assert b + lnd.gebuehrgrenze(b) <= 50_000
+    assert (b + 1) + lnd.gebuehrgrenze(b + 1) > 50_000
+    # Ohne Angabe: unbekannt, nicht null. Null hiesse "geht gar nicht".
+    assert ohne["hinaus_hoechstens"] is None
+    assert ohne["umschichten_hoechstens"] is None
+
+
 def test_ohne_alias_lookup_saehe_man_nur_schluessel():
     """LNDs eigene Beschreibung: "It is turned off by default." Ohne das steht
     in der Liste ueberall nur ein Schluessel aus 66 Zeichen."""
@@ -267,7 +290,8 @@ GEGEN = "03" + "ab" * 32
 def _ausstehend(**mehr):
     antworten = {"/v1/channels/pending": {
         "pending_open_channels": [{
-            "channel": {"remote_node_pub": GEGEN, "channel_point": "ee" * 32 + ":0",
+            "channel": {"remote_node_pub": GEGEN,
+                        "channel_point": "ee" * 32 + ":0",
                         "capacity": "100000", "local_balance": "99000",
                         "remote_balance": "0", "initiator": "INITIATOR_LOCAL",
                         "private": False},
@@ -330,6 +354,8 @@ def test_die_sicherung_nennt_ihre_kanaele_lesbar():
     bei jeder Ausfuhr ein anderer). funding_txid_bytes steht in interner
     Reihenfolge -- rueckwaerts zu dem, was ein Explorer zeigt."""
     import base64 as b64
+    # Ausgedacht -- nur unsymmetrisch genug, dass eine vergessene Umkehrung
+    # auffaellt.
     txid = "0123456789abcdef" * 4
     roh = b64.b64encode(bytes.fromhex(txid)[::-1]).decode()
     k = FakeRuf({"/v1/channels/backup": {"multi_chan_backup": {
@@ -1635,12 +1661,17 @@ class Schichtattrappe:
 
     def ruf(self, pfad, macaroon="readonly", daten=None, zeitlimit=None):
         assert pfad == "/v1/invoices", pfad
+        import base64 as b64
         self.ausgestellt = daten
-        return {"payment_request": self.rechnung}
+        # Wie LND: r_hash kommt als base64.
+        return {"payment_request": self.rechnung,
+                "r_hash": b64.b64encode(bytes.fromhex("cd" * 32)).decode()}
 
     def strom(self, pfad, daten, macaroon="readonly", zeitlimit=None):
         self.gesendet = daten
         for m in self.meldungen:
+            if m == "ausbleiben":
+                raise lnd.Beschaeftigt("kein Wort innerhalb der Frist")
             yield m
 
 
@@ -1691,6 +1722,77 @@ def test_ein_gescheiterter_rundweg_nennt_den_grund():
                     "failure_reason": "FAILURE_REASON_NO_ROUTE"}}])
     with pytest.raises(lnd.LndFehler, match="NO_ROUTE"):
         lnd.umschichten(a, "12345", KENNUNG, 50_000, 100)
+
+
+def test_bleibt_die_antwort_aus_nennt_das_umschichten_seine_kennung():
+    """DER BEFUND VOM 24.09.2026: mehr als ein LDK-Kanal gleichzeitig
+    annimmt, LND teilte auf, der zweite Teil kam nie los -- und die Oberflaeche wusste
+    danach nicht, WELCHE Zahlung sie weiterverfolgen soll."""
+    a = Schichtattrappe([{"result": {"status": "IN_FLIGHT"}}, "ausbleiben"])
+    with pytest.raises(lnd.ZahlungUnterwegs) as fehler:
+        lnd.umschichten(a, "12345", KENNUNG, 50_000, 100)
+    assert fehler.value.kennung == "cd" * 32
+    # Weiterhin ein Beschaeftigt -- wer nur das kennt, behandelt es richtig.
+    assert isinstance(fehler.value, lnd.Beschaeftigt)
+
+
+class Verfolgattrappe:
+    """TrackPaymentV2 -- ein Strom, dessen erste Meldung den Stand von jetzt
+    traegt (router.swagger.json, v0.21.3-beta)."""
+
+    def __init__(self, meldungen):
+        self.meldungen = meldungen
+        self.gefragt = None
+
+    def strom(self, pfad, daten=None, macaroon="readonly", zeitlimit=None,
+              methode=""):
+        self.gefragt = (pfad, daten, macaroon, methode)
+        for m in self.meldungen:
+            if m == "ausbleiben":
+                raise lnd.Beschaeftigt("kein Wort innerhalb der Frist")
+            yield m
+
+
+def test_eine_zahlung_laesst_sich_weiterverfolgen():
+    import base64 as b64
+    a = Verfolgattrappe([
+        {"result": {"status": "IN_FLIGHT"}},
+        {"result": {"status": "SUCCEEDED", "value_sat": "20000",
+                    "fee_sat": "3"}}])
+    d = lnd.zahlung_abwarten(a, "cd" * 32)
+    assert d == {"zustand": "angekommen", "betrag": 20_000, "gebuehr": 3,
+                 "grund": ""}
+    pfad, daten, macaroon, methode = a.gefragt
+    # bytes im Pfad: URL-sicheres base64, prozentkodiert -- genau wie beim
+    # Abwarten einer Rechnung. Das REST-Tor dekodiert es vor dem Routen.
+    import urllib.parse
+    assert pfad.startswith("/v2/router/track/")
+    assert urllib.parse.unquote(pfad[len("/v2/router/track/"):]) == \
+        b64.urlsafe_b64encode(bytes.fromhex("cd" * 32)).decode()
+    assert "/" not in pfad[len("/v2/router/track/"):]
+    assert daten is None and methode == "GET"
+    assert macaroon == lnd.EIGENES_MACAROON
+
+
+def test_eine_gescheiterte_zahlung_nennt_ihren_grund():
+    a = Verfolgattrappe([{"result": {
+        "status": "FAILED", "failure_reason": "FAILURE_REASON_TIMEOUT"}}])
+    d = lnd.zahlung_abwarten(a, "cd" * 32)
+    assert d["zustand"] == "gescheitert"
+    assert d["grund"] == "FAILURE_REASON_TIMEOUT"
+
+
+def test_ohne_endgueltigen_stand_ist_sie_noch_unterwegs():
+    """Die Frist um ist kein Fehler -- es hat sich eben noch nichts getan."""
+    a = Verfolgattrappe([{"result": {"status": "IN_FLIGHT"}}, "ausbleiben"])
+    assert lnd.zahlung_abwarten(a, "cd" * 32)["zustand"] == "unterwegs"
+
+
+def test_eine_unbrauchbare_kennung_fragt_gar_nicht_erst():
+    a = Verfolgattrappe([])
+    with pytest.raises(lnd.LndFehler):
+        lnd.zahlung_abwarten(a, "keine-kennung")
+    assert a.gefragt is None
 
 
 def test_rechnungen_ausstellen_braucht_das_recht_dafuer():
@@ -2091,6 +2193,7 @@ AUFRUFE = [
     ("rechnung_abwarten", lambda k: lnd.rechnung_abwarten(k, KENNUNG_ZAHLUNG)),
     ("rechnung_stornieren",
      lambda k: lnd.rechnung_stornieren(k, KENNUNG_ZAHLUNG)),
+    ("zahlung_abwarten", lambda k: lnd.zahlung_abwarten(k, "cd" * 32)),
     ("umschichten", lambda k: lnd.umschichten(
         k, "123456789", KENNUNG_TEST, 1000, 10)),
     ("htlc_strom", lambda k: next(iter(lnd.htlc_strom(k)))),

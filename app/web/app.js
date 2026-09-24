@@ -1058,6 +1058,19 @@ const I18N = {
     us_laeuft: "Sucht einen Rundweg — das kann bis zu einer Minute dauern.",
     us_fertig: "Umgeschichtet: {betrag} sat, dazu {gebuehr} sat für den Rundweg.",
     us_gleicher_kanal: "Hinaus und zurück über denselben Kanal — dafür gibt es keinen Rundweg. Nimm zwei verschiedene.",
+    us_grenze: "{name} nimmt höchstens {grenze} sat gleichzeitig an. Samt Gebühren passen je Durchgang höchstens {hoechstens} sat — mehr geht nur in mehreren Schritten.",
+    umschichten_ueber_grenze: "Zu viel für einen Durchgang: {name} nimmt höchstens {grenze} sat gleichzeitig an, samt Gebühren passen also höchstens {hoechstens} sat. Schichte in mehreren Schritten um.",
+    umschichten_unklar: "Noch keine Antwort. Die App sieht selbst nach, wie es ausgeht — nicht noch einmal drücken.",
+    zahlung_unbekannt: "LND kennt diese Zahlung nicht.",
+    us_verfolgt: "Noch keine Antwort in der Wartezeit. Die App sieht jetzt selbst nach, wie es ausgeht — bitte nicht noch einmal drücken.",
+    us_verfolgt_lange: "Auch nach 30 Minuten ist noch nicht entschieden, wie das Umschichten ausgeht. LND klärt es spätestens, wenn die Frist der Zahlung abläuft. Lade die Seite später neu; bis dahin bleibt der Knopf gesperrt.",
+    us_gescheitert_spaet: "Nicht umgeschichtet: {grund} Es wurde nichts bewegt, der Knopf ist wieder frei.",
+    us_grund_zeit: "In der Wartezeit fand sich kein Weg, der den ganzen Betrag trug.",
+    us_grund_weg: "Für diesen Betrag gibt es keinen Rundweg.",
+    us_grund_guthaben: "Im Ausgangskanal liegt dafür zu wenig.",
+    us_grund_rechnung: "Die eigene Rechnung passte nicht mehr — vermutlich war sie abgelaufen.",
+    us_grund_abgebrochen: "Die Zahlung wurde abgebrochen.",
+    us_grund_sonst: "LND meldet einen Fehler.",
     umschichten_gescheitert: "Es ließ sich kein Rundweg finden: {einzelheit}. Das ist normal — versuch einen kleineren Betrag oder eine andere Richtung.",
     wt_eigen_titel: "Dein eigener Wachturm",
     wt_eigen_d: "Dein Knoten bewacht seit dem ersten Tag fremde Kanäle — ohne dass du etwas tun musstest. Das ist der direkteste Beitrag überhaupt: du verhinderst Betrug bei Leuten, die du nie treffen wirst. Damit dich jemand eintragen kann, braucht er diese Adresse.",
@@ -2280,6 +2293,19 @@ const I18N = {
     us_laeuft: "Looking for a round trip — this can take up to a minute.",
     us_fertig: "Moved: {betrag} sat, plus {gebuehr} sat for the round trip.",
     us_gleicher_kanal: "Out and back through the same channel — there is no round trip for that. Pick two different ones.",
+    us_grenze: "{name} accepts at most {grenze} sat at a time. Including fees, at most {hoechstens} sat fit into one round — more only in several steps.",
+    umschichten_ueber_grenze: "Too much for one round: {name} accepts at most {grenze} sat at a time, so including fees at most {hoechstens} sat fit. Rebalance in several steps.",
+    umschichten_unklar: "No answer yet. The app is checking how it turns out — do not press again.",
+    zahlung_unbekannt: "LND does not know this payment.",
+    us_verfolgt: "No answer within the waiting time. The app is now checking how it turns out — please do not press again.",
+    us_verfolgt_lange: "After 30 minutes it is still not decided how the rebalance turns out. LND settles it at the latest when the payment's deadline passes. Reload the page later; until then the button stays locked.",
+    us_gescheitert_spaet: "Not rebalanced: {grund} Nothing was moved, the button is free again.",
+    us_grund_zeit: "Within the waiting time no route was found that carried the whole amount.",
+    us_grund_weg: "There is no round trip for this amount.",
+    us_grund_guthaben: "The outgoing channel does not hold enough for it.",
+    us_grund_rechnung: "Your own invoice no longer matched — it had probably expired.",
+    us_grund_abgebrochen: "The payment was canceled.",
+    us_grund_sonst: "LND reports an error.",
     umschichten_gescheitert: "No round trip could be found: {einzelheit}. That is normal — try a smaller amount or the other direction.",
     wt_eigen_titel: "Your own watchtower",
     wt_eigen_d: "Your node has been guarding other people's channels since day one — without you doing anything. It is the most direct contribution there is: you prevent fraud against people you will never meet. For anyone to register you, they need this address.",
@@ -6116,6 +6142,37 @@ function fuelleUmschichten(liste) {
   }
   if (vorherVon) von.value = vorherVon;
   if (vorherNach) nach.value = vorherNach;
+  zeigeUmschichtenGrenze();
+}
+
+/* Was die Gegenstelle des Ausgangskanals gleichzeitig annimmt.
+
+   DER BEFUND VOM 24.09.2026: ein Umschichten ueber einen Kanal zu einem
+   LDK-Knoten, der nur 25 % seiner Kapazitaet gleichzeitig annimmt, mit mehr
+   als diesem Anteil. LND teilte auf, der zweite Teil kam nie los, und nach 80 Sekunden stand "keine Antwort" da. Die Grenze liefert
+   der Server je Kanal mit (lnd.kanaele, aus local_constraints); hier steht
+   sie VOR dem Druecken, und der Knopf schickt nichts los, was sicher
+   scheitert. Der Server prueft dasselbe noch einmal. */
+function umschichtenGrenze(von) {
+  const k = (KANAELE_LETZTE || []).find((x) => x.nummer === von);
+  if (!k || k.umschichten_hoechstens === null
+      || k.umschichten_hoechstens === undefined) return null;
+  return { name: k.gegenstelle || (k.kennung || "").slice(0, 12),
+           grenze: zahl(k.hinaus_hoechstens),
+           hoechstens: zahl(k.umschichten_hoechstens),
+           wert: k.umschichten_hoechstens };
+}
+
+function zeigeUmschichtenGrenze() {
+  const ziel = $("#us-grenze");
+  if (!ziel) return;
+  const g = umschichtenGrenze($("#us-von").value);
+  // Nur zeigen, wenn die Grenze wirklich enger ist als das, was im Kanal
+  // liegt -- sonst ist es eine Zahl ohne Bedeutung.
+  const k = (KANAELE_LETZTE || []).find((x) => x.nummer === $("#us-von").value);
+  const eng = g && k && g.wert < (k.verfuegbar || 0);
+  ziel.textContent = eng ? t("us_grenze", g) : "";
+  ziel.classList.toggle("hidden", !eng);
 }
 
 async function umschichten() {
@@ -6132,13 +6189,19 @@ async function umschichten() {
     meldung.textContent = t("us_gleicher_kanal");
     return;
   }
+  const betrag = Number($("#us-betrag").value || 0);
+  const g = umschichtenGrenze(von);
+  if (g && betrag > g.wert) {
+    meldung.textContent = t("umschichten_ueber_grenze", g);
+    return;
+  }
   knopf.disabled = true;
   meldung.textContent = t("us_laeuft");
   $("#us-fertig").classList.add("hidden");
   let wiederFrei = true;
   try {
     const d = await api("/lightning/umschichten", "POST", {
-      von, nach, betrag: Number($("#us-betrag").value || 0),
+      von, nach, betrag,
       ...mitPin("#us-pin"),
     }, FRIST_GELD_MS);
     const fertig = $("#us-fertig");
@@ -6152,10 +6215,91 @@ async function umschichten() {
     // Umschichten ist ein Rundweg mit dem eigenen Geld -- verlieren kann man
     // nur die Gebuehr. Ohne Bescheid trotzdem nicht wiederholen: sonst
     // laeuft derselbe Rundweg ein zweites Mal und kostet ein zweites Mal.
-    wiederFrei = geldfehler(e, meldung, "zahlung_unklar");
+    const d = (e && e.detail) || {};
+    if (d.meldung === "umschichten_unklar" && d.kennung) {
+      // Losgeschickt, kein Ergebnis in der Frist. Der Server gibt die
+      // Kennung mit -- die App sieht selbst nach, statt den Knopf bis zum
+      // Neuladen zu sperren und niemandem zu sagen, wie es ausging.
+      wiederFrei = false;
+      umschichtenVerfolgen(d.kennung);
+    } else if (d.meldung === "umschichten_ueber_grenze") {
+      meldung.textContent = t("umschichten_ueber_grenze", {
+        name: d.name, grenze: zahl(d.grenze), hoechstens: zahl(d.hoechstens) });
+    } else {
+      wiederFrei = geldfehler(e, meldung, "zahlung_unklar");
+    }
   } finally {
     if (wiederFrei) knopf.disabled = false;
   }
+}
+
+// Wie lange die App ein Umschichten ohne Antwort hoechstens weiterverfolgt.
+// Ein haengender Teil loest sich spaetestens mit seiner Frist -- das kann
+// Stunden dauern; so lange soll keine Seite im Hintergrund fragen.
+const US_VERFOLGEN_MS = 30 * 60 * 1000;
+const US_ABRISS_MS = 5000;
+
+// Die Gruende aus LNDs router.swagger.json (v0.21.3-beta), als Satz.
+const US_GRUENDE = {
+  FAILURE_REASON_TIMEOUT: "us_grund_zeit",
+  FAILURE_REASON_NO_ROUTE: "us_grund_weg",
+  FAILURE_REASON_INSUFFICIENT_BALANCE: "us_grund_guthaben",
+  FAILURE_REASON_INCORRECT_PAYMENT_DETAILS: "us_grund_rechnung",
+  FAILURE_REASON_CANCELED: "us_grund_abgebrochen",
+  FAILURE_REASON_ERROR: "us_grund_sonst",
+};
+
+/* Ein Umschichten weiterverfolgen, das in der Frist keine Antwort bekam.
+
+   Dasselbe Muster wie beim Warten auf eine Rechnung: der Server haelt jede
+   Runde bis zu 45 Sekunden offen und meldet sich, sobald die Zahlung
+   entschieden ist. Der Knopf geht ERST bei einem Ergebnis wieder auf -- ein
+   zweiter Druck, solange die erste Zahlung laeuft, schickte denselben
+   Rundweg ein zweites Mal los. */
+async function umschichtenVerfolgen(kennung) {
+  const knopf = $("#us-los");
+  const meldung = $("#us-meldung");
+  const ende = Date.now() + US_VERFOLGEN_MS;
+  meldung.textContent = t("us_verfolgt");
+  while (Date.now() < ende) {
+    let d;
+    try {
+      d = await api("/lightning/umschichten/abwarten?kennung="
+                    + encodeURIComponent(kennung), "GET", null,
+                    FRIST_WARTEN_MS);
+    } catch (e) {
+      if (e && e.abgemeldet) return;
+      if (!(e && e.netzfehler)) {
+        // Eine richtige Absage (LND zu, Zahlung unbekannt). Dann nicht
+        // raten: sagen, was der Server sagt, und den Knopf zu lassen.
+        const f = (e && e.detail) || {};
+        meldung.textContent = f.meldung ? t(f.meldung, f) : t("e_fehler");
+        return;
+      }
+      await new Promise((r) => setTimeout(r, US_ABRISS_MS));
+      continue;
+    }
+    if (d.zustand === "angekommen") {
+      const fertig = $("#us-fertig");
+      fertig.textContent = t("us_fertig", { betrag: zahl(d.betrag),
+                                            gebuehr: zahl(d.gebuehr) });
+      fertig.classList.remove("hidden");
+      $("#us-pin").value = "";
+      meldung.textContent = "";
+      knopf.disabled = false;
+      ladeLightningKanaele();
+      return;
+    }
+    if (d.zustand === "gescheitert") {
+      const grundSchluessel = US_GRUENDE[d.grund] || "us_grund_sonst";
+      meldung.textContent = t("us_gescheitert_spaet",
+                              { grund: t(grundSchluessel) });
+      knopf.disabled = false;
+      return;
+    }
+    // "unterwegs": der Server hat die Runde schon abgewartet -- gleich weiter.
+  }
+  meldung.textContent = t("us_verfolgt_lange");
 }
 
 // Der letzte Stand der Kanaele -- fuers Pruefen, ob jemand aus einem Kanal
@@ -11561,6 +11705,7 @@ async function start() {
   $("#ko-ansehen").addEventListener("click", () => gegenstelleAnsehen());
   $("#wt-eintragen").addEventListener("click", () => wachturmEintragen());
   $("#us-los").addEventListener("click", () => umschichten());
+  $("#us-von").addEventListener("change", () => zeigeUmschichtenGrenze());
   $("#ks-los").addEventListener("click", () => kanalSchliessen());
   $("#wt-eigen-kopieren").addEventListener("click", () => kopiere(
     $("#wt-eigen-uri"), $("#wt-eigen-kopiert"), "lgi_kopiert"));

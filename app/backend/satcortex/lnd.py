@@ -79,6 +79,22 @@ class Beschaeftigt(NichtErreichbar):
     """
 
 
+class ZahlungUnterwegs(Beschaeftigt):
+    """Die Zahlung ist losgeschickt, aber in der Frist kam kein Ergebnis.
+
+    Traegt die Zahlungskennung, damit man sie weiterverfolgen kann. Als
+    Unterklasse von Beschaeftigt behandelt jeder, der nur das kennt, sie
+    unveraendert: "nicht wiederholen, der Ausgang ist offen".
+
+    DER BEFUND VOM 24.09.2026: nach einem Umschichten ohne Antwort wusste
+    die Oberflaeche nicht, WELCHE Zahlung sie weiterverfolgen soll.
+    """
+
+    def __init__(self, text: str, kennung: str) -> None:
+        super().__init__(text)
+        self.kennung = kennung
+
+
 class LndFehler(Exception):
     """LND antwortet, lehnt den Aufruf aber ab."""
 
@@ -816,6 +832,21 @@ def kanaele(knoten: Knoten) -> List[Dict[str, Any]]:
             # weiter. 0.0 = leer bei uns, 1.0 = voll bei uns.
             "anteil_hier": round(hier / kapazitaet, 3) if kapazitaet else 0.0,
             "privat": bool(k.get("private")),
+            # Was die Gegenstelle GLEICHZEITIG von uns annimmt -- ihr
+            # max_htlc_value_in_flight. DER BEFUND VOM 24.09.2026: LDK nimmt
+            # nur 25 % der Kapazitaet, und ein Umschichten mit mehr als diesem
+            # Anteil konnte deshalb nie gelingen.
+            #
+            # Es steht in LOCAL_constraints, nicht in remote_constraints --
+            # nachgelesen in v0.21.3-beta: funding/manager.go gibt den Wert
+            # der Gegenstelle an CommitConstraints, das legt ihn in UNSERE
+            # Konfiguration, und lnwallet/channel.go prueft unsere eigenen
+            # HTLCs gegen genau die. None heisst: unbekannt, NICHT null.
+            "hinaus_hoechstens": _hoechstens_sat(k.get("local_constraints")),
+            "umschichten_hoechstens": (
+                None if _hoechstens_sat(k.get("local_constraints")) is None
+                else umschichten_hoechstens(
+                    _hoechstens_sat(k.get("local_constraints")))),
             # Welche Sitzung dieser Kanal bei einem Wachturm braucht. Ein
             # Turm, der nur Anker-Sitzungen haelt, bewacht keinen
             # Taproot-Kanal.
@@ -829,6 +860,35 @@ def kanaele(knoten: Knoten) -> List[Dict[str, Any]]:
     # Aufmerksamkeit braucht. Danach nach Kapazitaet.
     liste.sort(key=lambda k: (k["aktiv"], k["kapazitaet"]))
     return liste
+
+
+def _hoechstens_sat(bedingungen: Any) -> Optional[int]:
+    """max_pending_amt_msat in Satoshi -- oder None, wenn LND nichts sagt."""
+    if not isinstance(bedingungen, dict):
+        return None
+    roh = bedingungen.get("max_pending_amt_msat")
+    if roh is None:
+        return None
+    try:
+        return int(roh) // 1000
+    except (TypeError, ValueError):
+        return None
+
+
+def umschichten_hoechstens(grenze_sat: int) -> int:
+    """Der groesste Betrag, der samt Gebuehrengrenze unter die Grenze passt.
+
+    Das HTLC, das hinausgeht, traegt den Betrag PLUS die Gebuehren der
+    Knoten dahinter. Genau an der Grenze haette der Rundweg also schon zu
+    viel -- deshalb zaehlt die vorgeschlagene Gebuehrengrenze mit.
+    """
+    grenze = max(0, int(grenze_sat))
+    b = int(grenze / (1 + GEBUEHRGRENZE_ANTEIL))
+    while b > 0 and b + gebuehrgrenze(b) > grenze:
+        b -= 1
+    while b + 1 + gebuehrgrenze(b + 1) <= grenze:
+        b += 1
+    return b
 
 
 def _ausstehend_eintrag(stand: str, k: Dict[str, Any]) -> Dict[str, Any]:
@@ -2484,15 +2544,17 @@ def rechnung_stornieren(knoten: Knoten, kennung: str) -> None:
 
 
 def rechnung_ausstellen(knoten: Knoten, betrag_sat: int,
-                        zweck: str = "") -> str:
+                        zweck: str = "") -> Dict[str, Any]:
     """Die Rechnung fuers Umschichten -- kurz gueltig, eigener Zweck.
 
     Sie wird in Sekunden bezahlt oder gar nicht; deshalb laeuft sie schnell
-    ab statt eine Stunde lang offen zu stehen.
+    ab statt eine Stunde lang offen zu stehen. Zurueck kommen die Rechnung
+    UND ihre Kennung: mit der laesst sich die Zahlung weiterverfolgen, wenn
+    sie in der Frist kein Ergebnis bringt.
     """
     return rechnung_erstellen(
         knoten, betrag_sat, zweck or UMSCHICHTEN_ZWECK,
-        int(ZAHLUNG_ZEITLIMIT_SEKUNDEN * 5))["rechnung"]
+        int(ZAHLUNG_ZEITLIMIT_SEKUNDEN * 5))
 
 
 def umschichten(knoten: Knoten, von_nummer: str, nach_kennung: str,
@@ -2514,9 +2576,9 @@ def umschichten(knoten: Knoten, von_nummer: str, nach_kennung: str,
     if betrag_sat <= 0:
         raise LndFehler("Ohne Betrag gibt es nichts umzuschichten.")
 
-    rechnung = rechnung_ausstellen(knoten, betrag_sat)
+    ausgestellt = rechnung_ausstellen(knoten, betrag_sat)
     daten: Dict[str, Any] = {
-        "payment_request": rechnung,
+        "payment_request": ausgestellt["rechnung"],
         "timeout_seconds": ZAHLUNG_ZEITLIMIT_SEKUNDEN,
         "fee_limit_sat": str(int(gebuehrengrenze_sat)),
         # HIER an, und nur hier: das ist der Zweck des Vorgangs.
@@ -2526,16 +2588,23 @@ def umschichten(knoten: Knoten, von_nummer: str, nach_kennung: str,
         "last_hop_pubkey": base64.b64encode(bytes.fromhex(nach)).decode(),
     }
     letzte: Dict[str, Any] = {}
-    for meldung in knoten.strom(
-            "/v2/router/send", daten, macaroon=EIGENES_MACAROON,
-            zeitlimit=ZAHLUNG_ZEITLIMIT_SEKUNDEN + ZAHLUNG_LUFT_SEKUNDEN):
-        if meldung.get("error"):
-            raise LndFehler(str(meldung["error"]))
-        ergebnis = meldung.get("result") or {}
-        if ergebnis:
-            letzte = ergebnis
-        if ergebnis.get("status") in ("SUCCEEDED", "FAILED"):
-            break
+    try:
+        for meldung in knoten.strom(
+                "/v2/router/send", daten, macaroon=EIGENES_MACAROON,
+                zeitlimit=ZAHLUNG_ZEITLIMIT_SEKUNDEN + ZAHLUNG_LUFT_SEKUNDEN):
+            if meldung.get("error"):
+                raise LndFehler(str(meldung["error"]))
+            ergebnis = meldung.get("result") or {}
+            if ergebnis:
+                letzte = ergebnis
+            if ergebnis.get("status") in ("SUCCEEDED", "FAILED"):
+                break
+    except ZahlungUnterwegs:
+        raise
+    except Beschaeftigt as fehler:
+        # Losgeschickt, aber kein Ergebnis in der Frist. Mit der Kennung
+        # laesst sie sich weiterverfolgen, statt dass jemand raten muss.
+        raise ZahlungUnterwegs(str(fehler), ausgestellt["kennung"]) from fehler
 
     if letzte.get("status") != "SUCCEEDED":
         raise LndFehler(letzte.get("failure_reason")
@@ -2543,6 +2612,60 @@ def umschichten(knoten: Knoten, von_nummer: str, nach_kennung: str,
     return {
         "betrag": _zahl(letzte.get("value_sat")),
         "gebuehr": _zahl(letzte.get("fee_sat")),
+    }
+
+
+# Wie lange ein Abwarten einer Zahlung hoechstens stillsteht -- dieselbe
+# Frist wie bei einer Rechnung, aus demselben Grund: lang genug, dass die
+# Oberflaeche nicht klopfen muss, kurz genug fuer jeden Proxy davor.
+ZAHLUNG_WARTEN_S = RECHNUNG_WARTEN_S
+
+# Welche Zustaende von TrackPaymentV2 endgueltig sind (router.swagger.json,
+# v0.21.3-beta: UNKNOWN, IN_FLIGHT, SUCCEEDED, FAILED, INITIATED).
+_ZAHLUNG_ENDE = {"SUCCEEDED": "angekommen", "FAILED": "gescheitert"}
+
+
+def zahlung_abwarten(knoten: Knoten, kennung: str,
+                     frist_s: int = ZAHLUNG_WARTEN_S) -> Dict[str, Any]:
+    """Eine eigene, losgeschickte Zahlung weiterverfolgen -- TrackPaymentV2.
+
+    DER BEFUND VOM 24.09.2026: ein Umschichten bekam in der Frist keine
+    Antwort, die Oberflaeche sagte "nicht wiederholen" und sperrte den Knopf
+    -- und dann wusste niemand, wie es ausging. Die Antwort stand nur im
+    LND-Protokoll ("MPPTimeout@3").
+
+    Ein Strom: die erste Meldung traegt den Stand von jetzt, danach kommt
+    etwas, wenn sich etwas tut. Kehrt zurueck, sobald der Stand endgueltig
+    ist -- oder mit "unterwegs", wenn die Frist um ist. Das ist kein Fehler,
+    es hat sich eben noch nichts entschieden.
+
+    bytes im Pfad: URL-sicheres base64, dieselbe Falle wie bei den
+    Rechnungen (siehe dort). Nur lesend: offchain:read.
+    """
+    pfad = "/v2/router/track/" + urllib.parse.quote(
+        _kennung_b64(kennung), safe="")
+    letzte: Dict[str, Any] = {}
+    try:
+        for meldung in knoten.strom(pfad, macaroon=EIGENES_MACAROON,
+                                    zeitlimit=frist_s, methode="GET"):
+            if meldung.get("error"):
+                raise LndFehler(str(meldung["error"]))
+            ergebnis = meldung.get("result") or {}
+            if ergebnis:
+                letzte = ergebnis
+            if ergebnis.get("status") in _ZAHLUNG_ENDE:
+                break
+    except ZahlungUnterwegs:
+        raise
+    except Beschaeftigt:
+        pass
+    zustand = _ZAHLUNG_ENDE.get(letzte.get("status", ""), "unterwegs")
+    return {
+        "zustand": zustand,
+        "betrag": _zahl(letzte.get("value_sat")),
+        "gebuehr": _zahl(letzte.get("fee_sat")),
+        "grund": (str(letzte.get("failure_reason") or "")
+                  if zustand == "gescheitert" else ""),
     }
 
 

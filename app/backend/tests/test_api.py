@@ -2184,6 +2184,14 @@ class LndVollstaendig(FakeLnd):
         self.gezahlt = None
         # Was /v1/channels/pending liefert -- ohne Eintrag: nichts im Bau.
         self.ausstehend = {}
+        # Die offenen Kanaele, roh wie LND sie schickt. None: der eine
+        # Standardkanal zu ACINQ.
+        self.kanaele_roh = None
+        # Was der Zahl-Strom meldet, und was das Weiterverfolgen einer
+        # Zahlung meldet. "ausbleiben" heisst: keine Antwort in der Frist.
+        self.zahl_meldungen = [{"result": {"status": "IN_FLIGHT"}}]
+        self.verfolg_meldungen = []
+        self.verfolgt = None
 
     def strom(self, pfad, daten=None, macaroon="readonly", zeitlimit=None,
               methode=""):
@@ -2196,8 +2204,17 @@ class LndVollstaendig(FakeLnd):
             yield from FakeLnd.strom(self, pfad, daten, macaroon, zeitlimit,
                                      methode)
             return
-        self.gezahlt = daten
-        yield {"result": {"status": "IN_FLIGHT"}}
+        if pfad.startswith("/v2/router/track/"):
+            self.verfolgt = pfad
+            meldungen = self.verfolg_meldungen
+        else:
+            self.gezahlt = daten
+            meldungen = self.zahl_meldungen
+        for m in meldungen:
+            if m == "ausbleiben":
+                from satcortex import lnd as lnd_modul
+                raise lnd_modul.Beschaeftigt("kein Wort innerhalb der Frist")
+            yield m
         yield {"result": {"status": "SUCCEEDED", "value_sat": "1500",
                           "fee_sat": "2", "payment_preimage": "beleg",
                           "payment_hash": "aa"}}
@@ -2226,6 +2243,8 @@ class LndVollstaendig(FakeLnd):
                 roh = bytes.fromhex("ab" * 32)[::-1]
                 return {"funding_txid_bytes": b64.b64encode(roh).decode(),
                         "output_index": 0}
+            if self.kanaele_roh is not None:
+                return {"channels": list(self.kanaele_roh)}
             return {"channels": [{"active": True, "peer_alias": "ACINQ",
                                   "capacity": "5000000",
                                   "local_balance": "2000000",
@@ -6192,6 +6211,103 @@ def test_die_pin_steht_vor_dem_umschichten(client, lnd_voll, monkeypatch):
         "von": "12345", "nach": KENNUNG66, "betrag": 50_000})
     assert a.status_code == 403
     assert a.json()["detail"]["meldung"] == "pin_noetig"
+
+
+# ── Umschichten: Grenze vorher, Ergebnis danach (24.09.2026) ───────────────
+#
+# Aus dem Betrieb: ein Umschichten ueber einen LDK-Kanal -- nach 80 Sekunden
+# "keine Antwort", Knopf gesperrt, und der Grund stand nur im LND-Protokoll
+# ("MPPTimeout@3"). LDK nimmt je Kanal nur 25 % gleichzeitig an.
+
+# Ausgedachte Werte, keine echten -- nur die 25 % von LDK sind wie in echt.
+KANAL_LDK = {"active": True, "chan_id": "12345", "peer_alias": "LDK-Beispiel",
+             "remote_pubkey": "03" + "cd" * 32, "capacity": "200000",
+             "local_balance": "180000", "remote_balance": "0",
+             "local_constraints": {"max_pending_amt_msat": "50000000"}}
+KANAL_CLN = {"active": True, "chan_id": "67890", "peer_alias": "CLN-Beispiel",
+             "remote_pubkey": KENNUNG66, "capacity": "150000",
+             "local_balance": "0", "remote_balance": "140000"}
+
+
+def _ring(lnd_voll):
+    lnd_voll.kanaele_roh = [KANAL_LDK, KANAL_CLN]
+
+
+def test_ueber_der_grenze_geht_das_umschichten_gar_nicht_erst_los(
+        client, lnd_voll, monkeypatch):
+    """Ein Versuch, der sicher scheitert, sperrt den Knopf und haelt das
+    Geld in der Schwebe -- dann lieber vorher sagen, was geht."""
+    _kanalbereit(client, monkeypatch)
+    _ring(lnd_voll)
+    a = client.post("/api/lightning/umschichten", json={
+        "von": "12345", "nach": KENNUNG66, "betrag": 50_000, "pin": PIN})
+    assert a.status_code == 400, a.text
+    d = a.json()["detail"]
+    assert d["meldung"] == "umschichten_ueber_grenze"
+    assert d["name"] == "LDK-Beispiel" and d["grenze"] == 50_000
+    assert d["hoechstens"] + lnd_modul_gebuehrgrenze(d["hoechstens"]) <= 50_000
+    assert lnd_voll.gezahlt is None, "es wurde trotzdem gezahlt"
+
+
+def lnd_modul_gebuehrgrenze(betrag):
+    from satcortex import lnd as lnd_modul
+    return lnd_modul.gebuehrgrenze(betrag)
+
+
+def test_auch_ueber_der_grenze_kommt_die_pin_zuerst(client, lnd_voll,
+                                                     monkeypatch):
+    """AGENTS.md: die PIN wird vor allem anderen geprueft -- auch vor der
+    Grenze. Sonst verriete eine uebernommene Sitzung ohne PIN, wie viel
+    ueber welchen Kanal geht."""
+    _kanalbereit(client, monkeypatch)
+    _ring(lnd_voll)
+    a = client.post("/api/lightning/umschichten", json={
+        "von": "12345", "nach": KENNUNG66, "betrag": 50_000})
+    assert a.status_code == 403
+    assert a.json()["detail"]["meldung"] == "pin_noetig"
+
+
+def test_bleibt_die_antwort_aus_kommt_die_kennung_mit(client, lnd_voll,
+                                                      monkeypatch):
+    _kanalbereit(client, monkeypatch)
+    _ring(lnd_voll)
+    lnd_voll.zahl_meldungen = [{"result": {"status": "IN_FLIGHT"}},
+                               "ausbleiben"]
+    a = client.post("/api/lightning/umschichten", json={
+        "von": "12345", "nach": KENNUNG66, "betrag": 20_000, "pin": PIN})
+    assert a.status_code == 504, a.text
+    d = a.json()["detail"]
+    assert d["meldung"] == "umschichten_unklar"
+    assert d["kennung"] == "cd" * 32
+    assert lnd_voll.gezahlt is not None
+
+
+def test_das_ergebnis_laesst_sich_ohne_pin_abwarten(client, lnd_voll,
+                                                    monkeypatch):
+    """Nur lesend: es wird zugehoert, bewegt wird nichts."""
+    _kanalbereit(client, monkeypatch)
+    lnd_voll.verfolg_meldungen = [
+        {"result": {"status": "IN_FLIGHT"}},
+        {"result": {"status": "SUCCEEDED", "value_sat": "20000",
+                    "fee_sat": "2"}}]
+    r = client.get("/api/lightning/umschichten/abwarten?kennung=" + "cd" * 32)
+    assert r.status_code == 200, r.text
+    assert r.json() == {"zustand": "angekommen", "betrag": 20_000,
+                        "gebuehr": 2, "grund": ""}
+    assert lnd_voll.verfolgt.startswith("/v2/router/track/")
+
+    lnd_voll.verfolg_meldungen = [{"result": {
+        "status": "FAILED", "failure_reason": "FAILURE_REASON_TIMEOUT"}}]
+    r = client.get("/api/lightning/umschichten/abwarten?kennung=" + "cd" * 32)
+    assert r.json()["zustand"] == "gescheitert"
+
+
+def test_eine_unbrauchbare_kennung_ist_eine_klare_absage(client, lnd_voll,
+                                                         monkeypatch):
+    _kanalbereit(client, monkeypatch)
+    r = client.get("/api/lightning/umschichten/abwarten?kennung=nix")
+    assert r.status_code == 400
+    assert r.json()["detail"]["meldung"] == "zahlung_unbekannt"
 
 
 def test_die_pin_steht_vor_dem_schliessen(client, lnd_voll, monkeypatch):

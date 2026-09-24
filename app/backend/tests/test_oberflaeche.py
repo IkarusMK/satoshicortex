@@ -1890,6 +1890,58 @@ def test_jede_lage_des_servers_hat_ihren_satz(js):
         assert f"{lage}: " in tabelle or f'"{lage}"' in tabelle, lage
 
 
+# ── Umschichten: Grenze vorher, Ergebnis danach (24.09.2026) ───────────────
+#
+# Aus dem Betrieb: ein Umschichten ueber einen Kanal zu einem LDK-Knoten (der
+# nimmt nur 25 % der Kapazitaet gleichzeitig an) -- "keine Antwort", Knopf gesperrt bis zum
+# Neuladen, und wie es ausging stand nur im LND-Protokoll.
+
+def _block(js, anfang):
+    stelle = js.index(anfang)
+    return _ohne_js_kommentare(js[stelle:js.index("\n}\n", stelle)])
+
+
+def test_die_grenze_wird_vor_dem_versuch_geprueft(js):
+    block = _block(js, "async function umschichten(")
+    assert "umschichtenGrenze(" in block
+    assert block.index("umschichtenGrenze(") < block.index(
+        'api("/lightning/umschichten"'), "erst pruefen, dann losschicken"
+
+
+def test_ohne_antwort_sieht_die_app_selbst_nach(js):
+    block = _block(js, "async function umschichten(")
+    fang = block[block.index("catch (e)"):]
+    assert 'd.meldung === "umschichten_unklar"' in fang
+    assert "umschichtenVerfolgen(d.kennung)" in fang
+    # Waehrend nachgesehen wird, bleibt der Knopf zu.
+    zweig = fang[fang.index('d.meldung === "umschichten_unklar"'):]
+    zweig = zweig[:zweig.index("}")]
+    assert "wiederFrei = false" in zweig
+
+
+def test_der_knopf_geht_erst_bei_einem_ergebnis_wieder_auf(js):
+    block = _block(js, "async function umschichtenVerfolgen(")
+    assert ('api("/lightning/umschichten/abwarten?kennung="' in block
+            and "FRIST_WARTEN_MS" in block)
+    assert block.count("knopf.disabled = false") == 2
+    for zustand in ('d.zustand === "angekommen"', 'd.zustand === "gescheitert"'):
+        zweig = block[block.index(zustand):]
+        zweig = zweig[:zweig.index("return;")]
+        assert "knopf.disabled = false" in zweig, zustand
+
+
+def test_jeder_grund_von_lnd_hat_einen_satz(js):
+    """Die Gruende aus router.swagger.json (v0.21.3-beta), ausser NONE."""
+    stelle = js.index("const US_GRUENDE = {")
+    tabelle = js[stelle:js.index("};", stelle)]
+    for grund in ("FAILURE_REASON_TIMEOUT", "FAILURE_REASON_NO_ROUTE",
+                  "FAILURE_REASON_ERROR",
+                  "FAILURE_REASON_INCORRECT_PAYMENT_DETAILS",
+                  "FAILURE_REASON_INSUFFICIENT_BALANCE",
+                  "FAILURE_REASON_CANCELED"):
+        assert grund in tabelle, grund
+
+
 # ── Die Kettenzeile im Lightning-Kasten (24.09.2026) ───────────────────────
 #
 # Aus dem Betrieb: "bei lightning rechts im kasten steht immer noch kann
