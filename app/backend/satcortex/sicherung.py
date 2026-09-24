@@ -39,7 +39,7 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Iterable, Optional
 
 log = logging.getLogger(__name__)
 
@@ -96,14 +96,33 @@ DEUTUNG_BEIM_HOLEN = {
 }
 
 
-def pruefsumme(blob: str) -> str:
-    """Woran erkannt wird, dass sich etwas geaendert hat.
+# Wie lange eine abgelegte Sicherung auch OHNE Kanalaenderung gilt. Der
+# Fingerabdruck unten ist die Liste der Kanaele -- was sonst in der Datei
+# steht, deckt er nicht ab. Deshalb geht sie spaetestens nach einem Tag neu
+# hinaus, auch wenn sich an den Kanaelen nichts getan hat.
+AUFFRISCHEN_SEKUNDEN = 24 * 60 * 60
 
-    Ueber den entschluesselten Inhalt laesst sich das nicht sagen -- wir sehen
-    nur den verschluesselten Klumpen. Der aendert sich aber bei jeder
-    Kanalaenderung, und mehr braucht es nicht.
+
+def inhalt(punkte: Iterable[str]) -> str:
+    """Woran erkannt wird, dass sich etwas geaendert hat: WELCHE Kanaele
+    die Sicherung abdeckt.
+
+    DER BEFUND VOM 24.09.2026, aus dem Betrieb: "Rueckstand: dein Knoten hat
+    2 Kanaele, abgelegt wurde zuletzt ein aelterer Stand ... aber er solte
+    doch bei aenderungen selbst eine sicherung machen".
+
+    Bis dahin stand hier die Pruefsumme des verschluesselten Klumpens. Den
+    verschluesselt LND aber bei JEDER Ausfuhr mit einer frischen Zufallszahl
+    (lnencrypt/crypto.go, v0.21.3-beta: rand.Read(nonce[:])) -- dieselben
+    Kanaele ergeben jedes Mal einen anderen Klumpen. Er glich nie dem
+    abgelegten: der Kasten meldete bei offenen Kanaelen immer Rueckstand, und
+    der Waechter lud bei jedem Durchgang neu hoch. Die Attrappe im Pruefstand
+    lieferte immer denselben Klumpen und verbarg es.
+
+    Die Kanalpunkte dagegen liefert LND im Klartext mit, sortiert wird hier.
     """
-    return hashlib.sha256((blob or "").encode("utf-8")).hexdigest()
+    return hashlib.sha256(
+        "\n".join(sorted(punkte)).encode("utf-8")).hexdigest()
 
 
 class Stand:
@@ -194,20 +213,39 @@ def hole_ab(url: str, benutzer: str, passwort: str,
     return base64.b64encode(roh).decode()
 
 
-def faellig(stand: Dict, blob: str) -> bool:
-    """Hat sich seit der letzten Sicherung etwas geaendert?"""
-    return bool(blob) and stand.get("pruefsumme") != pruefsumme(blob)
+def deckt_ab(stand: Dict, punkte: Iterable[str]) -> bool:
+    """Liegen alle Kanaele, die es jetzt gibt, in der abgelegten Sicherung?"""
+    return bool(stand.get("inhalt")) and stand.get("inhalt") == inhalt(punkte)
 
 
-def vermerke(stand_ablage: Stand, blob: str, kanaele: int,
-             ziel: str, fehler: str = "") -> Dict:
-    wert = {
-        "pruefsumme": pruefsumme(blob) if not fehler else
-                      (stand_ablage.laden().get("pruefsumme") or ""),
-        "kanaele": kanaele,
-        "zeitpunkt": time.time(),
-        "ziel": ziel,
-        "fehler": fehler,
-    }
+def faellig(stand: Dict, blob: str, punkte: Iterable[str],
+            jetzt: Optional[float] = None) -> bool:
+    """Muss sie (wieder) hinaus? Bei anderen Kanaelen, oder nach einem Tag."""
+    if not blob:
+        return False
+    if not deckt_ab(stand, punkte):
+        return True
+    zuletzt = float(stand.get("zeitpunkt") or 0)
+    jetzt = time.time() if jetzt is None else jetzt
+    return jetzt - zuletzt >= AUFFRISCHEN_SEKUNDEN
+
+
+def vermerke(stand_ablage: Stand, punkte: Iterable[str], kanaele: int,
+             ziel: str, fehler: str = "",
+             jetzt: Optional[float] = None) -> Dict:
+    """Festhalten, was abgelegt wurde -- oder dass es nicht klappte.
+
+    Ein Fehlschlag laesst den letzten GUTEN Stand stehen: Fingerabdruck,
+    Zeitpunkt, Kanalzahl. Sonst gaelte beim naechsten Durchgang alles als
+    erledigt, und "zuletzt abgelegt am" hiesse den Fehlversuch.
+    """
+    jetzt = time.time() if jetzt is None else jetzt
+    if fehler:
+        wert = {k: v for k, v in stand_ablage.laden().items()
+                if k in ("inhalt", "kanaele", "zeitpunkt")}
+        wert.update(ziel=ziel, fehler=fehler, versucht=jetzt)
+    else:
+        wert = {"inhalt": inhalt(punkte), "kanaele": kanaele,
+                "zeitpunkt": jetzt, "ziel": ziel, "fehler": ""}
     stand_ablage.speichern(wert)
     return wert

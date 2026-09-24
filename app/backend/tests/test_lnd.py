@@ -325,6 +325,22 @@ def test_nichts_im_aufbau_heisst_leere_liste():
     assert lnd.ausstehende_kanaele(FakeRuf({})) == []
 
 
+def test_die_sicherung_nennt_ihre_kanaele_lesbar():
+    """Die Kanalpunkte sind der Fingerabdruck der Sicherung (der Klumpen ist
+    bei jeder Ausfuhr ein anderer). funding_txid_bytes steht in interner
+    Reihenfolge -- rueckwaerts zu dem, was ein Explorer zeigt."""
+    import base64 as b64
+    txid = "0123456789abcdef" * 4
+    roh = b64.b64encode(bytes.fromhex(txid)[::-1]).decode()
+    k = FakeRuf({"/v1/channels/backup": {"multi_chan_backup": {
+        "multi_chan_backup": "AAAA",
+        "chan_points": [{"funding_txid_bytes": roh, "output_index": 1},
+                        {"funding_txid_str": "ab" * 32}]}}})
+    d = lnd.sicherung_holen(k)
+    assert d["punkte"] == [f"{txid}:1", "ab" * 32 + ":0"]
+    assert d["kanaele"] == 2
+
+
 def test_guthaben_zaehlt_kette_und_kanaele_nicht_zusammen():
     """Was in einem Kanal liegt, ist gebunden. Was auf der ANDEREN Seite
     liegt, ist gar nicht deins -- aber genau das, was du empfangen kannst."""

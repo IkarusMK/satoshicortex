@@ -492,7 +492,25 @@ def sicherung_holen(knoten: Knoten) -> Dict[str, Any]:
     multi = antwort.get("multi_chan_backup") or {}
     blob = multi.get("multi_chan_backup") or ""
     punkte = multi.get("chan_points") or []
-    return {"blob": blob, "kanaele": len(punkte)}
+    # Die Kanalpunkte lesbar -- sie sind der Fingerabdruck der Sicherung,
+    # denn der Klumpen selbst ist bei jeder Ausfuhr ein anderer (siehe
+    # sicherung.inhalt).
+    return {"blob": blob, "kanaele": len(punkte),
+            "punkte": [_kanalpunkt(p) for p in punkte]}
+
+
+def _kanalpunkt(punkt: Any) -> str:
+    """Ein lnrpcChannelPoint als "txid:ausgang".
+
+    REST liefert die txid als funding_txid_bytes (base64, interne
+    Reihenfolge) oder als funding_txid_str -- lightning.swagger.json,
+    v0.21.3-beta.
+    """
+    if not isinstance(punkt, dict):
+        return str(punkt)
+    txid = (str(punkt.get("funding_txid_str") or "")
+            or _txid_lesbar(punkt.get("funding_txid_bytes") or ""))
+    return f"{txid}:{_zahl(punkt.get('output_index'))}"
 
 
 def sicherung_kanalpunkte(knoten: Knoten, blob: str) -> List[str]:

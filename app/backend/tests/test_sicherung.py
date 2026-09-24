@@ -138,28 +138,60 @@ def test_ein_schraegstrich_zu_viel_macht_keinen_unterschied(ziel):
         z.anfragen[0]["pfad"].endswith("/channel.backup")
 
 
-def test_faellig_ist_nur_was_sich_geaendert_hat():
-    assert sicherung.faellig({}, BLOB) is True
-    assert sicherung.faellig({"pruefsumme": sicherung.pruefsumme(BLOB)}, BLOB) is False
-    assert sicherung.faellig({"pruefsumme": "etwas anderes"}, BLOB) is True
+PUNKTE = ["aa" * 32 + ":0", "bb" * 32 + ":1"]
+
+
+def test_faellig_ist_nur_was_sich_geaendert_hat(tmp_path):
+    """Gemessen an den KANAELEN, nicht am verschluesselten Klumpen: den
+    verschluesselt LND bei jeder Ausfuhr mit einer frischen Zufallszahl neu
+    (lnencrypt/crypto.go, v0.21.3-beta). Befund vom 24.09.2026."""
+    stand = sicherung.Stand(str(tmp_path))
+    assert sicherung.faellig({}, BLOB, PUNKTE) is True
+    sicherung.vermerke(stand, PUNKTE, 2, "http://ziel")
+    neu_verschluesselt = base64.b64encode(b"gleiche-kanaele-andere-nonce").decode()
+    assert sicherung.faellig(stand.laden(), neu_verschluesselt,
+                             list(reversed(PUNKTE))) is False
+    assert sicherung.deckt_ab(stand.laden(), PUNKTE) is True
+    assert sicherung.faellig(stand.laden(), BLOB,
+                             PUNKTE + ["cc" * 32 + ":0"]) is True
     # Ohne Sicherung gibt es nichts zu tun -- und schon gar keinen Grund,
     # eine leere Datei ueber die alte zu schreiben.
-    assert sicherung.faellig({}, "") is False
+    assert sicherung.faellig({}, "", []) is False
 
 
-def test_ein_fehlschlag_ueberschreibt_die_letzte_gute_pruefsumme_nicht(tmp_path):
-    """Sonst gaelte beim naechsten Durchgang alles als erledigt -- und die
-    Sicherung, die nie ankam, waere still abgehakt."""
+def test_nach_einem_tag_ist_sie_auch_ohne_aenderung_faellig(tmp_path):
     stand = sicherung.Stand(str(tmp_path))
-    sicherung.vermerke(stand, BLOB, 3, "http://ziel")
-    gut = stand.laden()["pruefsumme"]
+    d = sicherung.vermerke(stand, PUNKTE, 2, "http://ziel", jetzt=1000.0)
+    grenze = 1000.0 + sicherung.AUFFRISCHEN_SEKUNDEN
+    assert sicherung.faellig(d, BLOB, PUNKTE, jetzt=grenze - 1) is False
+    assert sicherung.faellig(d, BLOB, PUNKTE, jetzt=grenze) is True
+    # Auf dem Stand ist sie trotzdem -- es fehlt ja kein Kanal.
+    assert sicherung.deckt_ab(d, PUNKTE) is True
 
-    neu = base64.b64encode(b"ein-vierter-kanal-kam-dazu").decode()
-    sicherung.vermerke(stand, neu, 4, "http://ziel", fehler="401: Unauthorized")
+
+def test_ein_fehlschlag_ueberschreibt_den_letzten_guten_stand_nicht(tmp_path):
+    """Sonst gaelte beim naechsten Durchgang alles als erledigt -- und die
+    Sicherung, die nie ankam, waere still abgehakt. Auch der Zeitpunkt
+    bleibt: "zuletzt abgelegt am" hiesse sonst den Fehlversuch."""
+    stand = sicherung.Stand(str(tmp_path))
+    gut = sicherung.vermerke(stand, PUNKTE, 2, "http://ziel", jetzt=1000.0)
+
+    mehr = PUNKTE + ["cc" * 32 + ":0"]
+    sicherung.vermerke(stand, mehr, 3, "http://ziel",
+                       fehler="401: Unauthorized", jetzt=2000.0)
     d = stand.laden()
-    assert d["pruefsumme"] == gut
-    assert d["fehler"]
-    assert sicherung.faellig(d, neu) is True, "der Rueckstand muss bestehen bleiben"
+    assert d["inhalt"] == gut["inhalt"]
+    assert d["zeitpunkt"] == 1000.0 and d["kanaele"] == 2
+    assert d["fehler"] and d["versucht"] == 2000.0
+    assert sicherung.faellig(d, BLOB, mehr) is True, (
+        "der Rueckstand muss bestehen bleiben")
+
+
+def test_ein_erster_fehlschlag_ist_kein_abgelegter_stand(tmp_path):
+    """Sonst zeigte der Kasten "Rueckstand" statt "noch nie gesichert"."""
+    stand = sicherung.Stand(str(tmp_path))
+    d = sicherung.vermerke(stand, PUNKTE, 2, "http://ziel", fehler="kaputt")
+    assert "zeitpunkt" not in d and d["fehler"] == "kaputt"
 
 
 # ── Zurueckholen ──────────────────────────────────────────────────────────

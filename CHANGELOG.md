@@ -4,6 +4,29 @@ All notable changes to SatoshiCortex. Format loosely after
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning after
 [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed: the channel backup always reported "behind"
+
+With channels open, the *Channel backup* box always said the stored copy was
+behind — "your node has 2 channels, an older state was stored last" — even
+though the backup had just been uploaded.
+
+The app decided "has anything changed?" by a checksum of the encrypted backup.
+LND encrypts every export with a fresh random nonce (`lnencrypt/crypto.go`,
+v0.21.3-beta), so the same channels produce a different file each time. The
+checksum never matched: the box reported a backlog that did not exist, and the
+background job uploaded the backup again on every round, every few minutes. The
+test double had always returned the same bytes, which hid it.
+
+What counts now is **which channels** the backup covers: LND lists their
+channel points in plain text next to the encrypted file. The backup goes out
+when that set changes, and at least once a day regardless, since the channel
+list does not cover everything else in the file. A failed upload no longer
+overwrites the time of the last good one, and a first attempt that fails now
+reads "never backed up" instead of "behind". The test double now encrypts
+every export differently, like LND.
+
 ## [1.2.3] — 2026-09-24
 
 ### Fixed: no PIN field when opening a channel

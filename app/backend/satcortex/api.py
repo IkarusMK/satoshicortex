@@ -3066,10 +3066,10 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         except (lnd.NichtErreichbar, lnd.LndFehler):
             return
         alt = sicherungsstand.laden()
-        if not sicherung.faellig(alt, d["blob"]):
+        if not sicherung.faellig(alt, d["blob"], d["punkte"]):
             return
         fehler = sicherung_hochladen(d["blob"])
-        sicherung.vermerke(sicherungsstand, d["blob"], d["kanaele"],
+        sicherung.vermerke(sicherungsstand, d["punkte"], d["kanaele"],
                            sicherungsziel()["url"], fehler)
         if fehler:
             log.warning("Kanalsicherung konnte nicht abgelegt werden: %s", fehler)
@@ -3095,7 +3095,7 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         # der Knoten jetzt hat. Ohne Kanaele gibt es nichts zu sichern -- das
         # ist dann auch kein Rueckstand.
         antwort["aktuell"] = (d["kanaele"] == 0
-                              or not sicherung.faellig(antwort["stand"], d["blob"]))
+                              or sicherung.deckt_ab(antwort["stand"], d["punkte"]))
         return antwort
 
     @api.get("/lightning/sicherung/datei", dependencies=geschuetzt)
@@ -3212,7 +3212,7 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
 
         storage.schreibe_geheimnis(str(pfad), wahl.passwort)
         zustand.merke_sicherungsziel({"url": wahl.url, "benutzer": wahl.benutzer})
-        stand = sicherung.vermerke(sicherungsstand, d["blob"], d["kanaele"],
+        stand = sicherung.vermerke(sicherungsstand, d["punkte"], d["kanaele"],
                                    wahl.url)
         return {"ok": True, "ziel": {"url": wahl.url, "benutzer": wahl.benutzer},
                 "stand": stand}

@@ -1863,12 +1863,30 @@ class LndMitKanaelen(FakeLnd):
         # eine heile Sicherung, die zu alt ist.
         self.abgedeckt = abgedeckt
         self.geprueft = None
+        self.ausfuhren = 0
+        self.letzter_blob = None
 
     def ruf(self, pfad, macaroon="readonly", daten=None, zeitlimit=None):
         if pfad == "/v1/channels/backup":
+            # WIE LND: jede Ausfuhr wird mit einer frischen Zufallszahl
+            # verschluesselt (lnencrypt/crypto.go, v0.21.3-beta) -- derselbe
+            # Inhalt ergibt jedes Mal einen anderen Klumpen. Die Attrappe
+            # lieferte bis zum 24.09.2026 immer denselben, und genau das
+            # verbarg, dass der Kasten am echten Knoten immer "Rueckstand"
+            # meldete.
+            self.ausfuhren += 1
+            blob = self.blob
+            if blob:
+                roh = self.ausfuhren.to_bytes(24, "big") + _b64.b64decode(blob)
+                blob = _b64.b64encode(roh).decode()
+            self.letzter_blob = blob
+            # Und die Kanalpunkte in LNDs REST-Form (lnrpcChannelPoint).
             return {"multi_chan_backup": {
-                "multi_chan_backup": self.blob,
-                "chan_points": [{"x": n} for n in range(self.kanaele)]}}
+                "multi_chan_backup": blob,
+                "chan_points": [
+                    {"funding_txid_bytes":
+                         _b64.b64encode(bytes([n + 1]) * 32).decode(),
+                     "output_index": n} for n in range(self.kanaele)]}}
         if pfad == "/v1/channels/backup/verify":
             self.geprueft = daten
             if not self.heil:
@@ -1947,7 +1965,9 @@ def test_die_sicherung_laesst_sich_herunterladen(client, lnd_kanaele):
     _richte_ein(client)
     r = client.get("/api/lightning/sicherung/datei")
     assert r.status_code == 200
-    assert r.content == b"so-sieht-eine-kanalsicherung-aus"
+    # Genau das, was LND bei dieser Ausfuhr herausgab.
+    assert r.content == _b64.b64decode(lnd_kanaele.letzter_blob)
+    assert r.content.endswith(b"so-sieht-eine-kanalsicherung-aus")
     assert "channel.backup" in r.headers["content-disposition"]
 
 
@@ -2061,6 +2081,49 @@ def test_der_waechter_sichert_nur_bei_aenderung(client, lnd_kanaele, monkeypatch
     client.app.state.sicherung_nachziehen()
     assert len(hoch) == 2
     assert client.get("/api/lightning/sicherung").json()["stand"]["kanaele"] == 4
+
+
+def test_nach_dem_ablegen_ist_die_sicherung_auf_dem_stand(client, lnd_kanaele,
+                                                          monkeypatch):
+    """DER BEFUND VOM 24.09.2026, aus dem Betrieb: "Rueckstand: dein Knoten hat
+    2 Kanaele, abgelegt wurde zuletzt ein aelterer Stand ... aber er solte
+    doch bei aenderungen selbst eine sicherung machen".
+
+    Er tat es -- sogar bei JEDEM Durchgang. Verglichen wurde die Pruefsumme
+    des verschluesselten Klumpens, und den verschluesselt LND bei jeder
+    Ausfuhr neu. Er glich nie dem abgelegten: der Kasten meldete immer
+    Rueckstand, und der Waechter lud alle paar Minuten hoch."""
+    from satcortex import sicherung as modul
+    _richte_ein(client)
+    hoch = []
+    monkeypatch.setattr(modul, "lade_hoch",
+                        lambda blob, url, b, p, **kw: hoch.append(blob))
+    client.post("/api/lightning/sicherung/ziel", json={
+        "url": "https://cloud.example/dav", "benutzer": "s", "passwort": "p"})
+    for _ in range(3):
+        client.app.state.sicherung_nachziehen()
+        d = client.get("/api/lightning/sicherung").json()
+        assert d["aktuell"] is True, "gleiche Kanaele galten als Rueckstand"
+    assert len(hoch) == 1
+
+
+def test_einmal_am_tag_geht_sie_trotzdem_hoch(client, lnd_kanaele,
+                                              monkeypatch):
+    """Die Kanalliste ist der Fingerabdruck -- was sonst in der Sicherung
+    steht, deckt er nicht ab. Deshalb spaetestens nach einem Tag neu."""
+    from satcortex import sicherung as modul
+    _richte_ein(client)
+    hoch = []
+    monkeypatch.setattr(modul, "lade_hoch",
+                        lambda blob, url, b, p, **kw: hoch.append(blob))
+    client.post("/api/lightning/sicherung/ziel", json={
+        "url": "https://cloud.example/dav", "benutzer": "s", "passwort": "p"})
+    stand = modul.Stand(str(client.tmp / "config"))
+    alt = stand.laden()
+    stand.speichern({**alt, "zeitpunkt": alt["zeitpunkt"]
+                     - modul.AUFFRISCHEN_SEKUNDEN - 1})
+    client.app.state.sicherung_nachziehen()
+    assert len(hoch) == 2
 
 
 def test_ein_rueckstand_bleibt_sichtbar_wenn_das_ziel_streikt(client, lnd_kanaele,
