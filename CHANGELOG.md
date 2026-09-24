@@ -4,7 +4,7 @@ All notable changes to SatoshiCortex. Format loosely after
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning after
 [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [1.2.4] — 2026-09-24
 
 ### Fixed: the channel backup always reported "behind"
 
