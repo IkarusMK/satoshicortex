@@ -4,6 +4,24 @@ All notable changes to SatoshiCortex. Format loosely after
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning after
 [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed: no PIN field when opening a channel
+
+With a transaction PIN set up, **Lightning → Channels** asked for it but showed
+no field to type it into: "That needs your PIN." and nowhere to enter it.
+
+The PIN field only appears once the interface has asked the server whether a
+PIN exists. The Wallet, Setup and Settings views asked; the Channels view never
+did. Anyone who went there straight after signing in could not open, close or
+rebalance a channel. Visiting one of the other views first made the field
+appear, which is why it went unnoticed.
+
+The Channels view now asks as well. And when the server answers "PIN needed",
+the interface re-reads the PIN state, so the field appears even if the PIN was
+set up in another tab. A test now derives the list from the page itself: every
+view that contains a PIN field must ask, not just the ones someone remembered.
+
 ## [1.2.2] — 2026-09-23
 
 ### Added: signed build provenance for every image

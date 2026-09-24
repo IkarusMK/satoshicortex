@@ -1805,6 +1805,51 @@ def test_die_sperre_sagt_wie_lange_noch(js):
     assert 't("pin_stand_gesperrt", { sekunden: d.wartet_noch })' in block
 
 
+def _ohne_js_kommentare(teil):
+    ohne = re.sub(r"/\*.*?\*/", " ", teil, flags=re.S)
+    return re.sub(r"(?<!:)//[^\n]*$", " ", ohne, flags=re.M)
+
+
+def test_jede_ansicht_mit_pin_feld_fragt_ob_eine_pin_da_ist(html, js):
+    """DER BEFUND VOM 24.09.2026, aus dem Betrieb: "wenn ich auf kanal
+    oeffnen druecke sagt er mir ich brauche einen PIN und kann niergends
+    einen eintragen".
+
+    Das Feld erscheint nur, wenn pinLaden() vorher gelaufen ist. Die
+    Kanal-Ansicht rief es nie auf -- wer nach dem Anmelden direkt dorthin
+    ging, sah kein Feld, schickte keine PIN und bekam "Dafuer braucht es
+    deine PIN." Geprueft wird deshalb nicht eine Liste von Hand, sondern
+    jede Ansicht, in der tatsaechlich ein PIN-Feld steht.
+    """
+    abschnitte = list(re.finditer(r'<section[^>]*data-ansicht="([^"]+)"',
+                                  html))
+    ansichten = set()
+    for feld in re.finditer(r'id="([\w-]+-pin-zeile)"', html):
+        davor = [a for a in abschnitte if a.start() < feld.start()]
+        ansichten.add(davor[-1].group(1))
+    assert {"ln-wallet", "ln-kanaele", "ln-einrichtung"} <= ansichten
+
+    stelle = js.index("function zeigeAnsicht(")
+    wechsel = _ohne_js_kommentare(js[stelle:js.index("\n}\n", stelle)])
+    for ansicht in sorted(ansichten):
+        anfang = wechsel.index(f'if (name === "{ansicht}")')
+        zweig = wechsel[anfang:wechsel.index("\n  }", anfang)]
+        assert "pinLaden();" in zweig, (
+            f"Ansicht {ansicht} hat ein PIN-Feld, fragt aber nie, ob eine "
+            "PIN eingerichtet ist -- das Feld bliebe versteckt")
+
+
+def test_verlangt_der_server_die_pin_erscheint_das_feld(js):
+    """Die zweite Sicherung: ist der Stand in der Oberflaeche veraltet --
+    PIN in einem anderen Reiter eingerichtet --, sagt der Server
+    "pin_noetig". Dann den Stand neu holen, damit das Feld auftaucht und
+    die Meldung nicht vor einem Formular ohne Feld steht."""
+    stelle = js.index("function geldfehler(")
+    block = _ohne_js_kommentare(js[stelle:js.index("\n}\n", stelle)])
+    assert 'd.meldung === "pin_noetig"' in block
+    assert "pinLaden();" in block
+
+
 # ── Senden an der Oberflaeche ──────────────────────────────────────────────
 #
 # Die Bedingung des Betreibers vom 30.08.2026: "ich werde nix dahin ueberweisen solange

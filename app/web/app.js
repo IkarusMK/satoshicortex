@@ -2511,6 +2511,11 @@ function geldfehler(e, meldung, unklar) {
   }
   const d = (e && e.detail) || {};
   meldung.textContent = d.meldung ? t(d.meldung, d) : t("e_fehler");
+  // Der Server verlangt eine PIN, die Oberflaeche wusste nichts davon --
+  // etwa weil sie in einem anderen Reiter eingerichtet wurde. Dann den
+  // Stand neu holen: das Feld erscheint, und die Meldung steht nicht vor
+  // einem Formular, in das man sie gar nicht eintragen kann.
+  if (d.meldung === "pin_noetig") pinLaden();
   return true;
 }
 // Die Erreichbarkeitsmessung baut echte Verbindungen ueber Tor auf: je
@@ -5514,6 +5519,11 @@ function zeigeAnsicht(name) {
     ladeLightning(true); ladeLightningKanaele(); wachtuermeLaden();
     ladeWegwissen();
     durchgangLaden();
+    // Oeffnen, Schliessen und Umschichten fragen hier nach der PIN.
+    // DER BEFUND VOM 24.09.2026: dieser Aufruf fehlte. Wer nach dem
+    // Anmelden direkt hierher kam, sah kein Feld und bekam trotzdem
+    // "Dafuer braucht es deine PIN."
+    pinLaden();
   }
   if (name === "ln-knoten") ladeLightningKanaele();
   if (name === "ln-einrichtung") {
