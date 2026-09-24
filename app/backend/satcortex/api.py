@@ -3893,7 +3893,56 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
             log.info("Bewegungen nicht abrufbar: %s", fehler)
             return {"bereit": True, "bewegungen": [], "weitere": 0,
                     "fehler": True}
-        return {"bereit": True, **d}
+        return {"bereit": True, **d,
+                "bewegungen": mit_wartelage(d["bewegungen"])}
+
+    def mit_wartelage(bewegungen: List[Dict]) -> List[Dict]:
+        """Zu jeder wartenden Ausgabe: haengt sie, oder wartet sie nur?
+
+        DER BEFUND VOM 24.09.2026 -- die Begruendung steht bei
+        cluster.wartelage. Gefragt wird der eigene bitcoind, und nur nach
+        den unbestaetigten Ausgaben; bestaetigte gehen ihn nichts an.
+        Antwortet er nicht, heisst die Lage "unklar" -- die Bewegungen
+        erscheinen trotzdem.
+        """
+        wartende = {b["txid"] for b in bewegungen
+                    if b["betrag_sat"] < 0 and not b["bestaetigungen"]}
+        if not wartende:
+            return bewegungen
+        # Derselbe Satz, auf den das Nachbessern hebt -- sonst verglichen
+        # wir mit einer Zahl, die der Knopf gar nicht benutzt.
+        try:
+            noetig: Optional[int] = sendesatz("schnell")
+        except HTTPException:
+            noetig = None
+        knoten = knotenverbindung()
+        try:
+            hoehe: Optional[int] = int(knoten.ruf("getblockcount"))
+        except (rpc.NichtErreichbar, rpc.Beschaeftigt, rpc.RpcFehler,
+                TypeError, ValueError) as fehler:
+            log.info("Wartelage nicht bestimmbar: %s", fehler)
+            hoehe = None
+        lagen: Dict[str, Dict] = {}
+        for txid in wartende:
+            lagen[txid] = {"lage": "unklar"}
+            if hoehe is None:
+                continue
+            try:
+                eintrag = knoten.ruf("getmempoolentry", txid)
+            except rpc.RpcFehler as fehler:
+                # Core: RPC_INVALID_ADDRESS_OR_KEY, "Transaction not in
+                # mempool" (src/rpc/mempool.cpp, v31.1). Alles andere ist
+                # eine Abfuhr aus anderem Grund -- dann nicht raten.
+                if "not in mempool" not in str(fehler):
+                    continue
+                eintrag = None
+            except (rpc.NichtErreichbar, rpc.Beschaeftigt):
+                continue
+            if eintrag is not None and not isinstance(eintrag, dict):
+                continue
+            lagen[txid] = mempoolcluster.wartelage(eintrag, hoehe, noetig)
+        return [{**b, "warten": lagen[b["txid"]]} if b["txid"] in lagen
+                else b for b in bewegungen]
 
     @api.get("/lightning/wachtuerme", dependencies=geschuetzt)
     def wachtuerme_lesen() -> Dict:

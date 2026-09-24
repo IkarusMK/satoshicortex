@@ -6149,6 +6149,93 @@ def test_die_wallet_zeigt_ihre_bewegungen(client, lnd_da):
     assert d["weitere"] == 0
 
 
+def _wartende_bewegung(lnd_da):
+    lnd_da.bewegungen_roh = [
+        {"tx_hash": "aa" * 32, "amount": "30000", "num_confirmations": 3,
+         "block_height": 900000, "time_stamp": "1757900000",
+         "total_fees": "0", "label": ""},
+        {"tx_hash": "bb" * 32, "amount": "-100141", "num_confirmations": 0,
+         "block_height": 0, "time_stamp": "1757990000",
+         "total_fees": "141", "label": "openchannel",
+         "output_details": [
+             {"address": "bc1qfremd", "is_our_address": False,
+              "output_index": "0"},
+             {"address": "bc1qwechsel", "is_our_address": True,
+              "output_index": "1"}]},
+    ]
+
+
+def test_eine_wartende_ueberweisung_sagt_ob_sie_haengt(client, lnd_da,
+                                                        monkeypatch):
+    """DER BEFUND VOM 24.09.2026, aus dem Betrieb: "das er mir jetzt bei
+    jeder transaktion im wallet direkt anzeigt 'gebueren erhoehen!'".
+
+    Die Oberflaeche bot den Knopf bei JEDER unbestaetigten Ausgabe an --
+    auch Sekunden nach dem Senden und auch dann, wenn die Gebuehr laengst
+    reichte. Ob sie haengt, weiss nur der eigene Mempool: bei welcher Hoehe
+    sie hereinkam und was ihr Paket zahlt."""
+    _sendebereit(client, lnd_da, monkeypatch)
+    _wartende_bewegung(lnd_da)
+    aufrufe = _bitcoind(monkeypatch, {
+        "getblockcount": 900_002,
+        "getmempoolentry": lambda txid: {
+            "vsize": 141, "height": 900_000, "chunkweight": 564,
+            "ancestorsize": 141,
+            "fees": {"base": 0.0000141, "ancestor": 0.0000141,
+                     "chunk": 0.0000141}},
+    })
+    d = client.get("/api/lightning/bewegungen").json()
+    wartend, bestaetigt = d["bewegungen"]
+    # 10 sat/vB gezahlt, 12 geschaetzt (aufgerundet wie beim Senden), zwei
+    # Bloecke ohne sie.
+    assert wartend["warten"] == {"lage": "haengt", "satz_sat_vb": 10.0,
+                                 "noetig_sat_vb": 12, "seit_block": 900_000}
+    assert "warten" not in bestaetigt
+    # Nur die wartende wird nachgeschlagen -- bestaetigte gehen bitcoind
+    # nichts an.
+    assert [p for m, p in aufrufe if m == "getmempoolentry"] == [("bb" * 32,)]
+
+
+def test_reicht_die_gebuehr_steht_dort_kein_knopf(client, lnd_da, monkeypatch):
+    _sendebereit(client, lnd_da, monkeypatch)
+    _wartende_bewegung(lnd_da)
+    _bitcoind(monkeypatch, {
+        "getblockcount": 900_000,
+        "getmempoolentry": {"vsize": 141, "height": 900_000,
+                            "chunkweight": 564, "ancestorsize": 141,
+                            "fees": {"chunk": 0.00002115,
+                                     "ancestor": 0.00002115}},
+    })
+    wartend = client.get("/api/lightning/bewegungen").json()["bewegungen"][0]
+    assert wartend["warten"]["lage"] == "reicht"
+
+
+def test_antwortet_bitcoind_nicht_ist_die_lage_unklar(client, lnd_da,
+                                                       monkeypatch):
+    """Dann nicht raten -- und die Bewegungen trotzdem zeigen."""
+    _sendebereit(client, lnd_da, monkeypatch)
+    _wartende_bewegung(lnd_da)
+    _bitcoind(monkeypatch, {})
+    r = client.get("/api/lightning/bewegungen")
+    assert r.status_code == 200
+    assert r.json()["bewegungen"][0]["warten"] == {"lage": "unklar"}
+
+
+def test_kennt_der_mempool_sie_nicht_sagt_die_lage_das(client, lnd_da,
+                                                       monkeypatch):
+    from satcortex import rpc as rpc_modul
+
+    def fehlt(_txid):
+        raise rpc_modul.RpcFehler(
+            "{'code': -5, 'message': 'Transaction not in mempool'}")
+    _sendebereit(client, lnd_da, monkeypatch)
+    _wartende_bewegung(lnd_da)
+    _bitcoind(monkeypatch, {"getblockcount": 900_001,
+                            "getmempoolentry": fehlt})
+    wartend = client.get("/api/lightning/bewegungen").json()["bewegungen"][0]
+    assert wartend["warten"] == {"lage": "nicht_im_mempool"}
+
+
 def test_ohne_laufendes_lightning_gibt_es_keine_bewegungen(client, lnd_da):
     _richte_ein(client)
     lnd_da.stand = "LOCKED"

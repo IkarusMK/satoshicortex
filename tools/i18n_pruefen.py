@@ -62,6 +62,11 @@ ZUSAMMENGESETZT = {
     # Die Kopfzeile der Wegwissen-Tafel wird ueber eine Schluesselliste
     # gebaut -- fuenf Spalten, fuenf Texte. Befund vom 22.09.2026.
     "t(k)": ["wg_von", "wg_nach", "wg_trug", "wg_fehl", "wg_wann"],
+    # Was unter einer wartenden Ausgabe steht -- eine Lage je Antwort von
+    # cluster.wartelage. Befund vom 24.09.2026.
+    "t(WARTE_TEXTE[w.lage], werte)": [
+        "nb_haengt", "nb_reicht", "nb_frisch", "nb_nicht_im_mempool",
+        "nb_keine_schaetzung", "nb_unklar"],
     # Was ein Geldweg meldet, wenn KEIN Bescheid kam -- der Abbruch der
     # Oberflaeche oder das 504 des Servers. Entweder nennt der Server den
     # Schluessel selbst, oder es gilt der, den der Aufrufer mitgibt: fuer

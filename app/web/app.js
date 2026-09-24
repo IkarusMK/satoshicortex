@@ -1146,9 +1146,15 @@ const I18N = {
     wegwissen_nicht_abrufbar: "Dein Knoten gibt das Wegwissen gerade nicht heraus.",
     nb_knopf: "Gebühr erhöhen",
     nb_laeuft: "Wird angehängt …",
-    nb_erklaerung: "Diese Überweisung hängt noch. Erhöhen heißt hier: dein Knoten hängt eine zweite Transaktion an dein Wechselgeld, damit ein Miner beide nur zusammen nehmen kann. Die erste verschwindet nicht — und die zweite kostet zusätzlich.",
+    nb_erklaerung: "Erhöhen heißt hier: dein Knoten hängt eine zweite Transaktion an dein Wechselgeld, damit ein Miner beide nur zusammen nehmen kann. Die erste verschwindet nicht — und die zweite kostet zusätzlich.",
     nb_fertig: "Angehängt mit {satz} sat/vB. Höchstens {hoechstens} Sat Gebühr. Beide Transaktionen bestätigen sich gemeinsam.",
     nb_nicht_moeglich: "Diese Überweisung lässt sich nicht nachbessern: es ging alles raus, es liegt kein Wechselgeld dieses Knotens darin, an das sich etwas anhängen ließe.",
+    nb_haengt: "Diese Überweisung hängt: sie wartet seit Block {seit}, und die Blöcke danach kamen ohne sie. Sie zahlt {satz} sat/vB, dein Knoten schätzt für den schnellsten Weg gerade {noetig} sat/vB.",
+    nb_reicht: "Wartet auf einen Block. Die Gebühr reicht: sie zahlt {satz} sat/vB, dein Knoten schätzt für den schnellsten Weg gerade {noetig} sat/vB. Erhöhen würde nichts beschleunigen.",
+    nb_frisch: "Gerade gesendet, seitdem kam noch kein Block. Sie zahlt {satz} sat/vB, dein Knoten schätzt für den schnellsten Weg gerade {noetig} sat/vB. Nimmt der nächste Block sie nicht mit, erscheint hier der Knopf zum Nachbessern.",
+    nb_nicht_im_mempool: "Diese Überweisung liegt nicht im Mempool deines Knotens. Nachbessern geht deshalb nicht: eine zweite Transaktion ließe sich an nichts anhängen, was dein Knoten kennt.",
+    nb_keine_schaetzung: "Dein Knoten hat gerade keine Gebührenschätzung. Ohne sie lässt sich nicht sagen, ob diese Überweisung hängt, und nachbessern ginge auch nicht.",
+    nb_unklar: "Ob diese Überweisung hängt, lässt sich gerade nicht sagen: dein Bitcoin-Knoten antwortet nicht.",
     nachbessern_abgelehnt: "Dein Knoten hat das Nachbessern abgelehnt: {einzelheit}",
     sd_warnung: "Eine gesendete Transaktion lässt sich nicht zurückholen. Prüfe die Adresse Zeichen für Zeichen — Anfang UND Ende. Bleibt die Antwort einmal aus, schick NICHT noch einmal: sieh erst unter Blöcke oder Mempool nach, ob sie schon unterwegs ist.",
     sd_adresse: "Empfängeradresse",
@@ -2349,9 +2355,15 @@ const I18N = {
     wegwissen_nicht_abrufbar: "Your node is not handing out its route knowledge right now.",
     nb_knopf: "Raise the fee",
     nb_laeuft: "Attaching …",
-    nb_erklaerung: "This transfer is still waiting. Raising the fee here means: your node attaches a second transaction to your own change, so that a miner can only take both together. The first one does not go away — and the second one costs extra.",
+    nb_erklaerung: "Raising the fee here means: your node attaches a second transaction to your own change, so that a miner can only take both together. The first one does not go away — and the second one costs extra.",
     nb_fertig: "Attached at {satz} sat/vB. At most {hoechstens} sat in fees. Both transactions confirm together.",
     nb_nicht_moeglich: "This transfer cannot be bumped: everything went out, so there is no change of this node in it to attach anything to.",
+    nb_haengt: "This transfer is stuck: it has been waiting since block {seit}, and the blocks since came without it. It pays {satz} sat/vB; for the fastest option your node currently estimates {noetig} sat/vB.",
+    nb_reicht: "Waiting for a block. The fee is enough: it pays {satz} sat/vB; for the fastest option your node currently estimates {noetig} sat/vB. Raising it would not speed anything up.",
+    nb_frisch: "Just sent, no block has come since. It pays {satz} sat/vB; for the fastest option your node currently estimates {noetig} sat/vB. If the next block does not take it, the button to raise the fee appears here.",
+    nb_nicht_im_mempool: "This transfer is not in your node's mempool. It cannot be bumped: a second transaction would have nothing your node knows to attach to.",
+    nb_keine_schaetzung: "Your node has no fee estimate right now. Without one it cannot tell whether this transfer is stuck, and raising the fee would not work either.",
+    nb_unklar: "Whether this transfer is stuck cannot be told right now: your Bitcoin node is not answering.",
     nachbessern_abgelehnt: "Your node refused to raise the fee: {einzelheit}",
     sd_warnung: "A sent transaction cannot be called back. Check the address character by character — beginning AND end. If an answer ever fails to arrive, do NOT send again: look under Blocks or Mempool first to see whether it is already on its way.",
     sd_adresse: "Recipient address",
@@ -7940,18 +7952,8 @@ function zeichneBewegungen(d) {
       zeile.append(an);
     }
     zeile.append(txidZeile(b.txid, b.txid));
-    // Haengt sie fest? Dann der einzige Handgriff, der hilft.
-    //
-    // Nur bei einem AUSGANG ohne Bestaetigung, und nur wenn ein Ausgang uns
-    // gehoert: LND haengt die Kind-Transaktion an unser Wechselgeld. Wurde
-    // alles verschickt, gibt es keins -- dann steht hier kein Knopf, sondern
-    // der Grund. Einen Knopf anzubieten, der sicher scheitert, waere
-    // schlimmer als keiner.
-    if (b.betrag_sat < 0 && !b.bestaetigungen) {
-      zeile.append(b.eigener_ausgang == null
-        ? hinweis(t("nb_nicht_moeglich"), "")
-        : nachbesserZeile(b));
-    }
+    // Bei einem AUSGANG ohne Bestaetigung: wartet sie nur, oder haengt sie?
+    if (b.betrag_sat < 0 && !b.bestaetigungen) zeile.append(warteZeile(b));
     ziel.append(zeile);
   }
   if (d.weitere) ziel.append(hinweis(t("bw_weitere", { n: zahl(d.weitere) }), ""));
@@ -8013,19 +8015,54 @@ async function ladeWegwissen() {
   }
 }
 
+/* Was unter einer wartenden Ausgabe steht: immer ein Satz, der Knopf nur,
+   wenn er hilft.
+
+   DER BEFUND VOM 24.09.2026, aus dem Betrieb: "das er mir jetzt bei jeder
+   transaktion im wallet direkt anzeigt 'gebueren erhoehen!'". Bis dahin stand
+   der Knopf unter JEDER unbestaetigten Ausgabe -- Sekunden nach dem Senden,
+   und auch wenn die Gebuehr laengst reichte. Ob sie haengt, entscheidet jetzt
+   der Server aus dem eigenen Mempool (cluster.wartelage); hier wird nur
+   gezeigt, was er sagt.
+
+   Bei "unklar" bleibt der Knopf: wer wirklich festsitzt, soll nicht
+   festsitzen, nur weil bitcoind gerade schweigt.
+
+   Zusaetzlich muss ein Ausgang uns gehoeren: LND haengt die Kind-Transaktion
+   an unser Wechselgeld. Wurde alles verschickt, gibt es keins -- dann steht
+   hier kein Knopf, sondern der Grund. Einen Knopf anzubieten, der sicher
+   scheitert, waere schlimmer als keiner. */
+const WARTE_TEXTE = {
+  haengt: "nb_haengt", reicht: "nb_reicht", frisch: "nb_frisch",
+  nicht_im_mempool: "nb_nicht_im_mempool",
+  keine_schaetzung: "nb_keine_schaetzung", unklar: "nb_unklar",
+};
+
+function warteZeile(b) {
+  const w = b.warten && WARTE_TEXTE[b.warten.lage]
+    ? b.warten : { lage: "unklar" };
+  const werte = { seit: zahl(w.seit_block), satz: zahl(w.satz_sat_vb),
+                  noetig: zahl(w.noetig_sat_vb) };
+  const satz = t(WARTE_TEXTE[w.lage], werte);
+  if (w.lage !== "haengt" && w.lage !== "unklar") return hinweis(satz, "");
+  if (b.eigener_ausgang == null) return hinweis(t("nb_nicht_moeglich"), "");
+  return nachbesserZeile(b, satz);
+}
+
 /* "Gebuehr erhoehen" fuer eine haengende Ueberweisung.
 
    Der Knopf sagt vorher, was er tut: es entsteht eine ZWEITE Transaktion,
    die zusaetzlich kostet. Die alte verschwindet nicht -- beide werden
    gemeinsam attraktiver (Child Pays For Parent). Wer das nicht weiss,
    erwartet sonst, dass die Gebuehr der alten einfach steigt. */
-function nachbesserZeile(b) {
+function nachbesserZeile(b, lage) {
   const kasten = document.createElement("div");
   kasten.className = "nachbessern";
 
+  // Erst WARUM (die Lage mit ihren Zahlen), dann was der Knopf tut.
   const erklaerung = document.createElement("p");
   erklaerung.className = "dim small";
-  erklaerung.textContent = t("nb_erklaerung");
+  erklaerung.textContent = lage + " " + t("nb_erklaerung");
   kasten.append(erklaerung);
 
   const meldung = document.createElement("span");

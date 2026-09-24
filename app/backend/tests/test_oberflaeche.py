@@ -1850,6 +1850,46 @@ def test_verlangt_der_server_die_pin_erscheint_das_feld(js):
     assert "pinLaden();" in block
 
 
+# ── Haengt sie, oder wartet sie nur? (24.09.2026) ──────────────────────────
+#
+# Aus dem Betrieb: "das er mir jetzt bei jeder transaktion im wallet direkt
+# anzeigt 'gebueren erhoehen!'".
+
+def test_der_knopf_steht_nur_unter_einer_haengenden_ausgabe(js):
+    """Die Liste ruft den Knopf nicht mehr selbst auf -- sie fragt die
+    Lage, und nur "haengt" (oder "unklar", wenn bitcoind schweigt) fuehrt
+    zum Knopf."""
+    stelle = js.index("function zeichneBewegungen(")
+    liste = _ohne_js_kommentare(js[stelle:js.index("\n}\n", stelle)])
+    assert "nachbesserZeile(" not in liste
+    assert "zeile.append(warteZeile(b))" in liste
+
+    stelle = js.index("function warteZeile(")
+    block = _ohne_js_kommentare(js[stelle:js.index("\n}\n", stelle)])
+    schranke = block.index(
+        'if (w.lage !== "haengt" && w.lage !== "unklar") return hinweis(')
+    assert schranke < block.index("nachbesserZeile(b, satz)")
+    assert block.index('hinweis(t("nb_nicht_moeglich")') < block.index(
+        "nachbesserZeile(b, satz)")
+
+
+def test_jede_lage_des_servers_hat_ihren_satz(js):
+    """Kaeme vom Server eine Lage, die die Oberflaeche nicht kennt, stuende
+    dort ein Schluessel statt eines Satzes. Die Liste wird aus dem Server
+    gelesen, nicht von Hand gefuehrt."""
+    quelle = (Path(__file__).resolve().parents[1] / "satcortex"
+              / "cluster.py").read_text(encoding="utf-8")
+    teil = quelle[quelle.index("def wartelage("):]
+    lagen = set(re.findall(r'"lage": "(\w+)"', teil))
+    lagen |= set(re.findall(r'lage = "(\w+)"', teil))
+    assert {"haengt", "reicht", "frisch", "nicht_im_mempool",
+            "keine_schaetzung", "unklar"} <= lagen
+    stelle = js.index("const WARTE_TEXTE = {")
+    tabelle = js[stelle:js.index("};", stelle)]
+    for lage in lagen:
+        assert f"{lage}: " in tabelle or f'"{lage}"' in tabelle, lage
+
+
 # ── Senden an der Oberflaeche ──────────────────────────────────────────────
 #
 # Die Bedingung des Betreibers vom 30.08.2026: "ich werde nix dahin ueberweisen solange

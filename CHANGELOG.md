@@ -22,6 +22,25 @@ the interface re-reads the PIN state, so the field appears even if the PIN was
 set up in another tab. A test now derives the list from the page itself: every
 view that contains a PIN field must ask, not just the ones someone remembered.
 
+### Fixed: "Raise the fee" under every unconfirmed transfer
+
+The wallet offered **Raise the fee** under every outgoing transfer without a
+confirmation — seconds after sending, and even when the fee was already enough.
+The button raises the package to the "fast" rate; if the transfer already pays
+that, it only costs money without speeding anything up.
+
+Whether a transfer is stuck now comes from your own node's mempool
+(`getmempoolentry`, Bitcoin Core 31.1). Two conditions, both required:
+
+- at least one block has come since it entered the mempool, and it was not in it;
+- its package (the chunk, so an earlier bump counts) pays less than your node
+  currently estimates for the fastest option — the same rate the button uses.
+
+Every waiting transfer now says where it stands, with the numbers: just sent,
+fee is enough, stuck, not in your node's mempool, or no fee estimate. The button
+appears only when it is stuck, or when Bitcoin Core is not answering and it
+cannot be told.
+
 ## [1.2.2] — 2026-09-23
 
 ### Added: signed build provenance for every image
