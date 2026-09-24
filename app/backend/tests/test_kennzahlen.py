@@ -193,7 +193,7 @@ def test_die_anpassung_wird_gekappt():
 # app dann direkt da wo es passiert sauber anzeigen, damit es nicht zu boesen
 # ueberraschungen kommt."
 #
-# Besonders wichtig, bei einem kleinen Einstieg -- mit rund hundert Euro. Zwei
+# Besonders wichtig bei einem kleinen Einstieg -- etwa hundert Euro. Zwei
 # Sats je vByte sind dann Kleingeld, zweihundert ein Drittel des Kanals.
 
 def test_ohne_schaetzung_gibt_es_keine_zahl():

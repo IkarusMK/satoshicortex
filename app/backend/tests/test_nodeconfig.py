@@ -629,8 +629,8 @@ def test_die_ausgelieferte_core_fassung_steht_ueberall_gleich():
 
 # ── Die Kanal-Untergrenze passt zur Groesse des Knotens (04.09.2026) ────────
 #
-# Der Betreiber: "wollte so'n lnd knoten eigentlich klein betreiben in
-# btc ... pass das auf eine kleine Grenze an, drueber geht dann immer."
+# Die Entscheidung vom 04.09.2026: ein kleiner Einstieg -- etwa hundert Euro --
+# muss gehen, groesser geht dann immer.
 #
 # Bis dahin stand dort eine Million Sats -- rund 680 Euro, uebernommen aus der
 # Routing-Knoten-Planung. Die Einstellung betrifft laut LNDs eigener

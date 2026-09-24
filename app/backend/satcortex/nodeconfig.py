@@ -862,15 +862,15 @@ class Lightningeinstellungen:
     #
     # Bis zum 04.09.2026 stand hier eine Million -- aus der Routing-Knoten-
     # Planung, wo Kanaele unter dieser Groesse tatsaechlich kaum etwas
-    # weiterleiten. Fuer den Knoten, den der Betreiber wirklich betreibt, war das
-    # falsch herum gedacht: wer klein anfaengt, hat rund hundert Euro, also etwa
-    # 146.000 sat. Ein eingehender Kanal ist fuer ihn geschenkte
+    # weiterleiten. Fuer einen Knoten, der klein anfaengt -- etwa mit rund
+    # hundert Euro, also rund 146.000 sat --, war das falsch herum gedacht.
+    # Ein eingehender Kanal ist fuer ihn geschenkte
     # Empfangs-Liquiditaet -- die Gegenstelle zahlt die On-Chain-Gebuehr und
     # bindet ihr eigenes Geld. Einen von 500.000 sat abzulehnen, weil er
     # unter einer Million liegt, waere das Gegenteil von hilfreich gewesen.
     #
-    # Aus dem Betrieb, 04.09.2026: "pass das auf eine kleine Grenze an ...
-    # drueber geht dann immer." Also eine Untergrenze in seiner
+    # Die Entscheidung vom 04.09.2026: eine kleine Groesse muss gehen, groesser
+    # geht dann immer. Also eine Untergrenze in seiner
     # Groessenordnung statt in der eines Grossrouters. LNDs eigene Vorgabe
     # waere 20.000 -- so tief muss es nicht, das waere gegenueber seinem
     # eigenen Kanal kaum noch etwas.

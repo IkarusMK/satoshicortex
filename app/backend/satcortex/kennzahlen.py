@@ -130,7 +130,7 @@ def gebuehren(knoten: rpc.Knoten) -> Dict[str, float]:
 # sollte unsere App dann direkt da, wo es passiert, sauber anzeigen, damit es
 # nicht zu boesen Ueberraschungen kommt."
 #
-# Besonders wichtig, bei einem kleinen Einstieg: bei einem Kanal von rund 146.000
+# Besonders wichtig bei einem kleinen Einstieg: bei einem Kanal von rund 146.000
 # Sats sind zwei Sats je vByte Kleingeld -- zweihundert waeren ein Drittel
 # davon. Dieselbe Gebuehr, voellig andere Bedeutung.
 #
