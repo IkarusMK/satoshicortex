@@ -2979,7 +2979,7 @@ def test_das_stornieren_schickt_die_kennung_im_rumpf(tmp_path, monkeypatch):
 
 def test_das_stornieren_braucht_das_eigene_macaroon(tmp_path, monkeypatch):
     """invoices:write -- dasselbe Recht wie das Ausstellen. Mit readonly
-    ginge es nicht, und das soll hier auffallen, nicht bei der Betreiber."""
+    ginge es nicht, und das soll hier auffallen, nicht erst im Betrieb."""
     _ohne_tls(monkeypatch)
     knoten = _knoten(tmp_path, mit_macaroon=True)
     (knoten.macaroons / f"{lnd.EIGENES_MACAROON}.macaroon").write_bytes(b"\x07")

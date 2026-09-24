@@ -8190,7 +8190,7 @@ function zeichneBewegungen(d) {
     kopf.append(betrag, stand);
     zeile.append(kopf);
     // An WEN es ging. Stand bis zum 16.09.2026 nur im Protokoll -- gebraucht,
-    // als ein Empfaenger bestritt, etwas bekommen zu haben.
+    // wenn ein Empfaenger bestreitet, etwas bekommen zu haben.
     if (b.ziel) {
       const an = document.createElement("div");
       an.className = "bewegung-ziel";

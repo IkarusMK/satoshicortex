@@ -27,10 +27,11 @@ page was reloaded. How it ended was only in LND's log.
   button stays locked while the payment is still in flight and unlocks as soon
   as the outcome is known.
 
-### Fixed: test data taken from a real node
+### Fixed: test data and comments taken from a real node
 
-Some test fixtures added in 1.2.3 and 1.2.4 used values from a real node
-instead of made-up ones. They are replaced with synthetic values.
+Some test fixtures and comments used values from a real installation — an
+address, amounts, identifiers — instead of made-up ones. They are replaced with
+synthetic values (addresses from the documentation range 203.0.113.0/24).
 
 ## [1.2.5] — 2026-09-24
 

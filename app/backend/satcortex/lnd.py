@@ -707,8 +707,8 @@ def bewegungen(knoten: Knoten,
         betrag = _mit_vorzeichen(tx.get("amount"))
         # Bei einem Ausgang: an WEN ging es? Die erste Ausgabe, die nicht uns
         # gehoert. Stand bis zum 16.09.2026 nur im Protokoll -- und genau die
-        # brauchte der Betreiber, als ein Empfaenger bestritt, etwas bekommen
-        # zu haben.
+        # braucht man, wenn ein Empfaenger bestreitet, etwas bekommen zu
+        # haben.
         ziel = ""
         if betrag < 0:
             for ausgabe in tx.get("output_details") or []:
