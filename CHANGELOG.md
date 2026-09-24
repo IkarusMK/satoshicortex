@@ -4,7 +4,7 @@ All notable changes to SatoshiCortex. Format loosely after
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning after
 [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [1.2.5] — 2026-09-24
 
 ### Fixed: "Lightning can be set up" on a node that is set up
 
