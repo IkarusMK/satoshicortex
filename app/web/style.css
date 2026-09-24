@@ -1003,6 +1003,12 @@ a:hover { color: var(--btc); }
   background: rgb(52 211 153 / .85);
 }
 .kanal-punkt.still { background: rgb(248 113 113 / .85); }
+/* Im Aufbau oder Abbau: kein Fehler, also nicht rot -- ein hohler Ring,
+   der "unterwegs" sagt. Befund vom 24.09.2026. */
+.kanal-punkt.wartet {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px rgb(251 191 36 / .85);
+}
 .kanal-name { font-weight: 600; }
 .kanal-kopf .rechts {
   margin-left: auto; font-variant-numeric: tabular-nums;

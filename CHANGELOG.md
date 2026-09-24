@@ -41,6 +41,23 @@ fee is enough, stuck, not in your node's mempool, or no fee estimate. The button
 appears only when it is stuck, or when Bitcoin Core is not answering and it
 cannot be told.
 
+### Fixed: a new channel only showed up in the wallet
+
+After opening a channel, **Lightning → Channels** did not list it — only the
+funding transaction appeared under the wallet's movements. LND's channel list
+(`/v1/channels`) holds open channels only; a channel stays pending until the
+peer has seen enough confirmations, and how many is the peer's choice (LDK
+waits for six by default). Closing had the same gap in reverse: the channel
+left the list while its balance was not back in the wallet yet.
+
+The Channels view now also reads LND's pending channels (`/v1/channels/pending`,
+fields checked against `lightning.swagger.json` of v0.21.3-beta) and shows each
+one with what is still missing: confirmations until an opening channel is
+active, confirmations until a close is final, blocks until a force-close
+releases its funds. Pending channels get a neutral ring instead of the red dot,
+which means "inactive, needs attention". They are not offered for closing or
+rebalancing, since neither works before a channel is open.
+
 ## [1.2.2] — 2026-09-23
 
 ### Added: signed build provenance for every image

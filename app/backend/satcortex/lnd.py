@@ -813,6 +813,85 @@ def kanaele(knoten: Knoten) -> List[Dict[str, Any]]:
     return liste
 
 
+def _ausstehend_eintrag(stand: str, k: Dict[str, Any]) -> Dict[str, Any]:
+    kanal = k.get("channel") or {}
+    punkt = str(kanal.get("channel_point") or "")
+    return {
+        "stand": stand,
+        "gegenstelle": "",
+        "kennung": str(kanal.get("remote_node_pub") or ""),
+        "punkt": punkt,
+        "kapazitaet": _zahl(kanal.get("capacity")),
+        "hier": _zahl(kanal.get("local_balance")),
+        "drueben": _zahl(kanal.get("remote_balance")),
+        "privat": bool(kanal.get("private")),
+        # Beim Oeffnen ist die txid der Teil vor dem Doppelpunkt.
+        "txid": punkt.partition(":")[0],
+    }
+
+
+def ausstehende_kanaele(knoten: Knoten) -> List[Dict[str, Any]]:
+    """Kanaele, die es noch nicht oder nicht mehr ganz gibt.
+
+    DER BEFUND VOM 24.09.2026, aus dem Betrieb: "ich habe ja jetzt einen
+    kanal geoeffnet zu den anderen partner B ... nur warum seh ich das nur in
+    wallet und nicht unter kanal ?"
+
+    /v1/channels kennt nur OFFENE Kanaele. Ein neuer Kanal steht dort erst,
+    wenn die Gegenstelle genug Bestaetigungen hat -- wie viele, entscheidet
+    SIE. Bis dahin stand er nur als Ausgabe in der Wallet, und in der
+    Kanal-Ansicht fehlte er ganz. Dasselbe beim Schliessen: der Kanal faellt
+    aus /v1/channels heraus, und das Geld darin ist eine Weile weder im
+    Kanal noch in der Wallet zu sehen.
+
+    Feldnamen aus LNDs eigener Beschreibung (lightning.swagger.json,
+    v0.21.3-beta), nicht aus dem Gedaechtnis. pending_closing_channels ist
+    dort als veraltet gefuehrt und wird nicht gelesen.
+    """
+    d = knoten.ruf("/v1/channels/pending") or {}
+    liste: List[Dict[str, Any]] = []
+    for k in d.get("pending_open_channels") or []:
+        kanal = k.get("channel") or {}
+        liste.append({
+            **_ausstehend_eintrag("oeffnet", k),
+            "von_uns": kanal.get("initiator") == "INITIATOR_LOCAL",
+            # 0 heisst laut LND: jetzt aktiv. Bis zum naechsten Abruf
+            # steht er dann schon unter den offenen.
+            "noch_bloecke": _zahl(k.get("confirmations_until_active")),
+        })
+    for k in d.get("waiting_close_channels") or []:
+        liste.append({
+            **_ausstehend_eintrag("schliesst", k),
+            "txid": str(k.get("closing_txid") or ""),
+            "gesperrt": _zahl(k.get("limbo_balance")),
+            "noch_bloecke": _zahl(k.get("blocks_til_close_confirmed")),
+        })
+    for k in d.get("pending_force_closing_channels") or []:
+        liste.append({
+            **_ausstehend_eintrag("zwangsschluss", k),
+            "txid": str(k.get("closing_txid") or ""),
+            "gesperrt": _zahl(k.get("limbo_balance")),
+            # Negativ heisst: schon reif. Dann steht hier null.
+            "noch_bloecke": max(0, _zahl(k.get("blocks_til_maturity"))),
+        })
+    # Den Namen aus dem eigenen Graphen. Wer noch keinen oeffentlichen Kanal
+    # hat, steht dort nicht -- dann bleibt die Kennung, und der Kanal fehlt
+    # deswegen nicht.
+    for eintrag in liste[:HOECHSTENS_GRAPHFRAGEN]:
+        if not eintrag["kennung"]:
+            continue
+        try:
+            g = knoten.ruf(f"/v1/graph/node/{eintrag['kennung']}",
+                           macaroon=EIGENES_MACAROON,
+                           zeitlimit=GRAPH_ZEITLIMIT_SEKUNDEN) or {}
+        except (NichtErreichbar, LndFehler) as fehler:
+            log.debug("Kein Graph-Eintrag zu %s: %s",
+                      eintrag["kennung"][:12], fehler)
+            continue
+        eintrag["gegenstelle"] = str((g.get("node") or {}).get("alias") or "")
+    return liste
+
+
 # Welche Abgleichsarten heissen: ueber diese Leitung kommt die Netzkarte.
 # SyncType aus lightning.proto -- REST schickt den Namen, die Nummer wird
 # trotzdem verstanden.

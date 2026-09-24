@@ -97,6 +97,18 @@ const I18N = {
     lk_erreichbar_titel: "Anteil der Zeit, in der deine Gegenstelle dich erreichen konnte — seit {seit}. LND führt das je Kanal mit.",
     lk_erreichbar_gesamt: "Über alle Kanäle warst du zu {p} % der Zeit erreichbar, gewichtet nach Laufzeit. Das ist die Zahl, an der andere Betreiber dich messen — und die du zusagst, wenn du dich auf einen Swap über Monate einlässt.",
     lk_keine_kanaele: "Noch keine Kanäle — und damit steht dein Knoten gar nicht im Graphen. Das Netz reicht die Namensmeldung eines Knotens erst weiter, wenn es von ihm einen angekündigten Kanal kennt (BOLT 7). Bis dahin sehen Verzeichnisse nur deinen Schlüssel, keinen Namen, keine Farbe, keine Adresse. Mit dem ersten öffentlichen Kanal ändert sich das auf einen Schlag.",
+    lk_marke_oeffnet: "wird geöffnet",
+    lk_marke_schliesst: "wird geschlossen",
+    lk_marke_zwang: "Zwangsschluss",
+    lk_oeffnet_eine: "Noch eine Bestätigung, dann ist der Kanal aktiv. Wie viele es braucht, legt der fest, zu dem der Kanal geöffnet wird.",
+    lk_oeffnet_n: "Noch {n} Bestätigungen, dann ist der Kanal aktiv. Wie viele es braucht, legt der fest, zu dem der Kanal geöffnet wird.",
+    lk_oeffnet_gleich: "Aktiv — er erscheint gleich unter den offenen Kanälen.",
+    lk_schliesst_eine: "Noch eine Bestätigung, bis die Schließung endgültig ist. {sat} sind bis dahin gebunden.",
+    lk_schliesst_n: "Noch {n} Bestätigungen, bis die Schließung endgültig ist. {sat} sind bis dahin gebunden.",
+    lk_schliesst_wartet: "Die Schließung wartet auf ihre Bestätigung. {sat} sind bis dahin gebunden.",
+    lk_zwang_eine: "{sat} sind noch einen Block gesperrt, dann holt LND sie in die Wallet.",
+    lk_zwang_n: "{sat} sind noch {n} Blöcke gesperrt, dann holt LND sie in die Wallet.",
+    lk_zwang_frei: "Die Sperre ist abgelaufen — LND holt {sat} in die Wallet.",
     lk_kanal_hier_kurz: "{n} hier",
     lk_kanal_drueben_kurz: "{n} drüben",
     lk_privat: "privat",
@@ -1308,6 +1320,18 @@ const I18N = {
     lk_erreichbar_titel: "Share of the time your peer could reach you — since {seit}. LND keeps this per channel.",
     lk_erreichbar_gesamt: "Across all channels you were reachable {p} % of the time, weighted by lifetime. This is the number other operators judge you by — and the one you promise when you commit to a swap lasting months.",
     lk_keine_kanaele: "No channels yet — which means your node is not in the graph at all. The network only relays a node's name announcement once it knows an announced channel of that node (BOLT 7). Until then, directories see only your key: no name, no colour, no address. Your first public channel changes all of it at once.",
+    lk_marke_oeffnet: "opening",
+    lk_marke_schliesst: "closing",
+    lk_marke_zwang: "force-close",
+    lk_oeffnet_eine: "One more confirmation, then the channel is active. How many it takes is set by the node the channel is opened to.",
+    lk_oeffnet_n: "{n} more confirmations, then the channel is active. How many it takes is set by the node the channel is opened to.",
+    lk_oeffnet_gleich: "Active — it will appear among the open channels shortly.",
+    lk_schliesst_eine: "One more confirmation until the close is final. {sat} are tied up until then.",
+    lk_schliesst_n: "{n} more confirmations until the close is final. {sat} are tied up until then.",
+    lk_schliesst_wartet: "The close is waiting for its confirmation. {sat} are tied up until then.",
+    lk_zwang_eine: "{sat} stay locked for one more block, then LND sweeps them into the wallet.",
+    lk_zwang_n: "{sat} stay locked for {n} more blocks, then LND sweeps them into the wallet.",
+    lk_zwang_frei: "The lock has expired — LND is sweeping {sat} into the wallet.",
     lk_kanal_hier_kurz: "{n} here",
     lk_kanal_drueben_kurz: "{n} far side",
     lk_privat: "private",
@@ -5664,7 +5688,7 @@ async function ladeLightningKanaele() {
   }
   zeichneGegenstellenwege();
   if (d.guthaben) zeichneLnGuthaben(d.guthaben);
-  zeichneLnKanaele(d.kanaele || []);
+  zeichneLnKanaele(d.kanaele || [], d.ausstehend || []);
   if (d.weiterleitungen) zeichneLnWeiterleitungen(d.weiterleitungen);
   zeichneLnNetz(d.netz, d.kanaele || [], d.knoten);
   zeichneVerbindungen(d.verbindungen);
@@ -6166,14 +6190,70 @@ async function kanalSchliessen() {
   }
 }
 
-function zeichneLnKanaele(liste) {
+/* Ein Kanal im Aufbau oder im Abbau.
+
+   DER BEFUND VOM 24.09.2026, aus dem Betrieb: "ich habe ja jetzt einen kanal
+   geoeffnet zu den anderen partner B ... nur warum seh ich das nur in wallet
+   und nicht unter kanal ?" Bis die Gegenstelle genug Bestaetigungen hat,
+   kennt LNDs Kanalliste ihn nicht -- er stand nur als Ausgabe in der Wallet.
+   Beim Schliessen dasselbe andersherum. Jetzt steht er hier, mit dem, was
+   noch fehlt. Umschichten und Schliessen bieten ihn bewusst NICHT an: mit
+   einem Kanal, der noch nicht offen ist, geht beides nicht. */
+function ausstehendZeile(k) {
+  const reihe = document.createElement("div");
+  reihe.className = "kanal";
+  const kopf = document.createElement("div");
+  kopf.className = "kanal-kopf";
+  const punkt = document.createElement("span");
+  punkt.className = "kanal-punkt wartet";
+  const name = document.createElement("span");
+  name.className = "kanal-name";
+  name.textContent = k.gegenstelle || kurz(k.kennung || "");
+  kopf.append(punkt, name);
+  if (k.stand === "oeffnet") kopf.append(marke(t("lk_marke_oeffnet")));
+  else if (k.stand === "schliesst") kopf.append(marke(t("lk_marke_schliesst")));
+  else kopf.append(marke(t("lk_marke_zwang")));
+  if (k.privat) kopf.append(marke(t("lk_privat")));
+  const rechts = document.createElement("span");
+  rechts.className = "rechts";
+  rechts.textContent = sats(k.kapazitaet);
+  kopf.append(rechts);
+
+  const n = k.noch_bloecke || 0;
+  const werte = { n: zahl(n), sat: sats(k.gesperrt || 0) };
+  let satz;
+  if (k.stand === "oeffnet") {
+    satz = t(n === 0 ? "lk_oeffnet_gleich"
+      : n === 1 ? "lk_oeffnet_eine" : "lk_oeffnet_n", werte);
+  } else if (k.stand === "schliesst") {
+    satz = t(n === 0 ? "lk_schliesst_wartet"
+      : n === 1 ? "lk_schliesst_eine" : "lk_schliesst_n", werte);
+  } else {
+    satz = t(n === 0 ? "lk_zwang_frei"
+      : n === 1 ? "lk_zwang_eine" : "lk_zwang_n", werte);
+  }
+  const fuss = document.createElement("div");
+  fuss.className = "kanal-fuss";
+  const text = document.createElement("span");
+  text.textContent = satz;
+  fuss.append(text);
+  reihe.append(kopf, fuss);
+  return reihe;
+}
+
+function zeichneLnKanaele(liste, ausstehend) {
   KANAELE_LETZTE = liste;
   fuelleUmschichten(liste);
   fuelleSchliessen(liste);
   const ziel = $("#ln-kanaele-inhalt");
   ziel.textContent = "";
+  // Die im Aufbau und Abbau zuerst -- auf die wartet man gerade.
+  for (const k of ausstehend || []) ziel.append(ausstehendZeile(k));
   if (!liste.length) {
-    ziel.append(hinweis(t("lk_keine_kanaele"), ""));
+    // "Noch keine Kanaele" waere falsch, wenn einer gerade entsteht.
+    if (!(ausstehend || []).length) {
+      ziel.append(hinweis(t("lk_keine_kanaele"), ""));
+    }
     return;
   }
   const gesamt = gesamterreichbarkeit(liste);

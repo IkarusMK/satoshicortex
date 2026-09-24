@@ -5033,6 +5033,10 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         for name, holen in (("knoten", lambda: lnd.uebersicht(knoten)),
                             ("guthaben", lambda: lnd.guthaben(knoten)),
                             ("kanaele", lambda: lnd.kanaele(knoten)),
+                            # Die im Aufbau und im Abbau -- /v1/channels
+                            # kennt sie nicht. Befund vom 24.09.2026.
+                            ("ausstehend",
+                             lambda: lnd.ausstehende_kanaele(knoten)),
                             ("netz", lambda: lnd.netzgraph(knoten)),
                             ("weiterleitungen", lambda: lnd.weiterleitungen(knoten))):
             try:

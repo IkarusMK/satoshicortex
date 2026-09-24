@@ -2119,6 +2119,8 @@ class LndVollstaendig(FakeLnd):
         self.gefragt = []
         self.geoeffnet = None
         self.gezahlt = None
+        # Was /v1/channels/pending liefert -- ohne Eintrag: nichts im Bau.
+        self.ausstehend = {}
 
     def strom(self, pfad, daten=None, macaroon="readonly", zeitlimit=None,
               methode=""):
@@ -2165,6 +2167,8 @@ class LndVollstaendig(FakeLnd):
                                   "capacity": "5000000",
                                   "local_balance": "2000000",
                                   "remote_balance": "3000000"}]}
+        if nackt == "/v1/channels/pending":
+            return dict(self.ausstehend)
         if nackt.startswith("/v1/payreq/"):
             return {"destination": "03ff" + "aa" * 31, "num_satoshis": "1500",
                     "timestamp": "1000", "expiry": "9999999999",
@@ -2212,6 +2216,31 @@ def test_ein_ausfall_nimmt_nicht_die_ganze_ansicht_mit(client, lnd_voll):
     assert "weiterleitungen" not in d and "netz" not in d
     assert d["kanaele"][0]["kapazitaet"] == 5_000_000
     assert d["knoten"]["alias"] == "Testknoten"
+
+
+def test_ein_kanal_im_aufbau_steht_in_der_kanalansicht(client, lnd_voll):
+    """DER BEFUND VOM 24.09.2026: "warum seh ich das nur in wallet und
+    nicht unter kanal ?" -- /v1/channels kennt nur offene Kanaele."""
+    _richte_ein(client)
+    lnd_voll.ausstehend = {"pending_open_channels": [{
+        "channel": {"remote_node_pub": "03" + "ab" * 32,
+                    "channel_point": "ee" * 32 + ":0", "capacity": "100000",
+                    "local_balance": "99000", "remote_balance": "0",
+                    "initiator": "INITIATOR_LOCAL"},
+        "confirmations_until_active": 1}]}
+    d = client.get("/api/lightning/kanaele").json()
+    assert [(k["stand"], k["kapazitaet"], k["noch_bloecke"])
+            for k in d["ausstehend"]] == [("oeffnet", 100_000, 1)]
+    # Die offenen bleiben, wo sie sind.
+    assert d["kanaele"][0]["gegenstelle"] == "ACINQ"
+
+
+def test_faellt_die_liste_im_aufbau_aus_bleiben_die_offenen(client, lnd_voll):
+    _richte_ein(client)
+    lnd_voll.faellt_aus = {"/v1/channels/pending"}
+    d = client.get("/api/lightning/kanaele").json()
+    assert "ausstehend" not in d
+    assert d["kanaele"][0]["kapazitaet"] == 5_000_000
 
 
 def test_ohne_wallet_wird_gar_nicht_erst_gefragt(client, lnd_da):

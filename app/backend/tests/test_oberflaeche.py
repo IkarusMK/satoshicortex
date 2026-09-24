@@ -1890,6 +1890,41 @@ def test_jede_lage_des_servers_hat_ihren_satz(js):
         assert f"{lage}: " in tabelle or f'"{lage}"' in tabelle, lage
 
 
+# ── Kanaele im Aufbau und im Abbau (24.09.2026) ────────────────────────────
+#
+# Aus dem Betrieb: "ich habe ja jetzt einen kanal geoeffnet zu den anderen
+# partner B ... nur warum seh ich das nur in wallet und nicht unter kanal ?"
+
+def test_die_kanalansicht_zeigt_auch_die_im_aufbau(js):
+    stelle = js.index("async function ladeLightningKanaele(")
+    laden = _ohne_js_kommentare(js[stelle:js.index("\n}\n", stelle)])
+    assert "zeichneLnKanaele(d.kanaele || [], d.ausstehend || [])" in laden
+
+    stelle = js.index("function zeichneLnKanaele(")
+    block = _ohne_js_kommentare(js[stelle:js.index("\n}\n", stelle)])
+    # Erst die ausstehenden zeichnen, DANN bei leerer Liste aussteigen --
+    # sonst verschwaende ein Kanal im Aufbau hinter dem fruehen return.
+    assert block.index("ausstehendZeile(k)") < block.index("if (!liste.length)")
+    # Und "noch keine Kanaele" nur, wenn auch keiner entsteht.
+    leer = block[block.index("if (!liste.length)"):]
+    assert leer.index("(ausstehend || []).length") < leer.index(
+        't("lk_keine_kanaele")')
+
+
+def test_jeder_stand_aus_lnd_hat_seine_darstellung(js):
+    """Die Staende werden aus dem Server gelesen, nicht von Hand gefuehrt."""
+    quelle = (Path(__file__).resolve().parents[1] / "satcortex"
+              / "lnd.py").read_text(encoding="utf-8")
+    staende = set(re.findall(r'_ausstehend_eintrag\("(\w+)"', quelle))
+    assert staende == {"oeffnet", "schliesst", "zwangsschluss"}
+    stelle = js.index("function ausstehendZeile(")
+    block = js[stelle:js.index("\n}\n", stelle)]
+    # Der dritte ist der else-Zweig; kaeme ein vierter dazu, fiele er hier
+    # als Zwangsschluss durch -- deshalb die genaue Menge oben.
+    assert 'k.stand === "oeffnet"' in block
+    assert 'k.stand === "schliesst"' in block
+
+
 # ── Senden an der Oberflaeche ──────────────────────────────────────────────
 #
 # Die Bedingung des Betreibers vom 30.08.2026: "ich werde nix dahin ueberweisen solange

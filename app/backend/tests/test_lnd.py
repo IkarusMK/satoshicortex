@@ -253,6 +253,78 @@ def test_ein_kanal_ohne_kapazitaet_teilt_nicht_durch_null():
     assert lnd.kanaele(k)[0]["anteil_hier"] == 0.0
 
 
+# ── Kanaele im Aufbau und im Abbau (24.09.2026) ────────────────────────────
+#
+# Aus dem Betrieb: "ich habe ja jetzt einen kanal geoeffnet zu den anderen
+# partner B ... nur warum seh ich das nur in wallet und nicht unter kanal ?"
+# /v1/channels kennt nur OFFENE Kanaele. Bis die Gegenstelle genug
+# Bestaetigungen hat, steht ein neuer Kanal nur in /v1/channels/pending --
+# Feldnamen aus lightning.swagger.json, v0.21.3-beta.
+
+GEGEN = "03" + "ab" * 32
+
+
+def _ausstehend(**mehr):
+    antworten = {"/v1/channels/pending": {
+        "pending_open_channels": [{
+            "channel": {"remote_node_pub": GEGEN, "channel_point": "ee" * 32 + ":0",
+                        "capacity": "100000", "local_balance": "99000",
+                        "remote_balance": "0", "initiator": "INITIATOR_LOCAL",
+                        "private": False},
+            "confirmations_until_active": 1, "confirmation_height": 900000,
+            "funding_expiry_blocks": 2011}],
+        "waiting_close_channels": [{
+            "channel": {"remote_node_pub": "02" + "cd" * 32,
+                        "channel_point": "aa:1", "capacity": "200000",
+                        "local_balance": "150000", "remote_balance": "50000"},
+            "limbo_balance": "150000", "closing_txid": "cc" * 32,
+            "blocks_til_close_confirmed": 3}],
+        "pending_force_closing_channels": [{
+            "channel": {"remote_node_pub": "02" + "ef" * 32,
+                        "channel_point": "bb:0", "capacity": "300000",
+                        "local_balance": "100000", "remote_balance": "0"},
+            "closing_txid": "dd" * 32, "limbo_balance": "100000",
+            "blocks_til_maturity": 140}],
+    }, f"/v1/graph/node/{GEGEN}": {"node": {"alias": "Beispielknoten"}}}
+    antworten.update(mehr)
+    return FakeRuf(antworten)
+
+
+def test_ein_kanal_im_aufbau_steht_mit_seinen_bestaetigungen_da():
+    k = _ausstehend()
+    liste = lnd.ausstehende_kanaele(k)
+    auf = [x for x in liste if x["stand"] == "oeffnet"]
+    assert auf == [{
+        "stand": "oeffnet", "gegenstelle": "Beispielknoten", "kennung": GEGEN,
+        "punkt": "ee" * 32 + ":0", "kapazitaet": 100_000, "hier": 99_000,
+        "drueben": 0, "privat": False, "von_uns": True,
+        "noch_bloecke": 1, "txid": "ee" * 32}]
+
+
+def test_schliessende_kanaele_verschwinden_nicht_aus_der_ansicht():
+    """Auch beim Schliessen faellt ein Kanal aus /v1/channels heraus -- und
+    das Geld darin ist in dieser Zeit weder im Kanal noch in der Wallet."""
+    liste = lnd.ausstehende_kanaele(_ausstehend())
+    zu = {x["stand"]: x for x in liste if x["stand"] != "oeffnet"}
+    assert zu["schliesst"]["noch_bloecke"] == 3
+    assert zu["schliesst"]["txid"] == "cc" * 32
+    assert zu["schliesst"]["gesperrt"] == 150_000
+    assert zu["zwangsschluss"]["noch_bloecke"] == 140
+    assert zu["zwangsschluss"]["gesperrt"] == 100_000
+
+
+def test_ohne_graph_eintrag_bleibt_die_kennung():
+    """Eine Gegenstelle ohne Kanal steht nicht im Graphen -- dann eben die
+    Kennung, aber der Kanal fehlt deswegen nicht."""
+    k = _ausstehend(**{f"/v1/graph/node/{GEGEN}": {}})
+    auf = lnd.ausstehende_kanaele(k)[0]
+    assert auf["gegenstelle"] == "" and auf["kennung"] == GEGEN
+
+
+def test_nichts_im_aufbau_heisst_leere_liste():
+    assert lnd.ausstehende_kanaele(FakeRuf({})) == []
+
+
 def test_guthaben_zaehlt_kette_und_kanaele_nicht_zusammen():
     """Was in einem Kanal liegt, ist gebunden. Was auf der ANDEREN Seite
     liegt, ist gar nicht deins -- aber genau das, was du empfangen kannst."""
@@ -1966,6 +2038,7 @@ AUFRUFE = [
     ("bewegungen", lambda k: lnd.bewegungen(k)),
     ("ruecklage", lambda k: lnd.ruecklage(k)),
     ("kanaele", lambda k: lnd.kanaele(k)),
+    ("ausstehende_kanaele", lambda k: lnd.ausstehende_kanaele(k)),
     ("verbindungen", lambda k: lnd.verbindungen(k, [])),
     ("gegenstellen", lambda k: lnd.gegenstellen(k)),
     ("netzgraph", lambda k: lnd.netzgraph(k)),
