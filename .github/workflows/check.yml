@@ -20,9 +20,15 @@ permissions:
 # both are readable by anyone on a public repository, and the record carries
 # the build's metadata. The images are verified through the signed attestation
 # from actions/attest, not through these.
+#
+# BUILDX_METADATA_PROVENANCE: buildx also writes provenance into the metadata
+# file that build-push-action prints to the log as "Metadata" -- even with
+# the image attestation switched off below, and even in its default "min"
+# mode it held the complete GitHub event.
 env:
   DOCKER_BUILD_RECORD_UPLOAD: "false"
   DOCKER_BUILD_SUMMARY: "false"
+  BUILDX_METADATA_PROVENANCE: "disabled"
 
 jobs:
 

@@ -1454,6 +1454,10 @@ def test_kein_bauschritt_bettet_das_github_ereignis_ein():
         umgebung = ablauf.get("env") or {}
         assert str(umgebung.get("DOCKER_BUILD_RECORD_UPLOAD")) == "false", datei
         assert str(umgebung.get("DOCKER_BUILD_SUMMARY")) == "false", datei
+        # Sonst steht das Ereignis weiter im Protokoll: buildx schreibt die
+        # Herkunft auch in die Metadaten-Datei, die die Aktion ausgibt --
+        # gemessen am 25.09.2026 trotz provenance: false.
+        assert str(umgebung.get("BUILDX_METADATA_PROVENANCE")) == "disabled", datei
         bauschritte = [s for job in ablauf["jobs"].values()
                        for s in job.get("steps", [])
                        if "docker/build-push-action@" in str(s.get("uses", ""))]
