@@ -15,6 +15,15 @@ on:
 permissions:
   contents: read
 
+# No build record, no build summary. docker/build-push-action uploads a
+# record of every build as an artifact and writes a summary for the run page;
+# both are readable by anyone on a public repository, and the record carries
+# the build's metadata. The images are verified through the signed attestation
+# from actions/attest, not through these.
+env:
+  DOCKER_BUILD_RECORD_UPLOAD: "false"
+  DOCKER_BUILD_SUMMARY: "false"
+
 jobs:
 
   code:
@@ -215,6 +224,13 @@ jobs:
       - name: Build, but do not publish
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6
         with:
+          # No BuildKit provenance. In a public repository the action defaults
+          # to mode=max, which embeds the complete GitHub event -- for a push
+          # that includes the pusher's email address -- in the image's
+          # attestation, the build metadata in the log and the build record.
+          # The provenance people verify comes from actions/attest and holds
+          # no such data.
+          provenance: false
           context: .
           file: ${{ matrix.dockerfile }}
           push: false
@@ -355,6 +371,13 @@ jobs:
       - name: app
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6
         with:
+          # No BuildKit provenance. In a public repository the action defaults
+          # to mode=max, which embeds the complete GitHub event -- for a push
+          # that includes the pusher's email address -- in the image's
+          # attestation, the build metadata in the log and the build record.
+          # The provenance people verify comes from actions/attest and holds
+          # no such data.
+          provenance: false
           context: .
           file: app/Dockerfile
           push: false
@@ -365,6 +388,13 @@ jobs:
       - name: bitcoind
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6
         with:
+          # No BuildKit provenance. In a public repository the action defaults
+          # to mode=max, which embeds the complete GitHub event -- for a push
+          # that includes the pusher's email address -- in the image's
+          # attestation, the build metadata in the log and the build record.
+          # The provenance people verify comes from actions/attest and holds
+          # no such data.
+          provenance: false
           context: .
           file: images/bitcoind/Dockerfile
           push: false
@@ -375,6 +405,13 @@ jobs:
       - name: tor
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6
         with:
+          # No BuildKit provenance. In a public repository the action defaults
+          # to mode=max, which embeds the complete GitHub event -- for a push
+          # that includes the pusher's email address -- in the image's
+          # attestation, the build metadata in the log and the build record.
+          # The provenance people verify comes from actions/attest and holds
+          # no such data.
+          provenance: false
           context: .
           file: images/tor/Dockerfile
           push: false

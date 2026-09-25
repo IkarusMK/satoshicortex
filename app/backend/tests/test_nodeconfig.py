@@ -1442,6 +1442,27 @@ def test_jedes_gebaute_abbild_bekommt_einen_herkunftsnachweis():
     assert job["permissions"].get("attestations") == "write"
 
 
+def test_kein_bauschritt_bettet_das_github_ereignis_ein():
+    """Im oeffentlichen Repo stellt docker/build-push-action die Herkunft
+    von selbst auf mode=max -- und die enthaelt das komplette Ereignis, bei
+    einem Push also die Mailadresse dessen, der geschoben hat. Sie landete in
+    jedem veroeffentlichten Abbild, im Protokoll des Laufs und im
+    Bauprotokoll-Artefakt. Nachgewiesen wird die Herkunft ueber actions/attest
+    (siehe oben), der Nachweis von BuildKit ist dafuer nicht noetig."""
+    for datei in ("images.yml", "check.yml"):
+        ablauf = _ablauf(datei)
+        umgebung = ablauf.get("env") or {}
+        assert str(umgebung.get("DOCKER_BUILD_RECORD_UPLOAD")) == "false", datei
+        assert str(umgebung.get("DOCKER_BUILD_SUMMARY")) == "false", datei
+        bauschritte = [s for job in ablauf["jobs"].values()
+                       for s in job.get("steps", [])
+                       if "docker/build-push-action@" in str(s.get("uses", ""))]
+        assert bauschritte, f"{datei}: keine Bauschritte gefunden"
+        for schritt in bauschritte:
+            assert schritt["with"].get("provenance") is False, (
+                f"{datei}: {schritt.get('name')} bettet die Herkunft ein")
+
+
 def test_nur_der_bauauftrag_darf_signaturtoken_praegen():
     """id-token: write gehoert genau dorthin, wo signiert wird. Oben im
     Ablauf gaelte es auch fuer den Testauftrag, und der fuehrt mit pip
