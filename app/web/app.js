@@ -67,6 +67,10 @@ const I18N = {
     gb_kanal: "Für welchen Kanal",
     gb_kanal_d: "Der eigentliche Betriebsgriff liegt hier: teuer machen, wo ein Kanal leerläuft, billig, wo er aufgefüllt werden soll.",
     gb_alle: "Alle Kanäle",
+    gb_aktuell_einer: "Dieser Kanal verlangt derzeit {ppm} ppm und {msat} msat Grundgebühr.",
+    gb_aktuell_alle: "Derzeit verlangst du auf allen Kanälen {ppm} ppm und {msat} msat Grundgebühr.",
+    gb_aktuell_gemischt: "Deine Kanäle verlangen derzeit Unterschiedliches: {satz} ppm, Grundgebühr {basis} msat. Vorbelegt ist der häufigste Wert — „Gebühren setzen“ gilt dann für alle Kanäle.",
+    gb_aktuell_unbekannt: "Was deine Kanäle derzeit verlangen, konnte LND gerade nicht sagen. Die Felder zeigen die Vorgabe, nicht deinen Stand.",
     gb_satz: "Satz (ppm)",
     gb_satz_d: "Millionstel des weitergeleiteten Betrags. 100 ppm heißt: 100 Sats bei einer Million.",
     gb_basis: "Grundgebühr (Millisatoshi)",
@@ -1371,6 +1375,10 @@ const I18N = {
     gb_kanal: "For which channel",
     gb_kanal_d: "This is where the real operating lever sits: make it expensive where a channel is draining, cheap where it should be refilled.",
     gb_alle: "All channels",
+    gb_aktuell_einer: "This channel currently charges {ppm} ppm and a {msat} msat base fee.",
+    gb_aktuell_alle: "You currently charge {ppm} ppm and a {msat} msat base fee on all channels.",
+    gb_aktuell_gemischt: "Your channels currently charge different fees: {satz} ppm, base fee {basis} msat. The most common value is filled in — “Set fees” then applies it to all channels.",
+    gb_aktuell_unbekannt: "LND could not say right now what your channels charge. The fields show the default, not your current setting.",
     gb_satz: "Rate (ppm)",
     gb_satz_d: "Millionths of the forwarded amount. 100 ppm means 100 sats on a million.",
     gb_basis: "Base fee (millisatoshi)",
@@ -11674,6 +11682,9 @@ function medianUebernehmen() {
   const heute = (NETZGEBUEHREN || {}).heute;
   if (!heute || heute.median_ppm === null) return;
   $("#gb-satz").value = heute.median_ppm;
+  // Ab hier steht im Feld eine Absicht, kein Stand -- die Auffrischung im
+  // Takt darf sie nicht wieder mit dem alten Satz ueberschreiben.
+  GB_EIGENE_EINGABE = true;
   $("#gb-netz-meldung").textContent = t("gb_uebernommen");
 }
 
@@ -11719,6 +11730,85 @@ function fuelleGebuehrenauswahl(kanaele) {
     feld.append(o);
   }
   if (vorher) feld.value = vorher;
+  GB_KANAELE = kanaele || [];
+  gebuehrenVorbelegen();
+}
+
+/* Was die Kanaele JETZT verlangen -- fuer das Gebuehrenfeld.
+ *
+ * Aus dem Betrieb, 26.09.2026: "meine gesetzten gebueren nach jedem neu
+ * start oder refresh weg sind und nicht mehr angezeigt werden was ich da vom
+ * netzwerk verlange". Weg waren sie nie; das Feld zeigte nach jedem Laden nur
+ * wieder seine feste Vorgabe. Die Werte kommen aus LNDs Gebuehrenbericht und
+ * stehen seitdem an jedem Kanal der Kanalliste. */
+let GB_KANAELE = [];
+// Hat der Mensch selbst etwas eingetippt? Die Kanalansicht frischt sich im
+// Takt auf -- ohne diese Marke wuerde aus seinen 180 alle paar Sekunden
+// wieder der alte Satz.
+let GB_EIGENE_EINGABE = false;
+
+// Ohne DOM, damit es sich pruefen laesst. Gibt null zurueck, wenn fuer die
+// Auswahl nichts bekannt ist -- nicht gewusst ist nicht null ppm.
+function gebuehrenLage(kanaele, punkt) {
+  const bekannt = (kanaele || []).filter((k) => k.punkt
+    && (!punkt || k.punkt === punkt)
+    && Number.isFinite(k.satz_ppm) && Number.isFinite(k.basis_msat));
+  if (!bekannt.length) return null;
+  // Vorbelegt wird das haeufigste PAAR aus Satz und Grundgebuehr. Zwei
+  // getrennt ermittelte Werte ergaeben eine Kombination, die womoeglich an
+  // keinem einzigen Kanal gilt. Bei Gleichstand der guenstigere.
+  const zaehler = new Map();
+  for (const k of bekannt) {
+    const schluessel = k.satz_ppm + "|" + k.basis_msat;
+    zaehler.set(schluessel, (zaehler.get(schluessel) || 0) + 1);
+  }
+  let bestes = null;
+  for (const [schluessel, n] of zaehler) {
+    const [satz, basis] = schluessel.split("|").map(Number);
+    if (!bestes || n > bestes.n
+        || (n === bestes.n && (satz < bestes.satz
+            || (satz === bestes.satz && basis < bestes.basis)))) {
+      bestes = { n, satz, basis };
+    }
+  }
+  const saetze = bekannt.map((k) => k.satz_ppm);
+  const basen = bekannt.map((k) => k.basis_msat);
+  return {
+    satz_ppm: bestes.satz,
+    basis_msat: bestes.basis,
+    einheitlich: zaehler.size === 1,
+    satz_von: Math.min(...saetze),
+    satz_bis: Math.max(...saetze),
+    basis_von: Math.min(...basen),
+    basis_bis: Math.max(...basen),
+    anzahl: bekannt.length,
+  };
+}
+
+function gebuehrenVorbelegen() {
+  const punkt = $("#gb-kanal").value;
+  const lage = gebuehrenLage(GB_KANAELE, punkt);
+  const text = $("#gb-aktuell");
+  if (!lage) {
+    // Sagen, warum -- sonst hielte man die Vorgabe im Feld fuer den Stand.
+    text.textContent = GB_KANAELE.length ? t("gb_aktuell_unbekannt") : "";
+    return;
+  }
+  if (!GB_EIGENE_EINGABE) {
+    $("#gb-satz").value = lage.satz_ppm;
+    $("#gb-basis").value = lage.basis_msat;
+  }
+  if (lage.einheitlich) {
+    text.textContent = t(punkt ? "gb_aktuell_einer" : "gb_aktuell_alle",
+                         { ppm: zahl(lage.satz_ppm), msat: zahl(lage.basis_msat) });
+    return;
+  }
+  const spanne = (von, bis) => von === bis ? zahl(von)
+    : zahl(von) + "–" + zahl(bis);
+  text.textContent = t("gb_aktuell_gemischt", {
+    satz: spanne(lage.satz_von, lage.satz_bis),
+    basis: spanne(lage.basis_von, lage.basis_bis),
+  });
 }
 
 async function gebuehrenSetzen() {
@@ -11734,6 +11824,10 @@ async function gebuehrenSetzen() {
       kanalpunkt,
     });
     meldung.textContent = t(d.fuer_alle ? "gb_gesetzt_alle" : "gb_gesetzt_einer");
+    // Gesetzt -- ab jetzt zeigt das Feld wieder den Stand, und der kommt
+    // frisch von LND, nicht aus dem, was eben eingetippt war.
+    GB_EIGENE_EINGABE = false;
+    ladeLightningKanaele();
   } catch (e) {
     if (e && e.abgemeldet) return;
     const d = e.detail || {};
@@ -12206,6 +12300,17 @@ async function start() {
   });
   $("#ez-kopieren").addEventListener("click", adresseKopieren);
   $("#gb-setzen").addEventListener("click", gebuehrenSetzen);
+  // Ein anderer Kanal: dessen Stand zeigen, auch wenn vorher getippt wurde.
+  // Und die Meldung vom letzten Setzen weg -- "Gesetzt, fuer diesen Kanal"
+  // neben "Alle Kanaele" behauptet etwas, das so nicht geschehen ist.
+  $("#gb-kanal").addEventListener("change", () => {
+    GB_EIGENE_EINGABE = false;
+    $("#gb-meldung").textContent = "";
+    gebuehrenVorbelegen();
+  });
+  for (const id of ["#gb-satz", "#gb-basis"]) {
+    $(id).addEventListener("input", () => { GB_EIGENE_EINGABE = true; });
+  }
   $("#gb-messen").addEventListener("click", netzgebuehrenMessen);
   $("#gb-uebernehmen").addEventListener("click", medianUebernehmen);
   $("#gb-automatik").addEventListener("change", gebuehrenautomatikUmschalten);

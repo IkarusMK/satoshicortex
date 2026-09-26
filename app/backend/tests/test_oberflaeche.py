@@ -3451,3 +3451,100 @@ def test_der_schluessel_wird_nur_als_text_gesetzt(js):
     assert '$("#fz-text").textContent = d.verbindung' in block
     assert "innerHTML" not in block
     assert "innerHTML" not in _block(js, "function zeichneFzListe(")
+
+
+# ── Das Gebuehrenfeld zeigt, was gilt (26.09.2026) ─────────────────────────
+#
+# Aus dem Betrieb: "meine gesetzten gebueren nach jedem neu start oder
+# refresh weg sind und nicht mehr angezeigt werden was ich da vom netzwerk
+# verlange .. entweder bleibt das dann als weisse vorlage oder es wird mir
+# im info text angezeigt". Gesetzt waren sie -- das Feld zeigte nach jedem
+# Laden nur wieder seine feste Vorgabe, 100 ppm und 0.
+
+def _gebuehrenlage_ausfuehren(js, faelle):
+    import json
+    import shutil
+    import subprocess
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node nicht vorhanden -- die CI prueft es trotzdem")
+    stelle = js.index("function gebuehrenLage(")
+    quelle = js[stelle:js.index("\n}\n", stelle) + 2]
+    programm = (quelle + "\nconst faelle = " + json.dumps(faelle) + ";\n"
+                "console.log(JSON.stringify(faelle.map("
+                "([k, p]) => gebuehrenLage(k, p))));\n")
+    lauf = subprocess.run([node, "-e", programm], capture_output=True,
+                          text=True)
+    assert lauf.returncode == 0, lauf.stderr
+    return json.loads(lauf.stdout)
+
+
+def _kanal(punkt, satz, basis):
+    return {"punkt": punkt, "satz_ppm": satz, "basis_msat": basis}
+
+
+def test_das_gebuehrenfeld_kennt_den_stand_jedes_kanals(js):
+    gleich = [_kanal("a:0", 150, 1000), _kanal("b:0", 150, 1000)]
+    gemischt = [_kanal("a:0", 50, 0), _kanal("b:0", 200, 1000),
+                _kanal("c:0", 50, 0)]
+    unbekannt = [_kanal("a:0", None, None)]
+    ergebnis = _gebuehrenlage_ausfuehren(js, [
+        [gleich, ""], [gemischt, ""], [gemischt, "b:0"],
+        [unbekannt, ""], [gleich, "z:9"], [[], ""]])
+
+    alle_gleich, alle_gemischt, einer, nichts, fremd, leer = ergebnis
+    assert alle_gleich["einheitlich"] is True
+    assert (alle_gleich["satz_ppm"], alle_gleich["basis_msat"]) == (150, 1000)
+    assert alle_gleich["anzahl"] == 2
+    # Unterschiedlich: vorbelegt wird das haeufigste PAAR, nicht zwei
+    # Einzelwerte, die so an keinem Kanal gelten.
+    assert alle_gemischt["einheitlich"] is False
+    assert (alle_gemischt["satz_ppm"], alle_gemischt["basis_msat"]) == (50, 0)
+    assert (alle_gemischt["satz_von"], alle_gemischt["satz_bis"]) == (50, 200)
+    assert (alle_gemischt["basis_von"], alle_gemischt["basis_bis"]) == (0, 1000)
+    assert (einer["satz_ppm"], einer["basis_msat"], einer["einheitlich"]) == (
+        200, 1000, True)
+    # Nicht gewusst ist nicht null: dann gibt es keine Lage, statt einer
+    # erfundenen Zahl im Feld.
+    assert nichts is None and fremd is None and leer is None
+
+
+def test_die_auffrischung_ueberschreibt_keine_eingabe(js, html):
+    """Die Kanalansicht frischt sich im Takt auf, und mit ihr die
+    Kanalauswahl. Wer gerade 180 eintippt, darf nicht zusehen muessen, wie
+    daraus wieder 150 wird."""
+    assert 'id="gb-aktuell"' in html
+    vorbelegen = _ohne_js_kommentare(_block(js, "function gebuehrenVorbelegen("))
+    assert "gebuehrenLage(GB_KANAELE" in vorbelegen
+    zuweisung = vorbelegen.index('$("#gb-satz").value')
+    assert "if (!GB_EIGENE_EINGABE)" in vorbelegen[:zuweisung]
+    assert "#gb-aktuell" in vorbelegen
+
+    fuellen = _ohne_js_kommentare(_block(js, "function fuelleGebuehrenauswahl("))
+    assert "GB_KANAELE = " in fuellen and "gebuehrenVorbelegen()" in fuellen
+
+    # Eigene Eingabe merkt sich, ein anderer Kanal oder erfolgreiches
+    # Setzen gibt das Feld wieder frei.
+    uebernehmen = _ohne_js_kommentare(_block(js, "function medianUebernehmen("))
+    assert "GB_EIGENE_EINGABE = true" in uebernehmen
+    setzen = _ohne_js_kommentare(_block(js, "async function gebuehrenSetzen("))
+    erfolg = setzen[setzen.index('api("/lightning/gebuehren"'):
+                    setzen.index("catch (e)")]
+    assert "GB_EIGENE_EINGABE = false" in erfolg
+    assert "ladeLightningKanaele()" in erfolg
+    code = _ohne_js_kommentare(js)
+    wechsel = code[code.index('$("#gb-kanal").addEventListener("change"'):]
+    wechsel = wechsel[:wechsel.index("\n  });")]
+    assert "GB_EIGENE_EINGABE = false" in wechsel
+    # Die Meldung vom letzten Setzen gehoert zum vorigen Kanal.
+    assert '$("#gb-meldung").textContent = ""' in wechsel
+    schleife = code[code.index('for (const id of ["#gb-satz", "#gb-basis"])'):]
+    schleife = schleife[:schleife.index("\n  }\n")]
+    assert 'addEventListener("input"' in schleife
+    assert "GB_EIGENE_EINGABE = true" in schleife
+
+
+def test_der_stand_steht_in_beiden_sprachen_da(js):
+    for schluessel in ("gb_aktuell_einer", "gb_aktuell_alle",
+                       "gb_aktuell_gemischt", "gb_aktuell_unbekannt"):
+        assert js.count(schluessel + ":") == 2, schluessel

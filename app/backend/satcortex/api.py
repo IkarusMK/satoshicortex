@@ -5330,6 +5330,26 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
             except (lnd.NichtErreichbar, lnd.LndFehler) as fehler:
                 log.info("Lightning: %s nicht abrufbar (%s)", name, fehler)
 
+        # Was jeder Kanal verlangt -- direkt an den Kanal geschrieben, damit
+        # das Gebuehrenfeld zeigen kann, was gilt, statt einer festen
+        # Vorgabe. Aus dem Betrieb, 26.09.2026: nach jedem Neuladen standen
+        # dort wieder 100 ppm und 0, egal was gesetzt war.
+        #
+        # Fehlt der Bericht oder ein Kanal darin: None, nicht 0. Null ppm
+        # ist ein gewoehnlicher Satz; ihn hinzuschreiben, wo wir es nicht
+        # wissen, waere eine erfundene Zahl.
+        if antwort.get("kanaele") is not None:
+            try:
+                bericht = lnd.gebuehrenbericht(knoten)
+            except (lnd.NichtErreichbar, lnd.LndFehler) as fehler:
+                log.info("Lightning: Gebuehrenbericht nicht abrufbar (%s)",
+                         fehler)
+                bericht = {}
+            antwort["kanaele"] = [
+                {**k, **bericht.get(k.get("punkt") or "",
+                                    {"satz_ppm": None, "basis_msat": None})}
+                for k in antwort["kanaele"]]
+
         # Die Leitungen -- nur zusammen mit der Kanalliste. Ohne sie stuende
         # jede Verbindung als "ohne Kanal" da, und genau diese Verwechslung
         # von Verbindung und Kanal soll hier weg.

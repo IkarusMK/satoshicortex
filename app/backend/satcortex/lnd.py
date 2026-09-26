@@ -2893,3 +2893,29 @@ def setze_gebuehren(knoten: Knoten, basis_msat: int, satz_ppm: int,
         daten["global"] = True
     return knoten.ruf("/v1/chanpolicy", macaroon=EIGENES_MACAROON,
                       daten=daten) or {}
+
+
+def gebuehrenbericht(knoten: Knoten) -> Dict[str, Dict[str, int]]:
+    """Was jeder Kanal JETZT verlangt, nach Kanalpunkt.
+
+    Aus dem Betrieb, 26.09.2026: "meine gesetzten gebueren nach jedem neu
+    start oder refresh weg ... nicht mehr angezeigt was ich da vom netzwerk
+    verlange". Weg waren sie nie -- LND fuehrt sie selbst. Gefragt hat ihn
+    nur niemand, und die Felder standen nach jedem Laden wieder auf ihren
+    festen Vorgaben.
+
+    FeeReport, GET /v1/fees, braucht offchain:read. Feldnamen aus
+    lnrpc/lightning.proto am Tag v0.21.3-beta (ChannelFeeReport). Ein
+    fehlendes Feld heisst null, so wie protobuf es meint -- siehe
+    gebuehren.py. Ein Eintrag ohne Kanalpunkt laesst sich keinem Kanal
+    zuordnen und faellt weg.
+    """
+    d = knoten.ruf("/v1/fees") or {}
+    bericht: Dict[str, Dict[str, int]] = {}
+    for eintrag in d.get("channel_fees") or []:
+        punkt = str(eintrag.get("channel_point") or "")
+        if not punkt:
+            continue
+        bericht[punkt] = {"basis_msat": _zahl(eintrag.get("base_fee_msat")),
+                          "satz_ppm": _zahl(eintrag.get("fee_per_mil"))}
+    return bericht

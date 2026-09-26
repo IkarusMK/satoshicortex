@@ -1570,6 +1570,10 @@ class FakeLnd:
         # genau das war vorher die stille Kante.
         if pfad.startswith("/v1/graph/node/"):
             return {"node": {"addresses": [{"addr": "gegenstelle.onion:9735"}]}}
+        # Seit dem 26.09.2026 fragt die Kanalansicht, was jeder Kanal
+        # verlangt. Ohne Kanaele steht nichts darin.
+        if pfad == "/v1/fees":
+            return {"channel_fees": []}
         raise AssertionError(f"unerwarteter Aufruf: {pfad}")
 
 
@@ -2251,6 +2255,10 @@ class LndVollstaendig(FakeLnd):
                                   "remote_balance": "3000000"}]}
         if nackt == "/v1/channels/pending":
             return dict(self.ausstehend)
+        if nackt == "/v1/fees":
+            return {"channel_fees": [{"channel_point": "cc" * 32 + ":1",
+                                      "base_fee_msat": "1000",
+                                      "fee_per_mil": "150"}]}
         if nackt.startswith("/v1/payreq/"):
             return {"destination": "03ff" + "aa" * 31, "num_satoshis": "1500",
                     "timestamp": "1000", "expiry": "9999999999",
@@ -2315,6 +2323,32 @@ def test_ein_kanal_im_aufbau_steht_in_der_kanalansicht(client, lnd_voll):
             for k in d["ausstehend"]] == [("oeffnet", 100_000, 1)]
     # Die offenen bleiben, wo sie sind.
     assert d["kanaele"][0]["gegenstelle"] == "ACINQ"
+
+
+def test_die_kanalansicht_nennt_was_jeder_kanal_verlangt(client, lnd_voll):
+    """Aus dem Betrieb, 26.09.2026: nach jedem Neuladen standen im
+    Gebuehrenfeld wieder 100 ppm und 0 -- nicht das, was der Knoten
+    wirklich verlangt."""
+    _richte_ein(client)
+    lnd_voll.kanaele_roh = [
+        {"active": True, "peer_alias": "Eins", "channel_point": "cc" * 32 + ":1",
+         "capacity": "1000000", "local_balance": "500000"},
+        {"active": True, "peer_alias": "Zwei", "channel_point": "dd" * 32 + ":0",
+         "capacity": "1000000", "local_balance": "500000"}]
+    d = client.get("/api/lightning/kanaele").json()
+    eins, zwei = d["kanaele"]
+    assert (eins["satz_ppm"], eins["basis_msat"]) == (150, 1000)
+    # Steht der Kanal nicht im Bericht, ist das "weiss ich nicht" -- und
+    # keine erfundene Null.
+    assert zwei["satz_ppm"] is None and zwei["basis_msat"] is None
+
+
+def test_faellt_der_gebuehrenbericht_aus_bleibt_die_kanalliste(client, lnd_voll):
+    _richte_ein(client)
+    lnd_voll.faellt_aus = {"/v1/fees"}
+    d = client.get("/api/lightning/kanaele").json()
+    assert d["kanaele"][0]["gegenstelle"] == "ACINQ"
+    assert d["kanaele"][0]["satz_ppm"] is None
 
 
 def test_faellt_die_liste_im_aufbau_aus_bleiben_die_offenen(client, lnd_voll):

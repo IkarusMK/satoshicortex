@@ -380,6 +380,27 @@ def test_guthaben_zaehlt_kette_und_kanaele_nicht_zusammen():
                  "kanal_hier": 42000, "kanal_drueben": 58000}
 
 
+def test_der_gebuehrenbericht_nennt_was_jeder_kanal_verlangt():
+    """Aus dem Betrieb, 26.09.2026: "meine gesetzten gebueren nach jedem neu
+    start oder refresh weg ... nicht mehr angezeigt was ich da vom netzwerk
+    verlange". Weg waren sie nie -- LND vergisst sie nicht. Nur gefragt hat
+    ihn niemand: die Felder standen fest auf 100 und 0.
+
+    Feldnamen aus lnrpc/lightning.proto am Tag v0.21.3-beta (ChannelFeeReport:
+    channel_point, base_fee_msat, fee_per_mil). Ein fehlendes Feld heisst
+    null, so wie protobuf es meint -- siehe gebuehren.py."""
+    k = FakeRuf({"/v1/fees": {"channel_fees": [
+        {"chan_id": "1", "channel_point": "aa:0", "base_fee_msat": "1000",
+         "fee_per_mil": "150", "fee_rate": 0.00015},
+        {"chan_id": "2", "channel_point": "bb:1"},
+        {"chan_id": "3", "fee_per_mil": "5"}]}})
+    assert lnd.gebuehrenbericht(k) == {
+        "aa:0": {"basis_msat": 1000, "satz_ppm": 150},
+        "bb:1": {"basis_msat": 0, "satz_ppm": 0},
+    }
+    assert k.gerufen == [("/v1/fees", None)]
+
+
 def test_weiterleitungen_werden_summiert():
     k = FakeRuf({"/v1/switch": {"forwarding_events": [
         {"timestamp": "1780000000", "amt_out": "10000", "fee_msat": "1500",
@@ -2199,6 +2220,7 @@ AUFRUFE = [
     ("htlc_strom", lambda k: next(iter(lnd.htlc_strom(k)))),
     ("kanal_schliessen", lambda k: lnd.kanal_schliessen(k, KANALPUNKT_TEST, 5)),
     ("setze_gebuehren", lambda k: lnd.setze_gebuehren(k, 1000, 100)),
+    ("gebuehrenbericht", lambda k: lnd.gebuehrenbericht(k)),
     ("geraeteschluessel_kennungen", lambda k: lnd.geraeteschluessel_kennungen(k)),
     ("geraeteschluessel_backen", lambda k: lnd.geraeteschluessel_backen(
         k, fernzugang.rechte("ansehen"), fernzugang.ERSTE_KENNUNG)),
