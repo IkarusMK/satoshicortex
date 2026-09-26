@@ -698,6 +698,9 @@ const I18N = {
     ln_hinweis_gesperrt: "Deine Wallet ist angelegt, aber gesperrt. Solange sie zu ist, leitet dein Knoten nichts weiter und nimmt keine Zahlungen an. Unter „Wallet“ gibst du dein Wallet-Passwort ein.",
     ln_hinweis_startet: "LND fährt gerade hoch. Das dauert ein bis zwei Minuten, danach steht hier mehr.",
     ln_hinweis_laeuft: "Wallet steht, Knoten läuft, Kette aktuell. Solange du aber keinen öffentlichen Kanal hast, taucht dein Knoten NIRGENDWO im Lightning-Graphen auf — auch nicht auf amboss.space oder 1ml. Das ist keine Störung, sondern Absicht des Protokolls: ein Knoten wird erst mit seinem ersten angekündigten Kanal im Netz bekanntgemacht. Bis dahin erreicht dich nur, wem du deine Verbindungsadresse selbst gibst.",
+    ln_hinweis_laeuft_kurz: "Wallet steht, Knoten läuft, Kette aktuell.",
+    ln_hinweis_bald: "Wallet steht, Knoten läuft, Kette aktuell. Dein öffentlicher Kanal wird ab seiner sechsten Bestätigung im Lightning-Graphen angekündigt — und dein Knoten mit ihm. Bis dahin erreicht dich nur, wem du deine Verbindungsadresse selbst gibst.",
+    ln_hinweis_sichtbar: "Wallet steht, Knoten läuft, Kette aktuell — und dein Knoten steht im Lightning-Graphen: andere finden ihn und können Kanäle zu ihm öffnen.",
     ln_hinweis_bereit: "Die Kette steht, und LND läuft. Der nächste Schritt ist die Wallet: Seed auf Papier, mit Gegenprobe — unter „Wallet“ in der Leiste. Bis dahin hat dieser Knoten keinen Schlüssel, meldet sich im Lightning-Netz nicht an und hält keinen Satoshi.",
     a_seit: "Sammelt seit {datum} — {tx} Transaktionen, {bloecke} Blöcke.",
     a_wartet: "Der Zulauf läuft, gesammelt wurde noch nichts.",
@@ -2004,6 +2007,9 @@ const I18N = {
     ln_hinweis_gesperrt: "Your wallet exists but is locked. While it is, your node forwards nothing and accepts no payments. Enter your wallet password under “Wallet”.",
     ln_hinweis_startet: "LND is starting up. That takes a minute or two, and then there will be more here.",
     ln_hinweis_laeuft: "Wallet is up, node is running, chain is current. But as long as you have no public channel, your node appears NOWHERE in the Lightning graph — not on amboss.space, not on 1ml. That is not a fault but how the protocol works: a node is only announced to the network with its first announced channel. Until then, only those you hand your connection address to can reach you.",
+    ln_hinweis_laeuft_kurz: "Wallet is up, node is running, chain is current.",
+    ln_hinweis_bald: "Wallet is up, node is running, chain is current. Your public channel is announced to the Lightning graph from its sixth confirmation on — and your node with it. Until then, only those you hand your connection address to can reach you.",
+    ln_hinweis_sichtbar: "Wallet is up, node is running, chain is current — and your node is in the Lightning graph: others can find it and open channels to it.",
     ln_hinweis_bereit: "The chain is complete and LND is running. Next comes the wallet: seed on paper, with a verification step — under “Wallet” in the sidebar. Until then this node holds no key, does not announce itself on the Lightning network and holds no satoshi.",
     a_seit: "Collecting since {datum} — {tx} transactions, {bloecke} blocks.",
     a_wartet: "The feed is running, nothing collected yet.",
@@ -5819,13 +5825,60 @@ function zeichneLightning(d) {
   // Der Betreiber hatte seine Wallet laengst angelegt und las hier weiter "der
   // naechste Schritt ist die Wallet" -- ein Satz, der schlicht nicht mehr
   // stimmte. "das stimmt ja auch nicht habe ja alles gemacht".
+  LN_LAGE = d;
+  zeichneLnHinweis();
+}
+
+/* Ob der eigene Knoten im Lightning-Graphen steht -- aus den eigenen Kanaelen.
+
+   DER BEFUND VOM 26.09.2026: Bis dahin stand bei JEDEM laufenden Knoten
+   "solange du keinen oeffentlichen Kanal hast, taucht dein Knoten NIRGENDWO
+   im Lightning-Graphen auf" -- auch bei einem mit oeffentlichen Kanaelen. Der
+   Satz hing am Wallet-Zustand, nie an den Kanaelen.
+
+   Angekuendigt wird ein oeffentlicher Kanal ab der sechsten Bestaetigung
+   (BOLT 7, announcement_signatures), und mit ihm der Knoten. Die Hoehe des
+   Finanzierungsblocks steckt in der Kanalnummer, den oberen 24 Bit der
+   short_channel_id -- dafuer braucht es keinen Aufruf mehr. null heisst: die
+   Hoehe ist unbekannt, dann wird nichts behauptet. */
+let LN_LAGE = null;
+let LN_GRAPH = null;
+
+function graphLage(kanaele, hoehe) {
+  if (!Number.isFinite(hoehe) || hoehe <= 0) return null;
+  let oeffentlich = 0;
+  let angekuendigt = 0;
+  for (const k of kanaele || []) {
+    if (k.privat) continue;
+    oeffentlich++;
+    let block = 0;
+    try {
+      block = Number(BigInt(k.nummer) >> 40n);
+    } catch (e) {
+      block = 0;                  // unlesbar: dann eben nicht mitgezaehlt
+    }
+    if (block > 0 && hoehe - block + 1 >= 6) angekuendigt++;
+  }
+  return { oeffentlich, angekuendigt };
+}
+
+// Welcher Satz unter die drei Zeilen gehoert. Ohne DOM, damit er sich
+// pruefen laesst.
+function lnHinweis(d, graph) {
   const lnstand = (d.knoten || {}).stand || "aus";
-  $("#d-ln-hinweis").textContent =
-      !d.kette_bereit ? t("ln_hinweis_sync")
-    : lnstand === "keine_wallet" ? t("ln_hinweis_bereit")
-    : lnstand === "gesperrt" ? t("ln_hinweis_gesperrt")
-    : lnstand === "bereit" ? t("ln_hinweis_laeuft")
-    : t("ln_hinweis_startet");
+  if (!d.kette_bereit) return "ln_hinweis_sync";
+  if (lnstand === "keine_wallet") return "ln_hinweis_bereit";
+  if (lnstand === "gesperrt") return "ln_hinweis_gesperrt";
+  if (lnstand !== "bereit") return "ln_hinweis_startet";
+  if (!graph) return "ln_hinweis_laeuft_kurz";
+  if (graph.angekuendigt > 0) return "ln_hinweis_sichtbar";
+  return graph.oeffentlich > 0 ? "ln_hinweis_bald" : "ln_hinweis_laeuft";
+}
+
+function zeichneLnHinweis() {
+  const feld = $("#d-ln-hinweis");
+  if (!feld || !LN_LAGE) return;
+  feld.textContent = t(lnHinweis(LN_LAGE, LN_GRAPH));
 }
 
 /* ── Lightning: Kanaele und Graph ───────────────────────────────────────── */
@@ -5864,6 +5917,9 @@ async function ladeLightningKanaele() {
   // bitcoind. Sie gehoert deshalb auch dann hin, wenn Lightning noch gar
   // nicht laeuft: genau dann plant man ja seinen ersten Kanal.
   zeichneKanalkosten(d.kanalkosten);
+  // Erst mit den Kanaelen laesst sich sagen, ob der Knoten im Graphen steht.
+  LN_GRAPH = bereit ? graphLage(d.kanaele, (d.knoten || {}).hoehe) : null;
+  zeichneLnHinweis();
   if (!bereit) return;
   fuelleGebuehrenauswahl(d.kanaele || []);
   ladeNetzgebuehren();

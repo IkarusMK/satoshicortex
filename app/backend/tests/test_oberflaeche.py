@@ -1439,8 +1439,10 @@ def test_der_lightning_hinweis_kennt_den_wallet_zustand(js):
     """Er kannte bis zum 09.09.2026 NUR die Kette. Der Betreiber hatte seine
     Wallet laengst angelegt und las weiter "der naechste Schritt ist die
     Wallet" -- ein Satz, der schlicht nicht mehr stimmte."""
-    block = js[js.index('$("#d-ln-hinweis")') - 400:]
-    block = block[:block.index(";", block.index('$("#d-ln-hinweis")'))]
+    # Seit dem 26.09.2026 steht die Wahl in lnHinweis(), wo sie sich
+    # ausfuehren laesst -- test_der_hinweis_behauptet_nur_was_stimmt prueft
+    # sie Fall fuer Fall.
+    block = _block(js, "function lnHinweis(")
     for schluessel in ("ln_hinweis_sync", "ln_hinweis_bereit",
                        "ln_hinweis_gesperrt", "ln_hinweis_laeuft",
                        "ln_hinweis_startet"):
@@ -3547,4 +3549,101 @@ def test_die_auffrischung_ueberschreibt_keine_eingabe(js, html):
 def test_der_stand_steht_in_beiden_sprachen_da(js):
     for schluessel in ("gb_aktuell_einer", "gb_aktuell_alle",
                        "gb_aktuell_gemischt", "gb_aktuell_unbekannt"):
+        assert js.count(schluessel + ":") == 2, schluessel
+
+
+# ── Der Satz ueber den Lightning-Graphen (26.09.2026) ──────────────────────
+#
+# Unter "Wallet" stand bei JEDEM laufenden Knoten: "Solange du aber keinen
+# oeffentlichen Kanal hast, taucht dein Knoten NIRGENDWO im Lightning-Graphen
+# auf" -- auch bei einem, der laengst oeffentliche Kanaele hatte. Der Satz
+# hing nur am Wallet-Zustand, nie an den Kanaelen. Aufgefallen beim Erneuern
+# der Bildschirmfotos. Genau die Art Behauptung ueber das Netz, die nicht
+# stimmen muss, um richtig zu klingen (AGENTS.md: "Never claim something
+# about the network that is not true").
+
+def _funktionen_ausfuehren(js, namen, ausdruck):
+    import json
+    import shutil
+    import subprocess
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node nicht vorhanden -- die CI prueft es trotzdem")
+    quelle = ""
+    for name in namen:
+        stelle = js.index(f"function {name}(")
+        quelle += js[stelle:js.index("\n}\n", stelle) + 2]
+    lauf = subprocess.run([node, "-e", quelle + "\nconsole.log(JSON.stringify("
+                           + ausdruck + "));\n"],
+                          capture_output=True, text=True)
+    assert lauf.returncode == 0, lauf.stderr
+    return json.loads(lauf.stdout)
+
+
+def _scid(block):
+    """short_channel_id: Block in den oberen 24 Bit (BOLT 7)."""
+    return str(block << 40 | 5 << 16 | 1)
+
+
+def test_angekuendigt_ist_ein_oeffentlicher_kanal_ab_der_sechsten_bestaetigung(js):
+    import json
+    faelle = [
+        [[{"privat": False, "nummer": _scid(900_000)}], 900_010],
+        [[{"privat": False, "nummer": _scid(900_006)}], 900_010],   # 5 Bestaetigungen
+        [[{"privat": False, "nummer": _scid(900_005)}], 900_010],   # genau 6
+        [[{"privat": True, "nummer": _scid(800_000)}], 900_010],
+        [[{"privat": False, "nummer": ""}], 900_010],               # unlesbar
+        [[{"privat": False, "nummer": _scid(900_000)}], 0],         # Hoehe unbekannt
+    ]
+    ergebnis = _funktionen_ausfuehren(
+        js, ["graphLage"],
+        f"{json.dumps(faelle)}.map(([k, h]) => graphLage(k, h))")
+    assert ergebnis == [
+        {"oeffentlich": 1, "angekuendigt": 1},
+        {"oeffentlich": 1, "angekuendigt": 0},
+        {"oeffentlich": 1, "angekuendigt": 1},
+        {"oeffentlich": 0, "angekuendigt": 0},
+        {"oeffentlich": 1, "angekuendigt": 0},
+        None,
+    ]
+
+
+def test_der_hinweis_behauptet_nur_was_stimmt(js):
+    import json
+    laeuft = {"kette_bereit": True, "knoten": {"stand": "bereit"}}
+    faelle = [
+        [laeuft, None],
+        [laeuft, {"oeffentlich": 0, "angekuendigt": 0}],
+        [laeuft, {"oeffentlich": 1, "angekuendigt": 0}],
+        [laeuft, {"oeffentlich": 3, "angekuendigt": 2}],
+        [{"kette_bereit": False, "knoten": {"stand": "bereit"}}, None],
+        [{"kette_bereit": True, "knoten": {"stand": "gesperrt"}}, None],
+        [{"kette_bereit": True, "knoten": {"stand": "keine_wallet"}}, None],
+        [{"kette_bereit": True, "knoten": {"stand": "startet"}}, None],
+    ]
+    ergebnis = _funktionen_ausfuehren(
+        js, ["lnHinweis"],
+        f"{json.dumps(faelle)}.map(([d, g]) => lnHinweis(d, g))")
+    assert ergebnis == [
+        "ln_hinweis_laeuft_kurz",     # noch nicht gewusst: nichts behaupten
+        "ln_hinweis_laeuft",          # wirklich kein oeffentlicher Kanal
+        "ln_hinweis_bald",            # oeffentlich, aber noch nicht angekuendigt
+        "ln_hinweis_sichtbar",
+        "ln_hinweis_sync", "ln_hinweis_gesperrt", "ln_hinweis_bereit",
+        "ln_hinweis_startet",
+    ]
+
+
+def test_die_kanaele_ziehen_den_hinweis_nach(js):
+    """Die Lage kommt aus /lightning, die Kanaele aus /lightning/kanaele --
+    zwei Abrufe. Der Hinweis muss neu gezeichnet werden, wenn der zweite
+    ankommt, sonst stuende bis zur naechsten Runde der alte Satz da."""
+    zeichnen = _ohne_js_kommentare(_block(js, "function zeichneLightning("))
+    assert "zeichneLnHinweis()" in zeichnen
+    assert 't("ln_hinweis_laeuft")' not in zeichnen
+    laden = _ohne_js_kommentare(_block(js, "async function ladeLightningKanaele("))
+    assert "LN_GRAPH = " in laden and "graphLage(d.kanaele" in laden
+    assert laden.count("zeichneLnHinweis()") >= 1
+    for schluessel in ("ln_hinweis_laeuft_kurz", "ln_hinweis_bald",
+                       "ln_hinweis_sichtbar"):
         assert js.count(schluessel + ":") == 2, schluessel

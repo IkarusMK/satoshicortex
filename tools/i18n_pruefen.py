@@ -59,6 +59,12 @@ _ALS_TEXT = re.compile(r'"([a-z_][a-z0-9_]*)"')
 # NEUE solche Stelle nicht stillschweigend ungeprueft bleibt -- taucht unten
 # ein t(...) auf, das hier fehlt, meldet die Pruefung das.
 ZUSAMMENGESETZT = {
+    # Der Satz unter den drei Lightning-Zeilen -- einer je Lage aus
+    # lnHinweis(). Befund vom 26.09.2026.
+    "t(lnHinweis(LN_LAGE, LN_GRAPH))": [
+        "ln_hinweis_sync", "ln_hinweis_bereit", "ln_hinweis_gesperrt",
+        "ln_hinweis_startet", "ln_hinweis_laeuft_kurz", "ln_hinweis_laeuft",
+        "ln_hinweis_bald", "ln_hinweis_sichtbar"],
     # Die Kopfzeile der Wegwissen-Tafel wird ueber eine Schluesselliste
     # gebaut -- fuenf Spalten, fuenf Texte. Befund vom 22.09.2026.
     "t(k)": ["wg_von", "wg_nach", "wg_trug", "wg_fehl", "wg_wann"],
