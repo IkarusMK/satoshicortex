@@ -225,7 +225,7 @@ wrote down would not be convenience, it would be a trap.
 For wallet software on your home network to actually reach the node, **both**
 must be right:
 
-1. the release in the wizard (or later under Settings), and
+1. the release in the wizard (or later under *External wallets*), and
 2. `RPC_BIND=0.0.0.0` in your `.env`.
 
 The port alone is useless as long as `rpcallowip` does not let it through — and
@@ -793,14 +793,59 @@ proves the node is yours. Under *Node → Proof* the application does it — and
 verifies its own signature straight away: the key LND names in doing so must be
 your own. It moves no money and reveals no key.
 
-### What does not exist (yet)
+### A wallet on your phone (Zeus)
 
-**No remote access from a phone.** LND's REST and gRPC ports are NOT published
-outside by the compose, and there is no hidden service for them. A phone wallet
-such as Zeus therefore cannot attach to this node today. That is a deliberate
-intermediate stage, not an oversight: whoever may move money may move
-EVERYTHING with LND — macaroons know no amount limit. As long as that is open,
-the interface stays inside the compose network.
+Under **External wallets** you connect Zeus to this node. Zeus then talks to
+LND directly — balances, channels, invoices, payments — depending on what you
+allow the device. The same tab holds the release for wallet software such as
+Sparrow, which used to sit under *Settings*.
+
+**Two routes, and only these two:**
+
+| Route | What you do | What it costs |
+|---|---|---|
+| **VPN** | Set up a VPN for your phone on your router (on a FRITZ!Box: *Internet → Permit Access → VPN (WireGuard)*). In the `.env` set `LND_REST_BIND=0.0.0.0` and `LND_REST_LAN_PORT=8080` (any free port), and redeploy with the current compose file. | Nothing is opened to the internet. Fast. Works only while the phone's VPN is on. |
+| **Tor** | Nothing beyond switching on Tor in Zeus. | Slower. In Zeus on the iPhone, Tor is still marked experimental. |
+
+For the first Tor device the node creates an onion address of its own, for
+Zeus only. It is announced nowhere, Tor restarts once for it, and it is often
+reachable only after a minute or two. When the last Tor device is revoked, the
+address goes away too.
+
+**Never forward LND's REST port in your router.** That would put LND's
+interface on the internet — which is exactly what the two routes avoid.
+
+**Every device gets its own key**, on its own root key in LND. Revoking a
+device deletes that root key: the device's key is worthless at once, and every
+other key — including the application's own — keeps working. The key is shown
+**once**, as a QR code and as text; the application does not keep it.
+
+**The permission levels**, as checked in LND's permission table (v0.21.3-beta):
+
+| Level | May | May not |
+|---|---|---|
+| View | see balances, channels, payments, forwards | change anything |
+| Receive | also create invoices and deposit addresses | spend anything |
+| Pay over Lightning | also pay invoices, set channel fees, connect to peers | send on-chain, open or close channels (both need `onchain:write`) |
+| Full | everything, including sending on-chain and opening and closing channels | issue new keys — so a stolen phone cannot mint itself a key that survives its revocation |
+
+**What a key cannot do, and what that means:**
+
+- **There is no spending limit.** LND's macaroons know an expiry, an IP lock
+  and custom conditions, but no amount. Whoever holds an unlocked phone with a
+  *full* key can spend everything in the wallet and the channels.
+- **The PIN of this interface does not apply in Zeus.** Zeus talks to LND
+  directly. Turn on Zeus' own PIN or Face ID.
+- **A key cannot be tied to one route.** LND's IP lock checks the address of
+  the gRPC connection, and LND passes every REST request on to gRPC over
+  `127.0.0.1` — for a REST client, the lock would always see the same address.
+
+Creating and revoking keys sit behind the transaction PIN, like every other way
+money can leave. They use LND's `admin.macaroon`, and only for that: the
+application's own macaroon deliberately lacks the right to issue keys.
+
+In Zeus, leave certificate verification switched off. Your node's certificate
+is self-signed; the connection is protected by the VPN or by Tor.
 
 ## What needs backing up — and what does not
 

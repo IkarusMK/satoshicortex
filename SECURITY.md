@@ -57,7 +57,7 @@ The question that comes before the first satoshi lands on the machine: who can
 reach the services' interfaces? Measured against the shipped
 `docker-compose.yml` and the configuration templates.
 
-**Exactly five ports are published:**
+**Exactly six ports are published:**
 
 | Port | Bound to | Who can reach it |
 |---|---|---|
@@ -66,11 +66,21 @@ reach the services' interfaces? Measured against the shipped
 | Lightning P2P 9735 | all interfaces | the internet. **Intended** |
 | Watchtower 9911 | all interfaces | the internet, **only if you forward it** — needed for clearnet only; over Tor the tower has its own onion address |
 | bitcoind RPC 8332 | `RPC_BIND`, default **`127.0.0.1`** | the server itself only |
+| LND REST 8080 | `LND_REST_BIND`, default **`127.0.0.1`**, and **no fixed port** unless `LND_REST_LAN_PORT` is set | nobody by default — Docker picks a random port on the server itself. Set both for the VPN route to external wallets; then your home network |
 
 **Not published** — and this is the more important half of the answer:
 
-- **LND's gRPC (10009) and REST (8080).** No port, no onion service. LND cannot
-  be reached from your home network at all.
+- **LND's gRPC (10009)** — no port, no onion service. **LND's REST (8080)**
+  only as described in the table: by default nobody outside the compose network
+  reaches it. An onion service for it exists only while at least one device is
+  connected over Tor under *External wallets*; its address is announced
+  nowhere.
+
+  When REST is reachable (VPN route or that onion service), every call that does
+  anything needs a macaroon — with one exception that belongs on the record:
+  LND's wallet-unlocker calls (`/v1/state`, `/v1/unlockwallet` and its
+  siblings) take no macaroon. They reveal whether the wallet is locked and
+  accept unlock attempts, which only succeed with the wallet password.
 - **All ZMQ ports (28332, 28333, 28334).**
 - **Tor's SOCKS ports (9050, and 9052 for the reachability check) and HTTP
   tunnel (9080).** Tor has **no control port** at all — see below.
@@ -114,8 +124,12 @@ Two different answers, and both belong on the record:
   certificate against LND's own `tls.cert`
   (`ssl.create_default_context(cafile=...)`) — verification is not disabled.
   For that to work over the compose name, `tlsextradomain=lnd` is set in
-  `lnd.conf`. On top of that every call requires a macaroon, and the
-  application holds one **without `onchain:write`**.
+  `lnd.conf`. On top of that every call requires a macaroon. The application
+  bakes its own with exactly the rights it uses (`EIGENE_RECHTE` in `lnd.py`);
+  since sending on-chain arrived on 2026-09-10 that includes `onchain:write`,
+  and every endpoint that moves money checks the PIN first. It does **not**
+  include the right to issue keys: keys for external wallets are baked with
+  LND's `admin.macaroon`, only on an explicit request behind the PIN.
 - **Application → bitcoind: no.** The call goes over `http://`, because Bitcoin
   Core cannot do TLS on its RPC interface at all. It is authenticated via
   `rpcauth`, but not encrypted. That path never leaves the container network.

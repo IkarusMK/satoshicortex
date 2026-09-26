@@ -80,6 +80,18 @@ Two ideas carry the whole project:
 - **No remote images, ever** — a thumbnail from a publisher's server is a
   tracking pixel that would undo the Tor detour in the same second
 
+**📱 Your node in your pocket — on your terms**
+- **Zeus on your phone**, connected over **Tor** or over **your router's VPN**
+  — the only two routes on offer. Nothing is opened to the internet.
+- **Every device gets its own key**, with the permissions you choose: view,
+  receive, pay over Lightning, or full. Each one can be revoked on its own, at
+  once, without touching any other.
+- The key is shown **once**, as a QR code and as text, and never stored. Even
+  *full* may not issue new keys, so a stolen phone cannot mint itself a
+  replacement that survives its revocation.
+- Sparrow and hardware wallets use the same tab: your node as their backend,
+  released for your home network only.
+
 **📦 Set up by a wizard, not by a manual**
 - `cp example.env .env` → `docker compose up -d` → open the browser. That is
   the whole procedure.
@@ -95,8 +107,8 @@ Two ideas carry the whole project:
   switched off by taking its permission away.
 - **A PIN guards every step with consequences.** Sending on-chain, opening and
   closing a channel, paying an invoice, moving liquidity between your own
-  channels and deleting the wallet all ask for it, and it is checked *before*
-  anything else. Five wrong
+  channels, issuing or revoking a key for an external wallet and deleting the
+  wallet all ask for it, and it is checked *before* anything else. Five wrong
   tries lock it for fifteen minutes; the counter lives in a file and survives a
   restart. Setting it up requires the account password, so a hijacked session
   cannot hand itself the key.
@@ -151,15 +163,17 @@ There is no Electrum server: Sparrow and friends connect straight to Bitcoin
 Core (Settings → Server → Bitcoin Core), and with `txindex` they gain
 functions that would otherwise require one.
 
-No phone wallet yet: LND's REST and gRPC ports are **not** published by the
-compose file and there is no onion service for them, so Zeus and friends
-cannot attach to this node today. That is deliberate for now — an LND macaroon
-cannot carry a spending limit, so anything allowed to move money is allowed to
-move all of it.
+A phone wallet can attach: **Zeus**, under *External wallets*, over Tor or
+over your router's VPN — nothing else. Every device gets its own key with the
+permissions you choose (view, receive, pay over Lightning, or full), and you
+can revoke each one on its own. Off until you add a device. One thing to know
+before choosing "full": an LND macaroon cannot carry a spending limit, so a
+key that may move money may move all of it.
 
 Open to the internet: **8333** and **9735** — the two ports that are *supposed*
 to be open, because they are how you take part. On the LAN: **3333** for the
-web interface. RPC, ZMQ and gRPC never leave the compose network.
+web interface — and LND's REST port only if you switch on the VPN route for
+external wallets. RPC, ZMQ and gRPC never leave the compose network.
 
 **Tor holds the onion services itself.** Three of them — Bitcoin, Lightning and
 the watchtower, each with its own address — defined in Tor's own configuration
@@ -209,6 +223,25 @@ a thumbnail from a foreign server is a tracking pixel.
 <p align="center">
   <img src="assets/screenshots/12-news.png" width="90%"
        alt="News view with the price chart and a list of articles from selected sources">
+</p>
+
+**External wallets.** Zeus on your phone, over Tor or over your router's VPN.
+Every device gets its own key with the permissions you pick — and the page
+says plainly what a key cannot do: LND knows no spending limit, and this
+page's PIN does not reach into Zeus.
+
+<p align="center">
+  <img src="assets/screenshots/15-external-wallets.png" width="90%"
+       alt="External wallets: connect a device over VPN or Tor and choose its permissions">
+</p>
+
+**One key per device, revocable on its own.** The key is shown once as a QR
+code; afterwards the list is all that remains, with a button that makes that
+one key worthless at once.
+
+<p align="center">
+  <img src="assets/screenshots/16-external-wallets-devices.png" width="90%"
+       alt="Connected devices with their permission level and route, each with its own revoke button">
 </p>
 
 ### Setting it up
