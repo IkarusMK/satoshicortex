@@ -4,6 +4,63 @@ All notable changes to SatoshiCortex. Format loosely after
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning after
 [SemVer](https://semver.org/).
 
+## [1.3.0] — 2026-09-26
+
+### New: external wallets — Zeus on your phone, over Tor or VPN
+
+A new tab, **External wallets**, connects Zeus on a phone to this node. Zeus
+then talks to LND directly — balances, channels, invoices, payments —
+depending on what you allow the device.
+
+- **Two routes, and only these two.**
+  - **Tor:** for the first Tor device the node creates an onion address of its
+    own, for Zeus only. It is announced nowhere and exists only while at least
+    one device uses it.
+  - **VPN:** LND's REST interface on your home network, reached through your
+    router's VPN. Off by default: set `LND_REST_BIND` and `LND_REST_LAN_PORT`
+    in the `.env` and redeploy with the new `docker-compose.yml`. Nothing is
+    opened to the internet.
+- **Permission levels**, checked against LND's permission table
+  (v0.21.3-beta): *view*, *receive*, *pay over Lightning* (no on-chain
+  sending, no opening or closing channels — both need `onchain:write`) and
+  *full*. Not even *full* may issue keys, so a stolen phone cannot mint itself
+  a replacement that survives its revocation.
+- **One root key per device.** Revoking a device deletes its root key: that
+  device's key is worthless at once, every other key keeps working. The
+  default root key, which the application's own macaroon hangs on, can never
+  be touched.
+- **Behind the PIN**, like every other way money can leave: issuing and
+  revoking keys. The key is shown once, as a QR code and as text, and stored
+  nowhere.
+- **Said plainly in the interface:** LND has no spending limit for keys, this
+  page's PIN does not apply inside Zeus, and a key cannot be tied to one of
+  the two routes — LND hands every REST request to gRPC over `127.0.0.1`, so
+  an IP lock would always see the same address.
+- **QR codes up to version 20** (666 bytes). A key for Zeus is about 450
+  characters long and did not fit into the previous limit of 213.
+
+### Changed: the wallet-software release moved
+
+The release for Sparrow and hardware wallets now sits in the same tab. Saving
+it changes only the home-network release; before, it sent all network
+settings along, taken from the fields of the settings page.
+
+### Changed: build metadata
+
+Images are built without BuildKit provenance, and no build record or build
+summary is uploaded any more. Provenance stays verifiable through the signed
+attestation:
+
+```
+gh attestation verify oci://ghcr.io/ikarusmk/satcortex:1.3.0 --owner IkarusMK
+```
+
+### Upgrading
+
+- For the Tor route, pulling the new image is enough.
+- For the VPN route, take over the new `docker-compose.yml` and add the two
+  lines to your `.env` (see `example.env`). Without them nothing changes.
+
 ## [1.2.6] — 2026-09-24
 
 ### Improved: rebalancing knows the peer's limit and follows up by itself
