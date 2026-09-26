@@ -59,6 +59,30 @@ Two ideas carry the whole project:
   public explorer shows it.
 - **Why a Lightning route failed** — not just *that* it did, but the wire
   failure code, so the dashboard becomes an operating tool
+- **Every waiting transaction as a tile**, sorted into the blocks it would land
+  in next, with the moment your node first saw it
+- **Who found the blocks you recorded**, and how long their transactions waited
+  with *you* before they were mined
+- **Look up any block, track any transaction, check any address's balance** —
+  answered by your own chain, so nobody learns what you asked
+
+**🧭 Lightning you operate from the browser**
+- **Pay and receive** — an invoice shows as a QR code and says by itself the
+  moment it is paid; you can withdraw it, or look up any older one
+- **Move liquidity between your own channels**, with the peer's limit shown
+  before you press and the outcome followed up by itself
+- **Fees per channel, measured against the network** — what each channel
+  charges, what the network charges today (median and spread, from your own
+  graph), and if you want, a rate that follows the network within the band of
+  the last four weeks
+- **A watchtower both ways** — your node watches strangers' channels, and you
+  can check whether the towers you rely on actually cover yours
+- **Channel backup to your own WebDAV** (Nextcloud or any other), pushed on
+  every channel change — and checkable: hand in a copy, and LND says whether it
+  is intact and belongs to this node
+- **Restore** from the twenty-four words and the channel backup, and choose how
+  the wallet opens after a restart: by hand, remembered while the app runs, or
+  by itself
 
 **🌍 A world map of the network you are actually in**
 - Every peer and every Lightning channel partner placed on the map, with
@@ -194,11 +218,42 @@ screenshot. German and English, switchable at any moment; the toggle sits top
 right.
 
 **The overview.** Chain progress, the price, your balance split three ways,
-Lightning state, and what your node actually contributes to the network.
+Lightning state, the block pace up to the next halving, and what your node
+contributes to the network.
 
 <p align="center">
   <img src="assets/screenshots/10-overview.png" width="90%"
-       alt="Overview: chain progress, price, balance, Lightning state, participation and services">
+       alt="Overview: chain progress, price, balance, Lightning state, block time, participation and services">
+</p>
+
+**What your node gives back.** Connections by network, what it has served and
+to whom — blocks, transactions, filters for light wallets — and the addresses
+it can be reached at.
+
+<p align="center">
+  <img src="assets/screenshots/21-network.png" width="90%"
+       alt="Network and contribution: connections by network, bytes served broken down by kind, reachable onion address">
+</p>
+
+**Your mempool, and the blocks it came from.** The next blocks as your own
+node would build them, every waiting transaction as a tile — and for every
+block recorded, which pool found it and how long its transactions waited with
+you.
+
+<p align="center">
+  <img src="assets/screenshots/19-mempool.png" width="49%"
+       alt="Mempool: the next blocks and every waiting transaction as a tile, one column per block">
+  <img src="assets/screenshots/20-blocks.png" width="49%"
+       alt="Blocks: pool, message, transactions already seen and dwell time per block">
+</p>
+
+**The world map.** Where the peers you are talking to actually sit, and where
+your capital is tied up in channels. Below it the numbers only your own node
+can give: what *your* mempool would put in the next block.
+
+<p align="center">
+  <img src="assets/screenshots/11-worldmap.png" width="90%"
+       alt="World map with peer locations and channel partners, and a metrics bar with the next block, fees and difficulty">
 </p>
 
 **Your channels.** The bar is the real statement: with everything on one side,
@@ -210,13 +265,36 @@ peer's on the right.
        alt="Channels: capacity, local and remote balance per channel, and the dialog to open one">
 </p>
 
-**The world map.** Where the peers you are talking to actually sit — and,
-once channels are open, where your capital is tied up. Below it the numbers
-only your own node can give: what *your* mempool would put in the next block.
+**Fees, measured against the network.** What the network charges today, from
+your own graph, next to what each of your channels charges — and the rate you
+set stays in the field after a reload. **Receiving** is an invoice with a QR
+code that tells you by itself when it is paid.
 
 <p align="center">
-  <img src="assets/screenshots/11-worldmap.png" width="90%"
-       alt="World map with peer locations and a metrics bar showing the next block, fees and difficulty">
+  <img src="assets/screenshots/18-fees.png" width="49%"
+       alt="Fees: what the network charges, its distribution and four-week band, and the current fee of your channels">
+  <img src="assets/screenshots/22-receive.png" width="49%"
+       alt="Receive: a Lightning invoice with QR code, waiting for the payment">
+</p>
+
+**The wallet.** On-chain and in channels kept apart, the channel reserve named,
+every transaction with its full id.
+
+<p align="center">
+  <img src="assets/screenshots/14-wallet.png" width="90%"
+       alt="Wallet: balance split into on-chain, in channels, spendable and inbound room, and the list of transactions">
+</p>
+
+**External wallets.** Zeus on your phone, over Tor or over your router's VPN.
+Every device gets its own key with the permissions you pick, and each can be
+revoked on its own — the page says plainly what a key cannot do: LND knows no
+spending limit, and this page's PIN does not reach into Zeus.
+
+<p align="center">
+  <img src="assets/screenshots/15-external-wallets.png" width="49%"
+       alt="External wallets: connect a device over Tor or VPN and choose its permissions">
+  <img src="assets/screenshots/16-external-wallets-devices.png" width="49%"
+       alt="Connected devices with their permission level and route, each with its own revoke button">
 </p>
 
 **The news feed.** Fetched exclusively over Tor, because otherwise every
@@ -228,44 +306,23 @@ a thumbnail from a foreign server is a tracking pixel.
        alt="News view with the price chart and a list of articles from selected sources">
 </p>
 
-**External wallets.** Zeus on your phone, over Tor or over your router's VPN.
-Every device gets its own key with the permissions you pick — and the page
-says plainly what a key cannot do: LND knows no spending limit, and this
-page's PIN does not reach into Zeus.
-
-<p align="center">
-  <img src="assets/screenshots/15-external-wallets.png" width="90%"
-       alt="External wallets: connect a device over VPN or Tor and choose its permissions">
-</p>
-
-**One key per device, revocable on its own.** The key is shown once as a QR
-code; afterwards the list is all that remains, with a button that makes that
-one key worthless at once.
-
-<p align="center">
-  <img src="assets/screenshots/16-external-wallets-devices.png" width="90%"
-       alt="Connected devices with their permission level and route, each with its own revoke button">
-</p>
-
 ### Setting it up
 
 Seven steps, none of which assume you know Bitcoin. The one real decision is
 how visible your node is — and there is deliberately **no default** for it.
 
 <p align="center">
-  <img src="assets/screenshots/01-welcome.png" width="90%"
+  <img src="assets/screenshots/01-welcome.png" width="49%"
        alt="Wizard step 1: what the node needs and what it gives back">
-</p>
-
-<p align="center">
-  <img src="assets/screenshots/04-network.png" width="90%"
+  <img src="assets/screenshots/04-network.png" width="49%"
        alt="Wizard step 4: Tor only, Tor and clearnet, or announce nothing">
 </p>
 
-<sub>All screenshots come from a demo instance with example data — the disk
-sizes, balances, channels and articles are made up so the interface can be
-shown end to end on a laptop. The interface itself is the real one. More
-screens under <a href="assets/screenshots/">assets/screenshots/</a>.</sub>
+<sub>The screens of the running node come from a demo instance: the real
+interface, answered with made-up data — balances, channels, peers, addresses
+and articles are invented, the channel partners are fictional. The setup
+screens come from the real application with a simulated disk. More screens
+under <a href="assets/screenshots/">assets/screenshots/</a>.</sub>
 
 ## Requirements
 
@@ -417,7 +474,8 @@ reachable for Bitcoin, Lightning and the watchtower without a single open port
 ### Phase 6 — Wait, and then
 
 **14. The initial sync runs in the background**, days to weeks depending on the
-machine — the chain is around block 963,000 and ~762 GB. It survives restarts.
+machine — the chain is past block 960,000, and with its indexes it fills the
+roughly 950 GB the wizard recommends. It survives restarts.
 Near the end progress grows very slowly, which looks like a hang: as long as the
 block height rises, it is working. Under **Logs → SatoshiCortex** a line with
 height, share and speed appears every ten minutes.
@@ -521,7 +579,7 @@ Issues and pull requests are welcome. Two things to know before you start:
 Everything runs locally:
 
 ```sh
-cd app/backend && python3 -m pytest        # 779 tests
+cd app/backend && python3 -m pytest        # unit, API and interface tests
 python3 tools/i18n_pruefen.py              # translation completeness
 python3 tools/quellen_pruefen.py           # measure the news sources
 node --check app/web/app.js

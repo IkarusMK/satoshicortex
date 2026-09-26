@@ -4,6 +4,38 @@ All notable changes to SatoshiCortex. Format loosely after
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning after
 [SemVer](https://semver.org/).
 
+## [1.3.2] — 2026-09-26
+
+### Fixed: "your node appears NOWHERE in the Lightning graph" — on every node
+
+Under *Wallet*, every running node read: "as long as you have no public
+channel, your node appears NOWHERE in the Lightning graph". It said so on nodes
+with public channels too — the sentence depended on the wallet state only,
+never on the channels. Found while renewing the screenshots.
+
+The interface now works it out from your own channels. A public channel is
+announced from its sixth confirmation on (BOLT 7), and the node with it; the
+block it was funded in sits in the channel's short channel id, so no extra
+call is needed. The line now says one of three things: your node is in the
+graph, your public channel will be announced from its sixth confirmation on,
+or — only when there really is no public channel — that nobody finds it yet.
+Until the channels have loaded, it claims nothing about the graph at all.
+
+### Changed: the README shows the current version
+
+All screenshots are new. The earlier ones dated from before the first public
+release — an old version number, the navigation without *Connect*, and a
+display fault fixed in 1.2.5. New screens show the network contribution, the
+mempool tiles, the blocks, the fee panel and receiving over Lightning. The
+highlights now name what had been missing: paying and receiving, moving
+liquidity, fees against the network, the channel backup to your own WebDAV,
+restoring, and how the wallet opens after a restart.
+
+### Upgrading
+
+Nothing to change in `docker-compose.yml` or `.env`. Pull the new image and
+redeploy.
+
 ## [1.3.1] — 2026-09-26
 
 ### Fixed: "database is locked" and lost messages in the evaluation
