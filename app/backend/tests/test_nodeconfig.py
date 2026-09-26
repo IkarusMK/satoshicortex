@@ -1496,3 +1496,33 @@ def test_jede_fremde_aktion_ist_auf_eine_pruefsumme_genagelt():
                     continue
                 assert re.fullmatch(r"[\w.-]+/[\w./-]+@[0-9a-f]{40}", aktion), (
                     f"{datei}: {aktion} ist nicht auf eine Pruefsumme genagelt")
+
+
+# ── Externe Wallets ueber VPN ───────────────────────────────────────────────
+#
+# Seit dem 26.09.2026. LNDs REST-Schnittstelle kann im Heimnetz stehen, damit
+# Zeus sie ueber das VPN des Routers erreicht. Die Vorgabe muss fuer ALLE, die
+# das nicht wollen, genau das bleiben, was sie war: nichts erreichbar.
+
+def test_lnds_schnittstelle_steht_ohne_ausdrueckliche_wahl_nirgends_offen():
+    """127.0.0.1 und KEIN fester Port: Docker waehlt einen zufaelligen auf
+    dem Server selbst. Ein fester Vorgabeport wie 8080 koennte mit etwas
+    anderem auf der Maschine kollidieren -- und dann startete LND nicht."""
+    block = _dienstblock("lnd")
+    assert "- '${LND_REST_BIND:-127.0.0.1}:${LND_REST_LAN_PORT:-}:8080'" in block
+
+
+def test_die_app_erfaehrt_dieselbe_freigabe_mit_denselben_vorgaben():
+    block = _dienstblock("app")
+    assert "LND_REST_BIND: ${LND_REST_BIND:-127.0.0.1}" in block
+    assert "LND_REST_LAN_PORT: ${LND_REST_LAN_PORT:-}" in block
+
+
+def test_die_vorlage_nennt_beide_zeilen_und_laesst_sie_aus():
+    """In example.env stehen sie auskommentiert: wer die Vorlage kopiert,
+    soll nichts oeffnen, ohne es zu wollen."""
+    import re
+    text = _lies("example.env")
+    assert re.search(r"^# LND_REST_BIND=0\.0\.0\.0$", text, re.M)
+    assert re.search(r"^# LND_REST_LAN_PORT=8080$", text, re.M)
+    assert not re.search(r"^LND_REST_(BIND|LAN_PORT)=", text, re.M)

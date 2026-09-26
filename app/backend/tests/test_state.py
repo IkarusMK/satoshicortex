@@ -132,3 +132,30 @@ def test_speichern_hinterlaesst_keine_reste(tmp_path):
     a = Ablage(str(tmp_path))
     a.speichern(a.laden())
     assert sorted(p.name for p in tmp_path.iterdir()) == ["einrichtung.json"]
+
+
+
+# ── Externe Wallets ─────────────────────────────────────────────────────────
+
+def test_die_geraeteliste_ueberlebt_speichern_und_laden(tmp_path):
+    ablage = Ablage(str(tmp_path))
+    wahl = {"tor": True, "geraete": [{
+        "kennung": 1_000_000, "name": "Telefon", "stufe": "voll",
+        "weg": "tor", "angelegt": "2026-09-26T10:00:00+00:00"}]}
+    ablage.merke_fernzugang(wahl)
+    assert ablage.laden().fernzugang == wahl
+
+
+def test_eine_alte_datei_ohne_geraete_laedt_leer(tmp_path):
+    ablage = Ablage(str(tmp_path))
+    ablage.datei.write_text(json.dumps({"schritt": "willkommen"}))
+    assert ablage.laden().fernzugang == {}
+
+
+def test_die_geraeteliste_enthaelt_nie_einen_schluessel(tmp_path):
+    """Hier steht, WER verbunden ist -- nie das Macaroon. Die Datei ist fuer
+    die Gruppe lesbar."""
+    ablage = Ablage(str(tmp_path))
+    ablage.merke_fernzugang({"geraete": [{"kennung": 1_000_000,
+                                          "macaroon": "0201ab"}]})
+    assert "0201ab" not in ablage.datei.read_text()

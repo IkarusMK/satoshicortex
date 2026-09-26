@@ -51,6 +51,18 @@ def test_die_alphanumerischen_kapazitaeten_stimmen_auch():
         20, 38, 61, 90, 122, 154, 178, 221, 262, 311]
 
 
+def test_die_kapazitaeten_bis_version_20_stimmen_mit_der_norm():
+    """Seit dem 26.09.2026 geht der Rechner bis Version 20: ein Schluessel
+    fuer eine externe Wallet (lndconnect) ist rund 450 Zeichen lang und
+    passt in Version 10 nicht hinein. Werte aus ISO/IEC 18004, Tabelle 7,
+    Stufe M."""
+    versionen = list(range(11, 21))
+    assert _node(f"{versionen}.map((v) => QR._kapazitaet(v))") == [
+        251, 287, 331, 362, 412, 450, 504, 560, 624, 666]
+    assert _node(f"{versionen}.map((v) => QR._kapazitaet(v, true))") == [
+        366, 419, 483, 528, 600, 656, 734, 816, 909, 970]
+
+
 def test_der_modus_wird_am_inhalt_erkannt():
     assert _node('QR._istAlnum("LNBC1500N1PBEISPIEL")') is True
     assert _node('QR._istAlnum("lnbc1500n1pbeispiel")') is False
@@ -122,8 +134,25 @@ def test_die_eigene_reed_solomon_rechnung_stimmt_auch():
 # ── Zuruecklesen ────────────────────────────────────────────────────────────
 
 ALNUM = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:"
-ECC_M = [0, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26]
-BLOECKE_M = [0, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5]
+# Stufe M, je Version die Bloecke der Norm (ISO/IEC 18004, Tabelle 9) als
+# (Anzahl, Codewoerter je Block, davon Daten) -- bewusst in DIESER Form und
+# nicht als die zwei Zahlenreihen, die qr.js fuehrt. Daraus abgeleitet sind
+# ECC je Block und Blockzahl ein unabhaengiger Vergleich: ein Tippfehler in
+# qr.js faellt beim Zuruecklesen auf, statt sich hier zu wiederholen.
+BLOCKTABELLE_M = {
+    1: [(1, 26, 16)], 2: [(1, 44, 28)], 3: [(1, 70, 44)],
+    4: [(2, 50, 32)], 5: [(2, 67, 43)], 6: [(4, 43, 27)],
+    7: [(4, 49, 31)], 8: [(2, 60, 38), (2, 61, 39)],
+    9: [(3, 58, 36), (2, 59, 37)], 10: [(4, 69, 43), (1, 70, 44)],
+    11: [(1, 80, 50), (4, 81, 51)], 12: [(6, 58, 36), (2, 59, 37)],
+    13: [(8, 59, 37), (1, 60, 38)], 14: [(4, 64, 40), (5, 65, 41)],
+    15: [(5, 65, 41), (5, 66, 42)], 16: [(7, 73, 45), (3, 74, 46)],
+    17: [(10, 74, 46), (1, 75, 47)], 18: [(9, 69, 43), (4, 70, 44)],
+    19: [(3, 70, 44), (11, 71, 45)], 20: [(3, 67, 41), (13, 68, 42)],
+}
+ECC_M = [0] + [BLOCKTABELLE_M[v][0][1] - BLOCKTABELLE_M[v][0][2]
+               for v in range(1, 21)]
+BLOECKE_M = [0] + [sum(g[0] for g in BLOCKTABELLE_M[v]) for v in range(1, 21)]
 
 
 def _roh_module(v):
@@ -227,6 +256,9 @@ def _lies(erg):
             ecc_bloecke[j].append(woerter[pos])
             pos += 1
     assert pos == roh
+    # Und die Laengen der Datenbloecke genau so, wie die Norm sie vorgibt.
+    assert laengen == [daten for anzahl_g, _, daten in BLOCKTABELLE_M[v]
+                       for _ in range(anzahl_g)]
     for block, korrektur in zip(bloecke, ecc_bloecke):
         assert _rs_rest(block, ecc) == korrektur
 
@@ -271,6 +303,11 @@ RECHNUNG_LANG = (RECHNUNG
                  + "XQZPUAZTRNWNGZN3KDZW5HYDLZF03QDGM2HDQ27CQV3AGM2AWHZ5SE903"
                    "VRUATFHQ77W3LS4EV")
 
+# Aufbau wie ein echter Verbindungstext fuer Zeus: Onion-Adresse, Port, ein
+# Macaroon in base64url. Alles ausgedacht -- nur die Laenge ist die eines
+# gebackenen Schluessels mit vollen Rechten.
+LNDCONNECT = ("lndconnect://" + "x" * 56 + ".onion:8080?macaroon="
+              + "AgEDbG5kAvgBAwoQ" * 25)
 
 @pytest.mark.parametrize("text,version", [
     (TAPROOT, 5),
@@ -279,7 +316,12 @@ RECHNUNG_LANG = (RECHNUNG
     ("x" * 150, 8),          # ab Version 7 mit Versionsinformation
     ("y" * 213, 10),         # das groesste, was im Byte-Modus hineinpasst
     (RECHNUNG, 8),           # eine Lightning-Rechnung, alphanumerisch
-    (RECHNUNG_LANG, 10),     # eine lange -- das Groesste, was hineinpasst
+    (RECHNUNG_LANG, 10),     # eine lange -- in Grossbuchstaben passt sie
+    ("z" * 251, 11),         # ab hier die Versionen fuer externe Wallets
+    ("z" * 252, 12),
+    (LNDCONNECT, 17),        # ein Schluessel fuer Zeus, Groessenordnung echt
+    ("q" * 666, 20),         # das groesste, was im Byte-Modus hineinpasst
+    ("A" * 970, 20),         # und alphanumerisch
 ])
 def test_der_code_liest_sich_zurueck(text, version):
     erg = _node(f"QR.matrix({json.dumps(text)})")
@@ -293,7 +335,7 @@ def test_zu_langer_text_wird_abgewiesen_statt_abgeschnitten():
     if not node:
         pytest.skip("node nicht vorhanden -- die CI prueft es trotzdem")
     skript = (f"const QR = require({json.dumps(str(QR_JS))});"
-              "try { QR.matrix('z'.repeat(214)); process.exit(3); }"
+              "try { QR.matrix('z'.repeat(667)); process.exit(3); }"
               " catch (e) { process.stdout.write(e.message); }")
     lauf = subprocess.run([node, "-e", skript], capture_output=True,
                           text=True, timeout=60)
@@ -301,21 +343,17 @@ def test_zu_langer_text_wird_abgewiesen_statt_abgeschnitten():
     assert "zu lang" in lauf.stdout
 
 
-def test_eine_rechnung_passt_nur_gross_geschrieben():
+def test_eine_rechnung_gross_geschrieben_gibt_den_kleineren_code():
     """Eine Rechnung mit Betrag und Zweck wird schnell ueber 213 Zeichen
-    lang. Klein geschrieben faellt sie in den Byte-Modus, und dort ist bei
-    213 Byte Schluss; gross geschrieben passt sie alphanumerisch in Version
-    10. Deshalb schreibt die Oberflaeche sie gross, bevor sie in den QR-Code
-    geht -- BOLT 11 sieht das vor, bech32 ist gegenueber Gross- und
-    Kleinschreibung gleichgueltig."""
-    node = shutil.which("node")
-    if not node:
-        pytest.skip("node nicht vorhanden -- die CI prueft es trotzdem")
-    klein = json.dumps(RECHNUNG_LANG.lower())
-    skript = (f"const QR = require({json.dumps(str(QR_JS))});"
-              f"try {{ QR.matrix({klein}); process.stdout.write('ANGENOMMEN'); }}"
-              " catch (e) { process.stdout.write(e.message); }")
-    lauf = subprocess.run([node, "-e", skript], capture_output=True,
-                          text=True, timeout=60)
-    assert "zu lang" in lauf.stdout, lauf.stdout
+    lang. Klein geschrieben faellt sie in den Byte-Modus, gross geschrieben
+    passt sie alphanumerisch in eine kleinere Version -- BOLT 11 sieht das
+    vor, bech32 ist gegenueber Gross- und Kleinschreibung gleichgueltig.
 
+    Bis zum 26.09.2026 war bei Version 10 Schluss, und klein geschrieben
+    passte sie gar nicht. Seit der Rechner bis Version 20 geht, passt sie
+    auch so -- aber dichter, und ein dichterer Code scannt schlechter.
+    Deshalb schreibt die Oberflaeche sie weiterhin gross."""
+    gross = _node(f"QR.matrix({json.dumps(RECHNUNG_LANG)}).version")
+    klein = _node(f"QR.matrix({json.dumps(RECHNUNG_LANG.lower())}).version")
+    assert gross == 10
+    assert klein > gross

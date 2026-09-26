@@ -42,7 +42,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, Iterable, Optional, Tuple
 
-from . import netz
+from . import fernzugang, netz
 
 log = logging.getLogger(__name__)
 
@@ -80,12 +80,27 @@ DIENSTE: Dict[str, Dienst] = {d.name: d for d in (
     Dienst("wachturm", "onion-wachturm", 9911, "lnd", 9911,
            ("lnd", "data", "watchtower", "v3_onion_private_key"),
            "Wachturm: bewacht die Kanaele anderer"),
+    # Seit dem 26.09.2026: LNDs REST-Schnittstelle fuer externe Wallets
+    # (Zeus). Ein Dienst anderer Art als die drei oben -- er wird NIE
+    # angekuendigt, steht deshalb nicht in REIHENFOLGE und nicht in
+    # dienste_fuer. Seine Adresse kennt nur, wem man den Verbindungstext
+    # gibt. Eine eigene Adresse, damit niemand von ihr auf den Knoten
+    # schliessen kann. Einen alten Schluessel gibt es nicht: den Dienst gab
+    # es vor 0.63.0 nicht.
+    Dienst("fernzugang", "onion-fernzugang", fernzugang.ONION_PORT, "lnd",
+           8080, (), "Externe Wallets: LNDs Schnittstelle fuer Zeus"),
 )}
 
 # Die Reihenfolge, in der sie in der torrc stehen -- fest, damit dieselbe
 # Wahl immer dieselbe Datei ergibt. Sonst sahe der Waechter bei jedem Blick
 # eine "geaenderte" Konfiguration und startete Tor ohne Anlass neu.
 REIHENFOLGE = ("bitcoind", "lnd", "wachturm")
+
+# Was zusaetzlich in der torrc stehen kann, ohne angekuendigt zu werden.
+# IMMER hinter den dreien oben: so bleibt die torrc aller, die ihn nicht
+# nutzen, Byte fuer Byte, wie sie war -- sonst startete jedes Update Tor neu.
+FERNZUGANG = "fernzugang"
+ZUSATZDIENSTE = (FERNZUGANG,)
 
 HOSTNAME = "hostname"
 SCHLUESSELDATEI = "hs_ed25519_secret_key"
@@ -171,7 +186,7 @@ def abwarten(fast: str, namen: Iterable[str], frist: float,
 def torrc_block(namen: Iterable[str], praefix: str) -> str:
     """Die HiddenService-Zeilen fuer die gewaehlten Dienste."""
     zeilen = []
-    for name in REIHENFOLGE:
+    for name in REIHENFOLGE + ZUSATZDIENSTE:
         if name not in set(namen):
             continue
         d = DIENSTE[name]
@@ -230,7 +245,7 @@ def uebernimm_schluessel(fast: str, name: str) -> bool:
     """
     ziel_dir = verzeichnis(fast, name)
     ziel = ziel_dir / SCHLUESSELDATEI
-    if ziel.exists():
+    if ziel.exists() or not DIENSTE[name].alter_schluessel:
         return False
     quelle = Path(fast).joinpath(*DIENSTE[name].alter_schluessel)
     try:

@@ -31,7 +31,9 @@ import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence, Tuple
+
+from . import fernzugang
 
 log = logging.getLogger(__name__)
 
@@ -1357,6 +1359,65 @@ def lege_macaroon_ab(hexwert: str, verzeichnis: Optional[Path] = None) -> Path:
 
 def macaroon_da(knoten: Knoten) -> bool:
     return (knoten.macaroons / f"{EIGENES_MACAROON}.macaroon").exists()
+
+
+# ── Schluessel fuer externe Wallets ─────────────────────────────────────────
+#
+# Aus dem Betrieb, 26.09.2026: Zeus soll den Knoten vom Telefon aus bedienen,
+# mit Rechten, die in dieser Anwendung eingestellt werden. Welche Rechte
+# welche Stufe bekommt, steht in fernzugang.py; hier wird nur mit LND
+# gesprochen.
+#
+# ALLE DREI mit admin. Backen verlangt macaroon:generate, Loeschen
+# macaroon:write, Auflisten macaroon:read -- und das eigene Macaroon der
+# Anwendung haelt keines davon, mit Absicht (EIGENE_RECHTE): mit
+# macaroon:generate koennte es sich jedes Recht selbst ausstellen. admin
+# liegt ohnehin auf der Platte; gebraucht wird es hier nur auf ausdruecklichen
+# Knopfdruck, und der steht hinter der PIN.
+#
+# Jedes Geraet bekommt eine EIGENE Wurzelkennung (root_key_id). Wird sie
+# geloescht, sind die Macaroons dieses Geraets wertlos -- und nur diese.
+# Die Sperre unten gegen alles unter fernzugang.ERSTE_KENNUNG ist keine
+# Vorsicht aus Gewohnheit: an Kennung 0 haengen admin, readonly, invoice und
+# das Macaroon der Anwendung. Sie zu loeschen sperrte die Anwendung aus
+# ihrem eigenen Knoten aus.
+
+def _geraetekennung(kennung: int) -> int:
+    if not isinstance(kennung, int) or kennung < fernzugang.ERSTE_KENNUNG:
+        raise ValueError(f"keine Geraetekennung: {kennung!r}")
+    return kennung
+
+
+def geraeteschluessel_kennungen(knoten: Knoten) -> List[int]:
+    """Alle Wurzelkennungen, die LND kennt -- auch fremde."""
+    antwort = knoten.ruf("/v1/macaroon/ids", macaroon="admin") or {}
+    return [int(k) for k in antwort.get("root_key_ids") or []]
+
+
+def geraeteschluessel_backen(knoten: Knoten,
+                             rechte: Sequence[Tuple[str, str]],
+                             kennung: int) -> str:
+    """Ein Macaroon fuer ein Geraet, auf eigener Wurzel. Gibt es als Hex."""
+    antwort = knoten.ruf("/v1/macaroon", macaroon="admin", daten={
+        "permissions": [{"entity": e, "action": a} for e, a in rechte],
+        # uint64 geht ueber REST als Zeichenkette (proto3 JSON).
+        "root_key_id": str(_geraetekennung(kennung)),
+    }) or {}
+    hexwert = antwort.get("macaroon") or ""
+    if not hexwert:
+        raise LndFehler("LND hat kein Macaroon zurueckgegeben")
+    return hexwert
+
+
+def geraeteschluessel_widerrufen(knoten: Knoten, kennung: int) -> bool:
+    """Die Wurzel eines Geraets loeschen. Danach ist sein Schluessel wertlos.
+
+    Gibt zurueck, ob LND etwas geloescht hat. False heisst: die Wurzel gab es
+    nicht (mehr) -- der Schluessel war also ohnehin schon ungueltig.
+    """
+    antwort = knoten.ruf(f"/v1/macaroon/{_geraetekennung(kennung)}",
+                         macaroon="admin", methode="DELETE") or {}
+    return bool(antwort.get("deleted"))
 
 
 # Welche Adressformen LND erzeugen kann, und wie sie hier heissen.

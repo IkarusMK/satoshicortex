@@ -1967,6 +1967,16 @@ body.ansicht-welt .weltkarte .kleine circle { cursor: pointer; }
 .ez-qr { width: min(240px, 70vw); margin: 14px 0 6px; }
 .ez-qr:empty { display: none; }
 .ez-qr svg { display: block; width: 100%; height: auto; border-radius: 10px; }
+/* Der Schluessel fuer eine externe Wallet ist ein QR-Code der Version 17
+   oder groesser -- 85 Module und mehr statt 37. In 240 Pixeln waeren das
+   kaum drei Pixel je Modul, und vom Bildschirm scannt das schlecht. Also
+   mehr Platz, und der Rand der Norm bleibt, weil qr.js ihn mitzeichnet.
+   (26.09.2026) */
+#fz-qr { width: min(420px, 90vw); }
+/* Die Schritte fuer Zeus und fuer den VPN-Weg. Ohne eigene Regel hing die
+   Nummer links aus der Textspalte heraus. */
+ol.anleitung { margin: 10px 0 0; padding-left: 20px; }
+ol.anleitung li { margin: 4px 0; }
 
 /* ── Bewegungen der On-Chain-Wallet (15.09.2026) ─────────────────────────
    Die txid steht voll da -- gekuerzt liesse sie sich weder kopieren noch

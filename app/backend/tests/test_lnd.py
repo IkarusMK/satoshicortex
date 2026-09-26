@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from satcortex import lnd
+from satcortex import fernzugang, lnd
 
 
 class Antwort:
@@ -2199,6 +2199,11 @@ AUFRUFE = [
     ("htlc_strom", lambda k: next(iter(lnd.htlc_strom(k)))),
     ("kanal_schliessen", lambda k: lnd.kanal_schliessen(k, KANALPUNKT_TEST, 5)),
     ("setze_gebuehren", lambda k: lnd.setze_gebuehren(k, 1000, 100)),
+    ("geraeteschluessel_kennungen", lambda k: lnd.geraeteschluessel_kennungen(k)),
+    ("geraeteschluessel_backen", lambda k: lnd.geraeteschluessel_backen(
+        k, fernzugang.rechte("ansehen"), fernzugang.ERSTE_KENNUNG)),
+    ("geraeteschluessel_widerrufen", lambda k: lnd.geraeteschluessel_widerrufen(
+        k, fernzugang.ERSTE_KENNUNG + 3)),
 ]
 
 
@@ -3015,3 +3020,119 @@ def test_liste_und_nachschlagen_beschreiben_dieselbe_rechnung(tmp_path,
     assert nachgesehen["kennung"] == KENNUNG_ZAHLUNG
     assert nachgesehen["zustand"] == "bezahlt"
     assert nachgesehen["laeuft_ab_s"] == 1758603600
+
+
+# ── Schluessel fuer externe Wallets ─────────────────────────────────────────
+#
+# Drei Aufrufe, alle mit admin -- dem einzigen Macaroon, das Schluessel
+# backen, auflisten und loeschen darf. Die Anwendung selbst haelt dieses
+# Recht bewusst nicht (EIGENE_RECHTE).
+
+def _mit_admin(tmp_path):
+    knoten = _knoten(tmp_path, mit_macaroon=True)
+    (knoten.macaroons / "admin.macaroon").write_bytes(b"\xad\x01")
+    return knoten
+
+
+def _schluesselaufnahme(monkeypatch, antwort):
+    gesehen = []
+
+    def urlopen(anfrage, timeout=None, context=None):
+        gesehen.append({
+            "methode": anfrage.get_method(),
+            "url": anfrage.full_url,
+            "rumpf": json.loads(anfrage.data) if anfrage.data else None,
+            "macaroon": anfrage.headers.get("Grpc-metadata-macaroon"),
+        })
+        return Antwort(antwort)
+    monkeypatch.setattr(lnd.urllib.request, "urlopen", urlopen)
+    return gesehen
+
+
+def test_ein_geraeteschluessel_wird_mit_admin_und_eigener_wurzel_gebacken(
+        tmp_path, monkeypatch):
+    _ohne_tls(monkeypatch)
+    gesehen = _schluesselaufnahme(monkeypatch, {"macaroon": "0201abcd"})
+    kennung = fernzugang.ERSTE_KENNUNG + 2
+
+    hexwert = lnd.geraeteschluessel_backen(
+        _mit_admin(tmp_path), fernzugang.rechte("empfangen"), kennung)
+
+    assert hexwert == "0201abcd"
+    [anfrage] = gesehen
+    assert anfrage["methode"] == "POST"
+    assert anfrage["url"].endswith("/v1/macaroon")
+    assert anfrage["macaroon"] == "ad01"
+    # uint64 geht ueber REST als Zeichenkette (grpc-gateway, proto3 JSON).
+    assert anfrage["rumpf"]["root_key_id"] == str(kennung)
+    assert anfrage["rumpf"]["permissions"] == [
+        {"entity": e, "action": a} for e, a in fernzugang.rechte("empfangen")]
+
+
+def test_ohne_macaroon_in_der_antwort_gibt_es_einen_fehler(tmp_path,
+                                                           monkeypatch):
+    _ohne_tls(monkeypatch)
+    _schluesselaufnahme(monkeypatch, {})
+    with pytest.raises(lnd.LndFehler):
+        lnd.geraeteschluessel_backen(_mit_admin(tmp_path),
+                                     fernzugang.rechte("ansehen"),
+                                     fernzugang.ERSTE_KENNUNG)
+
+
+@pytest.mark.parametrize("kennung", [0, 1, fernzugang.ERSTE_KENNUNG - 1])
+def test_auf_den_standardschluessel_wird_nie_gebacken(tmp_path, monkeypatch,
+                                                      kennung):
+    """Ein Geraeteschluessel auf Kennung 0 liesse sich nicht einzeln
+    widerrufen -- nur zusammen mit admin, readonly und dem Schluessel der
+    Anwendung."""
+    _ohne_tls(monkeypatch)
+    gesehen = _schluesselaufnahme(monkeypatch, {"macaroon": "02"})
+    with pytest.raises(ValueError):
+        lnd.geraeteschluessel_backen(_mit_admin(tmp_path),
+                                     fernzugang.rechte("voll"), kennung)
+    assert gesehen == []
+
+
+def test_widerrufen_loescht_genau_die_wurzel_des_geraets(tmp_path,
+                                                        monkeypatch):
+    _ohne_tls(monkeypatch)
+    gesehen = _schluesselaufnahme(monkeypatch, {"deleted": True})
+    kennung = fernzugang.ERSTE_KENNUNG + 7
+
+    assert lnd.geraeteschluessel_widerrufen(_mit_admin(tmp_path), kennung) is True
+
+    [anfrage] = gesehen
+    assert anfrage["methode"] == "DELETE"
+    assert anfrage["url"].endswith(f"/v1/macaroon/{kennung}")
+    assert anfrage["macaroon"] == "ad01"
+
+
+@pytest.mark.parametrize("kennung", [0, 1, 999, fernzugang.ERSTE_KENNUNG - 1])
+def test_der_standardschluessel_wird_nie_geloescht(tmp_path, monkeypatch,
+                                                  kennung):
+    """Kennung 0 zu loeschen hiesse: admin, readonly, invoice und das
+    Macaroon der Anwendung sind auf einen Schlag wertlos -- die Anwendung
+    waere aus ihrem eigenen Knoten ausgesperrt. Das darf keine Eingabe
+    ausloesen, auch keine falsch gespeicherte."""
+    _ohne_tls(monkeypatch)
+    gesehen = _schluesselaufnahme(monkeypatch, {"deleted": True})
+    with pytest.raises(ValueError):
+        lnd.geraeteschluessel_widerrufen(_mit_admin(tmp_path), kennung)
+    assert gesehen == []
+
+
+def test_die_kennungen_kommen_als_zahlen(tmp_path, monkeypatch):
+    _ohne_tls(monkeypatch)
+    gesehen = _schluesselaufnahme(monkeypatch, {
+        "root_key_ids": ["0", str(fernzugang.ERSTE_KENNUNG), "42"]})
+
+    assert lnd.geraeteschluessel_kennungen(_mit_admin(tmp_path)) == [
+        0, fernzugang.ERSTE_KENNUNG, 42]
+    assert gesehen[0]["methode"] == "GET"
+    assert gesehen[0]["url"].endswith("/v1/macaroon/ids")
+
+
+def test_ohne_kennungen_ist_die_liste_leer(tmp_path, monkeypatch):
+    _ohne_tls(monkeypatch)
+    _schluesselaufnahme(monkeypatch, {})
+    assert lnd.geraeteschluessel_kennungen(_mit_admin(tmp_path)) == []

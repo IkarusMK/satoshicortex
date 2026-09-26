@@ -141,9 +141,76 @@ const I18N = {
     wsw_hinweis: "Das Passwort steht hier im Klartext, weil du es sonst nirgends herbekommst. Es gibt Zugriff auf die Kettendaten deines Knotens, nicht auf Guthaben.",
     wsw_port: "Damit das wirkt, muss der Port auch veröffentlicht sein: in deiner .env RPC_BIND=0.0.0.0 setzen und den Stapel neu bereitstellen. Ohne das bleibt die Schnittstelle auf dem Server selbst und dein Heimnetz kommt nicht daran — die Freigabe hier allein genügt nicht.",
     f_aus: "Aus",
-    wsw_netz_fehlt: "Trag dein Heimnetz ein — aus der Adresse dieser Seite lässt es sich nicht ableiten. Es sieht aus wie 192.168.178.0/24.",
-    wsw_danach: "Die Zugangsdaten — Benutzer und Passwort — entstehen erst mit der Konfiguration. Du findest sie danach unter Einstellungen → Wallet-Software, mit Kopierknopf.",
-    wsw_spaeter: "Aus. Das lässt sich jederzeit unter Einstellungen nachholen — es ändert nichts an der Kette und nichts an Lightning.",
+    wsw_netz_fehlt: "Trag dein Heimnetz ein — aus der Adresse dieser Seite lässt es sich nicht ableiten. Es sieht aus wie 192.168.1.0/24.",
+    wsw_danach: "Die Zugangsdaten — Benutzer und Passwort — entstehen erst mit der Konfiguration. Du findest sie danach unter Externe Wallets → Wallet-Software, mit Kopierknopf.",
+    wsw_spaeter: "Aus. Das lässt sich jederzeit unter Externe Wallets nachholen — es ändert nichts an der Kette und nichts an Lightning.",
+    nav_verbinden: "Verbinden",
+    nav_extern: "Externe Wallets",
+    fz_titel: "Lightning-Wallet auf dem Handy (Zeus)",
+    fz_lead: "Zeus bedient deinen Knoten vom Handy aus: Guthaben und Kanäle sehen, Rechnungen ausstellen, zahlen – je nachdem, was du dem Gerät erlaubst. Zeus spricht dabei direkt mit LND. Jedes Gerät bekommt einen eigenen Schlüssel, den du hier jederzeit widerrufen kannst.",
+    fz_neu_titel: "Gerät verbinden",
+    fz_name: "Name des Geräts",
+    fz_name_platz: "zum Beispiel Handy",
+    fz_weg: "Weg",
+    fz_weg_vpn: "VPN (Heimnetz)",
+    fz_weg_tor: "Tor",
+    fz_host: "Adresse des Servers im Heimnetz",
+    fz_host_d: "So erreicht das Handy den Server, wenn das VPN an ist. Vorgeschlagen ist die Adresse, unter der du diese Seite gerade geöffnet hast.",
+    fz_stufe: "Rechte",
+    fz_stufe_ansehen: "Ansehen",
+    fz_stufe_ansehen_d: "Guthaben, Kanäle, Zahlungen und Weiterleitungen sehen. Nichts ändern.",
+    fz_stufe_empfangen: "Empfangen",
+    fz_stufe_empfangen_d: "Dazu Rechnungen und Einzahladressen erstellen. Kein Geld ausgeben.",
+    fz_stufe_lightning: "Lightning zahlen",
+    fz_stufe_lightning_d: "Dazu Lightning-Rechnungen bezahlen, Kanalgebühren setzen und Gegenstellen verbinden. Nicht on-chain senden, keine Kanäle öffnen oder schließen.",
+    fz_stufe_voll: "Voll",
+    fz_stufe_voll_d: "Alles: auch on-chain senden und Kanäle öffnen und schließen. Nur keine neuen Schlüssel ausstellen.",
+    fz_voll_warnung: "Mit „Voll“ kann das Handy alles ausgeben, was in Wallet und Kanälen liegt. Eine Betragsgrenze kennt LND nicht, und die PIN dieser Seite gilt in Zeus nicht. Schalte in Zeus eine eigene PIN oder Face ID ein.",
+    fz_pin_d: "Zum Erstellen und Widerrufen von Schlüsseln.",
+    fz_erstellen: "Schlüssel erstellen",
+    fz_einmal: "Dieser Schlüssel wird nur jetzt angezeigt, die App speichert ihn nicht. Wer ihn hat, bedient deinen Knoten mit den gewählten Rechten – nicht weitergeben, nicht als Foto aufheben.",
+    fz_fertig: "Fertig, ausblenden",
+    fz_zeus_1: "In Zeus eine neue Verbindung zu einem eigenen Knoten anlegen – Art „LND (REST)“.",
+    fz_zeus_2: "Den QR-Code scannen oder den Text kopieren und dort einfügen.",
+    fz_zeus_3: "Die Zertifikatsprüfung in Zeus ausgeschaltet lassen: das Zertifikat deines Knotens ist selbst ausgestellt. Geschützt ist die Verbindung durch das VPN oder durch Tor.",
+    fz_liste_titel: "Verbundene Geräte",
+    fz_anleitung_vpn: "So richtest du den VPN-Weg ein",
+    fz_vpn_1: "Auf dem Router ein VPN für das Handy einrichten – bei einer FRITZ!Box unter Internet → Freigaben → VPN (WireGuard).",
+    fz_vpn_2: "In der .env des Servers zwei Zeilen setzen: LND_REST_BIND=0.0.0.0 und LND_REST_LAN_PORT=8080 (oder ein anderer freier Port).",
+    fz_vpn_3: "Den Stapel mit der aktuellen docker-compose.yml neu bereitstellen. Danach steht oben beim VPN-Weg „Bereit“.",
+    fz_vpn_4: "Auf dem Handy das VPN einschalten, hier ein Gerät mit Weg „VPN“ anlegen und den Code in Zeus scannen.",
+    fz_vpn_nie: "Diesen Port nie im Router freigeben – dann stünde LNDs Schnittstelle im offenen Internet.",
+    fz_anleitung_tor: "Wie der Tor-Weg funktioniert",
+    fz_tor_erklaerung: "Für das erste Tor-Gerät legt der Knoten eine eigene .onion-Adresse an, nur für Zeus. Sie wird nirgends angekündigt. Tor startet dafür einmal kurz neu, erreichbar ist die Adresse oft erst nach ein bis zwei Minuten. Tor ist langsamer als das VPN und in Zeus auf dem iPhone noch als experimentell gekennzeichnet. Wird das letzte Tor-Gerät widerrufen, verschwindet auch die Adresse.",
+    fz_grenzen: "Was ein Schlüssel nicht kann",
+    fz_grenzen_d: "LND kennt keine Betragsgrenze für Schlüssel. Die PIN dieser Seite gilt in Zeus nicht, denn Zeus spricht direkt mit LND. Einen Schlüssel nur für einen der beiden Wege gelten zu lassen, geht bei LNDs REST-Schnittstelle nicht. Was sicher funktioniert: jedes Gerät hat einen eigenen Schlüssel, und ein Widerruf macht genau diesen sofort wertlos.",
+    fz_vpn_compose_alt: "Deine docker-compose.yml ist älter und kennt diesen Weg noch nicht. Übernimm die aktuelle.",
+    fz_vpn_aus: "In der .env nicht freigegeben – siehe Anleitung unten.",
+    fz_vpn_bereit: "Bereit. LND antwortet im Heimnetz auf Port {port}.",
+    fz_tor_aus: "Tor ist in diesem Knoten abgeschaltet.",
+    fz_tor_aktiv: "Bereit, die .onion für Zeus steht.",
+    fz_tor_bereit: "Bereit. Beim ersten Gerät startet Tor einmal kurz neu.",
+    fz_lightning_nicht_bereit: "Lightning ist noch nicht bereit. Schlüssel gibt es erst mit laufender, entsperrter Wallet.",
+    fz_kein_weg: "Gerade steht kein Weg offen: Tor ist aus, und der VPN-Weg ist in der .env nicht freigegeben.",
+    fz_leer: "Noch kein Gerät verbunden.",
+    fz_geraet_zeile: "{stufe} · {weg} · seit {wann}",
+    fz_widerrufen: "Widerrufen",
+    fz_widerrufen_sicher: "Wirklich widerrufen?",
+    fz_pin_fuer_widerruf: "Trag oben deine PIN ein und widerrufe dann noch einmal.",
+    fz_widerrufen_ok: "„{name}“ ist widerrufen, der Schlüssel gilt nicht mehr.",
+    fz_tor_wartet: "Tor startet neu und legt die Adresse an – das kann bis zu einer Minute dauern …",
+    fz_laeuft: "Schlüssel wird erstellt …",
+    fz_angelegt: "Schlüssel für „{name}“ erstellt.",
+    fz_qr_zu_lang: "Der Schlüssel ist zu lang für einen QR-Code. Kopiere ihn stattdessen.",
+    fz_name_ungueltig: "Gib dem Gerät einen Namen – höchstens 40 Zeichen.",
+    fz_stufe_unbekannt: "Diese Rechtestufe gibt es nicht.",
+    fz_weg_unbekannt: "Diesen Weg gibt es nicht – nur Tor oder VPN.",
+    fz_host_ungueltig: "Das ist keine brauchbare Adresse. Nur IP oder Name, ohne http:// und ohne Port.",
+    fz_zu_viele: "Höchstens {hoechstens} Geräte. Widerrufe erst eines, das du nicht mehr brauchst.",
+    fz_vpn_nicht_frei: "Der VPN-Weg ist nicht freigegeben – siehe Anleitung unten.",
+    fz_onion_fehlt: "Tor hat die Adresse noch nicht angelegt. Warte einen Moment und versuch es noch einmal.",
+    fz_lnd_abgelehnt: "LND hat abgelehnt: {einzelheit}",
+    fz_unbekannt: "Dieses Gerät gibt es nicht mehr.",
     wsw_gespeichert: "Freigegeben. Der Knoten startet gleich neu.",
     wsw_zu: "Zugang wieder geschlossen. Der Knoten startet gleich neu.",
     lnsicht_titel: "Wie dein Knoten von außen sichtbar ist",
@@ -1378,9 +1445,76 @@ const I18N = {
     wsw_hinweis: "The password is shown in the clear because there is nowhere else to get it. It grants access to your node's chain data, not to funds.",
     wsw_port: "For this to take effect the port must also be published: set RPC_BIND=0.0.0.0 in your .env and redeploy the stack. Without that the interface stays on the server itself and your home network cannot reach it — this release alone is not enough.",
     f_aus: "Off",
-    wsw_netz_fehlt: "Enter your home network — it cannot be derived from this page's address. It looks like 192.168.178.0/24.",
-    wsw_danach: "The credentials — user and password — are created together with the configuration. You will find them afterwards under Settings → Wallet software, with a copy button.",
-    wsw_spaeter: "Off. You can turn this on later under Settings — it changes nothing about the chain and nothing about Lightning.",
+    wsw_netz_fehlt: "Enter your home network — it cannot be derived from this page's address. It looks like 192.168.1.0/24.",
+    wsw_danach: "The credentials — user and password — are created together with the configuration. You will find them afterwards under External wallets → Wallet software, with a copy button.",
+    wsw_spaeter: "Off. You can turn this on later under External wallets — it changes nothing about the chain and nothing about Lightning.",
+    nav_verbinden: "Connect",
+    nav_extern: "External wallets",
+    fz_titel: "Lightning wallet on your phone (Zeus)",
+    fz_lead: "Zeus runs your node from your phone: see balances and channels, create invoices, pay – depending on what you allow the device. Zeus talks to LND directly. Every device gets its own key, which you can revoke here at any time.",
+    fz_neu_titel: "Connect a device",
+    fz_name: "Device name",
+    fz_name_platz: "for example Phone",
+    fz_weg: "Route",
+    fz_weg_vpn: "VPN (home network)",
+    fz_weg_tor: "Tor",
+    fz_host: "Server address on your home network",
+    fz_host_d: "How the phone reaches the server while the VPN is on. Suggested is the address you opened this page with.",
+    fz_stufe: "Permissions",
+    fz_stufe_ansehen: "View",
+    fz_stufe_ansehen_d: "See balances, channels, payments and forwards. Change nothing.",
+    fz_stufe_empfangen: "Receive",
+    fz_stufe_empfangen_d: "In addition, create invoices and deposit addresses. Spend nothing.",
+    fz_stufe_lightning: "Pay over Lightning",
+    fz_stufe_lightning_d: "In addition, pay Lightning invoices, set channel fees and connect to peers. No on-chain sending, no opening or closing channels.",
+    fz_stufe_voll: "Full",
+    fz_stufe_voll_d: "Everything: also send on-chain and open and close channels. Only issuing new keys is excluded.",
+    fz_voll_warnung: "With “Full” the phone can spend everything in the wallet and the channels. LND has no amount limit for keys, and this page's PIN does not apply in Zeus. Turn on Zeus' own PIN or Face ID.",
+    fz_pin_d: "To create and revoke keys.",
+    fz_erstellen: "Create key",
+    fz_einmal: "This key is shown only now; the app does not keep it. Whoever has it runs your node with the chosen permissions – do not pass it on, do not keep a photo of it.",
+    fz_fertig: "Done, hide",
+    fz_zeus_1: "In Zeus, add a new connection to your own node – type “LND (REST)”.",
+    fz_zeus_2: "Scan the QR code, or copy the text and paste it there.",
+    fz_zeus_3: "Leave certificate verification in Zeus switched off: your node's certificate is self-signed. The connection is protected by the VPN or by Tor.",
+    fz_liste_titel: "Connected devices",
+    fz_anleitung_vpn: "How to set up the VPN route",
+    fz_vpn_1: "Set up a VPN for your phone on your router – on a FRITZ!Box under Internet → Permit Access → VPN (WireGuard).",
+    fz_vpn_2: "Set two lines in the server's .env: LND_REST_BIND=0.0.0.0 and LND_REST_LAN_PORT=8080 (or another free port).",
+    fz_vpn_3: "Redeploy the stack with the current docker-compose.yml. The VPN route above then says “Ready”.",
+    fz_vpn_4: "Turn on the VPN on your phone, add a device here with route “VPN” and scan the code in Zeus.",
+    fz_vpn_nie: "Never forward this port in your router – that would put LND's interface on the open internet.",
+    fz_anleitung_tor: "How the Tor route works",
+    fz_tor_erklaerung: "For the first Tor device the node creates a .onion address of its own, for Zeus only. It is not announced anywhere. Tor restarts once for this, and the address is often reachable only after a minute or two. Tor is slower than the VPN, and in Zeus on the iPhone it is still marked experimental. When the last Tor device is revoked, the address goes away too.",
+    fz_grenzen: "What a key cannot do",
+    fz_grenzen_d: "LND has no amount limit for keys. This page's PIN does not apply in Zeus, because Zeus talks to LND directly. Restricting a key to one of the two routes is not possible with LND's REST interface. What does work reliably: every device has its own key, and revoking it makes exactly that key worthless at once.",
+    fz_vpn_compose_alt: "Your docker-compose.yml is older and does not know this route yet. Take over the current one.",
+    fz_vpn_aus: "Not enabled in the .env – see the instructions below.",
+    fz_vpn_bereit: "Ready. LND answers on your home network on port {port}.",
+    fz_tor_aus: "Tor is switched off on this node.",
+    fz_tor_aktiv: "Ready, the .onion for Zeus is up.",
+    fz_tor_bereit: "Ready. With the first device, Tor restarts once briefly.",
+    fz_lightning_nicht_bereit: "Lightning is not ready yet. Keys are available only with a running, unlocked wallet.",
+    fz_kein_weg: "No route is open right now: Tor is off, and the VPN route is not enabled in the .env.",
+    fz_leer: "No device connected yet.",
+    fz_geraet_zeile: "{stufe} · {weg} · since {wann}",
+    fz_widerrufen: "Revoke",
+    fz_widerrufen_sicher: "Really revoke?",
+    fz_pin_fuer_widerruf: "Enter your PIN above, then revoke again.",
+    fz_widerrufen_ok: "“{name}” is revoked; the key no longer works.",
+    fz_tor_wartet: "Tor is restarting and creating the address – this can take up to a minute …",
+    fz_laeuft: "Creating key …",
+    fz_angelegt: "Key for “{name}” created.",
+    fz_qr_zu_lang: "The key is too long for a QR code. Copy it instead.",
+    fz_name_ungueltig: "Give the device a name – at most 40 characters.",
+    fz_stufe_unbekannt: "This permission level does not exist.",
+    fz_weg_unbekannt: "This route does not exist – only Tor or VPN.",
+    fz_host_ungueltig: "That is not a usable address. Only an IP or a name, without http:// and without a port.",
+    fz_zu_viele: "At most {hoechstens} devices. Revoke one you no longer need first.",
+    fz_vpn_nicht_frei: "The VPN route is not enabled – see the instructions below.",
+    fz_onion_fehlt: "Tor has not created the address yet. Wait a moment and try again.",
+    fz_lnd_abgelehnt: "LND refused: {einzelheit}",
+    fz_unbekannt: "This device no longer exists.",
     wsw_gespeichert: "Released. The node will restart shortly.",
     wsw_zu: "Access closed again. The node will restart shortly.",
     lnsicht_titel: "How visible your node is",
@@ -2868,7 +3002,7 @@ function zeichneWallet() {
   $("#n-rpc-an").checked = S.rpcAn;
   const feld = $("#n-rpc-netz");
   feld.value = S.rpcNetz;
-  feld.placeholder = heimnetzVorschlag() || "192.168.178.0/24";
+  feld.placeholder = heimnetzVorschlag() || "192.168.1.0/24";
   walletFolgen();
 }
 
@@ -5286,7 +5420,7 @@ function zeichneNewsListe(beitraege) {
     //   noopener/noreferrer -- die Zielseite bekommt kein Fenster-Handle
     //   referrerpolicy      -- und erfaehrt nicht, WOHER der Klick kam.
     // Ohne das letzte stuende im Referrer die interne Adresse des Knotens,
-    // etwa http://192.168.178.10:3333/ -- man teilte dem Verlag also seine
+    // etwa http://192.168.1.10:3333/ -- man teilte dem Verlag also seine
     // Heimnetzadresse mit.
     a.href = b.verweis;
     a.target = "_blank";
@@ -5535,6 +5669,9 @@ let ANSICHT = "uebersicht";
 const LOG_ZEILEN = 400;
 
 function zeigeAnsicht(name) {
+  // Ein ausgestellter Schluessel steht nur, solange man hinsieht. Wer den
+  // Reiter verlaesst, findet ihn bei der Rueckkehr nicht mehr vor.
+  if (ANSICHT === "extern" && name !== "extern") fzErgebnisWeg();
   ANSICHT = name;
   $$(".inhalt > section").forEach((s2) =>
     s2.classList.toggle("hidden", s2.dataset.ansicht !== name));
@@ -5550,8 +5687,11 @@ function zeigeAnsicht(name) {
   if (name === "bloecke") { ladePoolAnteile(); adresseStandLaden(); }
   if (name === "netz") ladeKarte(true);
   if (name === "einstellungen") {
-    ladeEinstellungen(); ladeRpcZugang(); knotennameLaden(); pinLaden();
+    ladeEinstellungen(); knotennameLaden(); pinLaden();
   }
+  // Externe Wallets: Zeus und Sparrow. Die PIN, weil Anlegen und
+  // Widerrufen hier nach ihr fragen.
+  if (name === "extern") { fernzugangLaden(); ladeRpcZugang(); pinLaden(); }
   if (name === "logs") ladeLogs(true);
   if (name === "news") { ladeNews(true); ladeKurs(true); }
   if (name === "rechner") { ladeKurs(true); ladeKanalrechner(); }
@@ -9104,8 +9244,8 @@ let WEGE_GELADEN = false;
 // ── Wallet-Software im Heimnetz ────────────────────────────────────────────
 
 // Ein Vorschlag fuer das eigene Netz, aus der Adresse dieser Seite. Wer den
-// Knoten unter 192.168.178.10 aufruft, meint mit "mein Heimnetz" mit grosser
-// Sicherheit 192.168.178.0/24. Abtippen ist die haeufigste Fehlerquelle bei
+// Knoten unter 192.168.1.10 aufruft, meint mit "mein Heimnetz" mit grosser
+// Sicherheit 192.168.1.0/24. Abtippen ist die haeufigste Fehlerquelle bei
 // so einer Angabe -- und ein Tippfehler bedeutet hier "Sparrow kommt nicht
 // durch", ohne dass irgendwo etwas danebenstuende.
 function heimnetzVorschlag() {
@@ -9146,7 +9286,7 @@ async function ladeRpcZugang() {
   RPC_DATEN = d;
   $("#e-rpc-an").checked = !!d.heimnetz;
   $("#e-rpc-netz").value = d.heimnetz || "";
-  $("#e-rpc-netz").placeholder = heimnetzVorschlag() || "192.168.178.0/24";
+  $("#e-rpc-netz").placeholder = heimnetzVorschlag() || "192.168.1.0/24";
   zeichneRpcZugang();
 }
 
@@ -9176,16 +9316,12 @@ async function rpcFreigabeSpeichern() {
   }
   const netz = heimnetzAusFeldern("#e-rpc-an", "#e-rpc-netz");
   try {
-    await api("/knoten/netzwege", "POST", {
-      tor: $("#e-tor").checked,
-      ipv4: $("#e-ipv4").checked,
-      ipv6: $("#e-ipv6").checked,
-      externe_adresse: $("#e-adresse").value.trim(),
-      adresse_ankuendigen: $("#e-ankuendigen").checked,
-      tor_pause_beim_abgleich: $("#e-pause").checked,
-      sichtbarkeit: lnSichtAusFeldern(),
-      rpc_heimnetz: netz,
-    });
+    // NUR das Heimnetz. Bis zum 26.09.2026 gingen hier alle Netzwege mit,
+    // aus den Feldern der Einstellungsseite -- seit die Karte im Reiter
+    // "Externe Wallets" steht, waeren das Felder einer Ansicht, die
+    // vielleicht nie geladen wurde, und ihre Vorgaben waeren gespeichert
+    // worden.
+    await api("/knoten/rpc-freigabe", "POST", { rpc_heimnetz: netz });
     $("#e-rpc-netz").value = netz;
     status.textContent = netz ? t("wsw_gespeichert") : t("wsw_zu");
     await ladeRpcZugang();
@@ -9203,6 +9339,199 @@ async function rpcFreigabeSpeichern() {
 }
 
 let RPC_DATEN = null;
+
+/* ── Externe Wallets: Zeus ──────────────────────────────────────────────────
+
+   Aus dem Betrieb, 26.09.2026: "also wenn dann will ich vollen umfangreichen
+   funktionen also alles ... und es wird dann nur tor und vpn angeboten".
+
+   Die Oberflaeche stellt einen Schluessel aus und zeigt ihn EINMAL, als
+   QR-Code und als Text. Sie hebt ihn nicht auf -- auch nicht im Speicher
+   dieser Seite, laenger als er auf dem Bildschirm steht. */
+
+let FZ_DATEN = null;
+
+function fzWeg() {
+  const r = document.querySelector('input[name="fz-weg"]:checked');
+  return r ? r.value : "vpn";
+}
+
+function fzStufe() {
+  const r = document.querySelector('input[name="fz-stufe"]:checked');
+  return r ? r.value : "voll";
+}
+
+// Die Bezeichnungen fuer Liste und Meldungen. Als Tabelle mit festen
+// Schluesseln, damit die Uebersetzungspruefung jeden einzeln sieht.
+const FZ_STUFEN = {
+  ansehen: "fz_stufe_ansehen", empfangen: "fz_stufe_empfangen",
+  lightning: "fz_stufe_lightning", voll: "fz_stufe_voll",
+};
+const FZ_WEGE = { tor: "fz_weg_tor", vpn: "fz_weg_vpn" };
+
+async function fernzugangLaden() {
+  let d;
+  try {
+    d = await api("/fernzugang");
+  } catch (e) {
+    if (e && e.abgemeldet) return;
+    log_fehler("Externe Wallets", e);
+    return;
+  }
+  FZ_DATEN = d;
+  zeichneFernzugang();
+}
+
+// Was ueber die zwei Wege zu sagen ist -- aus dem, was der Server vorfindet.
+// Ein Weg, den es gerade nicht gibt, wird nicht versteckt: er bleibt
+// sichtbar, abgeschaltet, mit dem Grund daneben.
+function zeichneFernzugang() {
+  const d = FZ_DATEN;
+  if (!d) return;
+  const vpn = d.vpn || {};
+  const vpnText = {
+    compose_alt: t("fz_vpn_compose_alt"),
+    aus: t("fz_vpn_aus"),
+    bereit: t("fz_vpn_bereit", { port: vpn.port }),
+  }[vpn.stand] || t("fz_vpn_aus");
+  $("#fz-weg-vpn-d").textContent = vpnText;
+  const tor = d.tor || {};
+  $("#fz-weg-tor-d").textContent = !tor.moeglich ? t("fz_tor_aus")
+    : (tor.aktiv ? t("fz_tor_aktiv") : t("fz_tor_bereit"));
+
+  const vpnRadio = document.querySelector('input[name="fz-weg"][value="vpn"]');
+  const torRadio = document.querySelector('input[name="fz-weg"][value="tor"]');
+  vpnRadio.disabled = vpn.stand !== "bereit";
+  torRadio.disabled = !tor.moeglich;
+  // Steht die Wahl auf einem Weg, den es nicht gibt, rueckt sie auf den
+  // anderen -- sonst schickt der Knopf eine Anfrage, die sicher scheitert.
+  if (vpnRadio.checked && vpnRadio.disabled && !torRadio.disabled) {
+    torRadio.checked = true;
+  } else if (torRadio.checked && torRadio.disabled && !vpnRadio.disabled) {
+    vpnRadio.checked = true;
+  }
+  if (!$("#fz-host").value) $("#fz-host").value = location.hostname;
+  fzFormularFolgen();
+
+  const lage = $("#fz-lightning");
+  const bereit = d.lightning === "bereit";
+  lage.classList.toggle("hidden", bereit);
+  lage.textContent = bereit ? "" : t("fz_lightning_nicht_bereit");
+  const keinWeg = vpnRadio.disabled && torRadio.disabled;
+  $("#fz-erstellen").disabled = !bereit || keinWeg;
+  if (bereit && keinWeg) $("#fz-meldung").textContent = t("fz_kein_weg");
+
+  zeichneFzListe(d.geraete || []);
+}
+
+function fzFormularFolgen() {
+  $("#fz-host-zeile").classList.toggle("hidden", fzWeg() !== "vpn");
+  $("#fz-voll-warnung").classList.toggle("hidden", fzStufe() !== "voll");
+}
+
+function zeichneFzListe(geraete) {
+  const kasten = $("#fz-liste");
+  kasten.textContent = "";
+  if (!geraete.length) {
+    kasten.append(hinweis(t("fz_leer"), ""));
+    return;
+  }
+  for (const g of geraete) {
+    const wann = g.angelegt ? new Date(g.angelegt).toLocaleDateString() : "";
+    const reihe = zeile(g.name, t("fz_geraet_zeile", {
+      stufe: t(FZ_STUFEN[g.stufe] || "fz_stufe_voll"),
+      weg: t(FZ_WEGE[g.weg] || "fz_weg_vpn"), wann }));
+    reihe.append(fzWiderrufenKnopf(g));
+    kasten.append(reihe);
+  }
+}
+
+// Zweimal klicken, wie beim Austragen eines Wachturms: ein Widerruf ist
+// nicht rueckgaengig zu machen, das Geraet muss danach neu verbunden werden.
+function fzWiderrufenKnopf(geraet) {
+  const knopf = document.createElement("button");
+  knopf.type = "button";
+  knopf.className = "btn ghost klein";
+  knopf.textContent = t("fz_widerrufen");
+  let scharf = null;
+  knopf.addEventListener("click", async () => {
+    const meldung = $("#fz-liste-meldung");
+    if (!scharf) {
+      knopf.textContent = t("fz_widerrufen_sicher");
+      scharf = setTimeout(() => {
+        scharf = null;
+        knopf.textContent = t("fz_widerrufen");
+      }, 4000);
+      return;
+    }
+    clearTimeout(scharf);
+    scharf = null;
+    if (PIN_DA && !$("#fz-pin").value) {
+      meldung.textContent = t("fz_pin_fuer_widerruf");
+      knopf.textContent = t("fz_widerrufen");
+      $("#fz-pin").focus();
+      return;
+    }
+    knopf.disabled = true;
+    meldung.textContent = "";
+    try {
+      await api("/fernzugang/geraet/" + encodeURIComponent(geraet.kennung)
+                + "/widerrufen", "POST", mitPin("#fz-pin"));
+      $("#fz-pin").value = "";
+      meldung.textContent = t("fz_widerrufen_ok", { name: geraet.name });
+      await fernzugangLaden();
+    } catch (e) {
+      geldfehler(e, meldung, "e_fehler");
+      knopf.disabled = false;
+      knopf.textContent = t("fz_widerrufen");
+    }
+  });
+  return knopf;
+}
+
+async function geraetErstellen() {
+  const knopf = $("#fz-erstellen");
+  const meldung = $("#fz-meldung");
+  meldung.textContent = "";
+  fzErgebnisWeg();
+  const name = $("#fz-name").value.trim();
+  if (!name) {
+    meldung.textContent = t("fz_name_ungueltig");
+    $("#fz-name").focus();
+    return;
+  }
+  const weg = fzWeg();
+  // Beim ersten Tor-Geraet startet Tor einmal neu, und der Server wartet
+  // auf die Adresse. Das dauert -- und das soll man sehen.
+  const ersterTor = weg === "tor" && FZ_DATEN && !(FZ_DATEN.tor || {}).aktiv;
+  meldung.textContent = t(ersterTor ? "fz_tor_wartet" : "fz_laeuft");
+  knopf.disabled = true;
+  try {
+    const d = await api("/fernzugang/geraet", "POST", Object.assign({
+      name, weg, stufe: fzStufe(),
+      host: weg === "vpn" ? $("#fz-host").value.trim() : "",
+    }, mitPin("#fz-pin")), FRIST_WARTEN_MS);
+    $("#fz-pin").value = "";
+    $("#fz-name").value = "";
+    meldung.textContent = t("fz_angelegt", { name: d.geraet.name });
+    $("#fz-text").textContent = d.verbindung;
+    zeichneQr($("#fz-qr"), d.verbindung, "fz_qr_zu_lang", "#fz-meldung");
+    $("#fz-ergebnis").classList.remove("hidden");
+    await fernzugangLaden();
+  } catch (e) {
+    geldfehler(e, meldung, "e_fehler");
+  } finally {
+    knopf.disabled = false;
+  }
+}
+
+// Den Schluessel vom Bildschirm nehmen. Er steht danach nirgends mehr.
+function fzErgebnisWeg() {
+  $("#fz-ergebnis").classList.add("hidden");
+  $("#fz-text").textContent = "";
+  $("#fz-qr").textContent = "";
+  $("#fz-kopiert").textContent = "";
+}
 
 function lnSichtAusFeldern() {
   const gewaehlt = document.querySelector('input[name="e-ln-sicht"]:checked');
@@ -9519,7 +9848,8 @@ async function pinLaden() {
   if (aendern) aendern.classList.toggle("hidden", !PIN_DA);
   // Und dort, wo sie tatsaechlich gebraucht wird.
   for (const id of ["#tg-pin-zeile", "#sd-pin-zeile", "#zl-pin-zeile",
-                    "#ko-pin-zeile", "#us-pin-zeile", "#ks-pin-zeile"]) {
+                    "#ko-pin-zeile", "#us-pin-zeile", "#ks-pin-zeile",
+                    "#fz-pin-zeile"]) {
     const zeile = $(id);
     if (zeile) zeile.classList.toggle("hidden", !PIN_DA);
   }
@@ -11961,6 +12291,12 @@ async function start() {
   $("#e-rpc-speichern").addEventListener("click", rpcFreigabeSpeichern);
   $("#e-rpc-kopieren").addEventListener("click", () => kopiere(
     $("#e-rpc-feld"), $("#e-rpc-meldung"), "lgi_kopiert"));
+  $("#fz-erstellen").addEventListener("click", geraetErstellen);
+  $("#fz-fertig").addEventListener("click", fzErgebnisWeg);
+  $("#fz-kopieren").addEventListener("click", () => kopiere(
+    $("#fz-text"), $("#fz-kopiert"), "lgi_kopiert"));
+  $$('input[name="fz-weg"], input[name="fz-stufe"]').forEach(
+    (r) => r.addEventListener("change", fzFormularFolgen));
   // Die Wahl oben wirkt auf die Haekchen darunter -- sofort sichtbar, nicht
   // erst beim Speichern.
   $$('input[name="e-ln-sicht"]').forEach(

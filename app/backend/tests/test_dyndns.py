@@ -122,7 +122,7 @@ def test_eine_ipv4_in_ipv6_schreibweise_taugt_nicht_als_externalip():
 
 @pytest.mark.parametrize("adresse", [
     "172.20.0.3",        # die Docker-interne, die der Knoten von sich sieht
-    "192.168.178.10",
+    "192.168.1.10",
     "127.0.0.1",
     "169.254.1.1",
     "fe80::1",

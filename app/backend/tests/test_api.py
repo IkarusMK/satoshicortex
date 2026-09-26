@@ -3107,10 +3107,10 @@ def test_die_freigabe_landet_in_der_konfiguration(client):
              "adresse_ankuendigen": False, "tor_pause_beim_abgleich": True,
              "sichtbarkeit": "still"}
     client.post("/api/knoten/netzwege",
-                json={**grund, "rpc_heimnetz": "192.168.178.0/24"})
+                json={**grund, "rpc_heimnetz": "192.168.1.0/24"})
     conf = (client.tmp / "config" / "bitcoind.conf").read_text()
     zeilen = [z for z in conf.splitlines() if z.startswith("rpcallowip=")]
-    assert "rpcallowip=192.168.178.0/24" in zeilen
+    assert "rpcallowip=192.168.1.0/24" in zeilen
     # Und die Zeile fuer das Compose-Netz MUSS stehen bleiben -- ohne sie
     # spraeche die Anwendung nicht mehr mit ihrem eigenen Knoten.
     assert any(z.endswith(nodeconfig.RPC_COMPOSE_NETZ) for z in zeilen), zeilen
@@ -3122,7 +3122,7 @@ def test_das_abschalten_nimmt_nur_die_heimnetz_zeile(client):
              "adresse_ankuendigen": False, "tor_pause_beim_abgleich": True,
              "sichtbarkeit": "still"}
     client.post("/api/knoten/netzwege",
-                json={**grund, "rpc_heimnetz": "192.168.178.0/24"})
+                json={**grund, "rpc_heimnetz": "192.168.1.0/24"})
     client.post("/api/knoten/netzwege", json={**grund, "rpc_heimnetz": ""})
     conf = (client.tmp / "config" / "bitcoind.conf").read_text()
     zeilen = [z for z in conf.splitlines() if z.startswith("rpcallowip=")]
@@ -3148,7 +3148,7 @@ def test_ein_tippfehler_startet_bitcoind_nicht_kaputt(client):
     a = client.post("/api/knoten/netzwege", json={
         "tor": True, "ipv4": True, "ipv6": True, "externe_adresse": "",
         "adresse_ankuendigen": False, "tor_pause_beim_abgleich": True,
-        "sichtbarkeit": "still", "rpc_heimnetz": "192.168.178."})
+        "sichtbarkeit": "still", "rpc_heimnetz": "192.168.1."})
     assert a.status_code == 422
 
 
@@ -3235,9 +3235,9 @@ def test_assistent_wahl_steht_danach_in_den_einstellungen(client):
 
 
 def test_assistent_gibt_das_heimnetz_frei(client):
-    _richte_ein(client, rpc_heimnetz="192.168.178.0/24")
+    _richte_ein(client, rpc_heimnetz="192.168.1.0/24")
     conf = (client.tmp / "config" / "bitcoind.conf").read_text()
-    assert "rpcallowip=192.168.178.0/24" in conf
+    assert "rpcallowip=192.168.1.0/24" in conf
     # Und das Compose-Netz bleibt drin -- ohne das spraeche die Anwendung
     # nicht mehr mit ihrem eigenen Knoten.
     assert f"rpcallowip={nodeconfig.RPC_COMPOSE_NETZ}" in conf

@@ -59,6 +59,13 @@ services:
       # simply pulls again, and must never be handed a line that pins them.
       # Same default as the image line above, on purpose.
       SATCORTEX_ABBILD_TAG: ${SATCORTEX_VERSION:-latest}
+      # Whether LND's REST interface is reachable on the home network, for
+      # external wallets over VPN -- the same two values as the port line of
+      # the lnd service, with the same defaults. The application cannot open
+      # a port itself (no Docker socket); it only reads what is set here and
+      # says so in the interface.
+      LND_REST_BIND: ${LND_REST_BIND:-127.0.0.1}
+      LND_REST_LAN_PORT: ${LND_REST_LAN_PORT:-}
     ports:
       # LAN_BIND controls which interface the web interface listens on.
       # 0.0.0.0 means: reachable from the whole home network — that is
@@ -245,6 +252,17 @@ services:
       # router only if you also want to offer it on the clearnet.
       # dclint disable-line require-quotes-in-ports
       - '${WATCHTOWER_PORT:-9911}:9911'
+      # LND's REST interface for an EXTERNAL WALLET on your phone (Zeus),
+      # reached over your router's VPN. Off by default, and that is the point:
+      # 127.0.0.1 with NO fixed port makes Docker pick a random port on the
+      # server itself -- reachable from nowhere, and it cannot collide with
+      # anything else running on the machine (a fixed default like 8080 could,
+      # and then LND would not start). To use it, set BOTH in the .env:
+      #   LND_REST_BIND=0.0.0.0
+      #   LND_REST_LAN_PORT=8080     (any port that is free on the server)
+      # NEVER forward this port in your router. Over Tor you need neither.
+      # dclint disable-line require-quotes-in-ports
+      - '${LND_REST_BIND:-127.0.0.1}:${LND_REST_LAN_PORT:-}:8080'
     networks:
       satcortex:
         # Fixed, for the same reason as bitcoind: Tor forwards channels and

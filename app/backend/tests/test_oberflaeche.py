@@ -3380,3 +3380,74 @@ def test_der_sammeltext_behauptet_kein_speichern(js):
     assert len(texte) == 2, "je Sprache genau einer"
     for text in texte:
         assert not re.search(r"gespeichert|saved", text, re.I), text
+
+
+# ── Externe Wallets ─────────────────────────────────────────────────────────
+#
+# Aus dem Betrieb, 26.09.2026: "dann solte es links einen neuen reiter geben
+# externe wallet oder so wo mann dann die sachen findet! und es wird dann nur
+# tor und vpn angeboten".
+
+def _abschnitt(html, name):
+    anfang = html.index(f'<section data-ansicht="{name}"')
+    return html[anfang:html.index("</section>", anfang)]
+
+
+def test_es_gibt_links_einen_reiter_fuer_externe_wallets(html):
+    leiste = html[html.index('<nav class="seitenleiste"'):html.index("</nav>")]
+    assert 'data-ansicht="extern"' in leiste
+    assert '<section data-ansicht="extern"' in html
+
+
+def test_angeboten_werden_genau_tor_und_vpn(html):
+    wege = re.findall(r'name="fz-weg" value="([^"]+)"',
+                      _abschnitt(html, "extern"))
+    assert sorted(wege) == ["tor", "vpn"]
+
+
+def test_die_stufen_der_oberflaeche_sind_die_des_servers(html):
+    from satcortex import fernzugang
+    stufen = re.findall(r'name="fz-stufe" value="([^"]+)"',
+                        _abschnitt(html, "extern"))
+    assert tuple(stufen) == fernzugang.STUFEN_REIHENFOLGE
+    for stufe in stufen:
+        assert f'data-i18n="fz_stufe_{stufe}_d"' in _abschnitt(html, "extern")
+
+
+def test_sparrow_steht_jetzt_bei_den_externen_wallets(html):
+    assert 'id="e-rpc-an"' in _abschnitt(html, "extern")
+    assert 'id="e-rpc-an"' not in _abschnitt(html, "einstellungen")
+
+
+def test_die_sparrow_freigabe_schickt_nur_das_heimnetz(js):
+    """Die Einstellungsfelder koennen ungeladen sein, wenn man direkt in den
+    Reiter geht -- ihre Vorgaben duerfen dann nicht mitgespeichert werden."""
+    block = _block(js, "async function rpcFreigabeSpeichern(")
+    assert 'api("/knoten/rpc-freigabe", "POST", { rpc_heimnetz: netz })' in block
+    assert "/knoten/netzwege" not in block
+    assert '$("#e-tor")' not in block
+
+
+def test_anlegen_und_widerrufen_schicken_die_pin(js):
+    anlegen = _block(js, "async function geraetErstellen(")
+    assert 'mitPin("#fz-pin")' in anlegen
+    widerruf = _block(js, "function fzWiderrufenKnopf(")
+    assert 'mitPin("#fz-pin")' in widerruf
+    assert "#fz-pin-zeile" in _block(js, "async function pinLaden(")
+
+
+def test_der_schluessel_verschwindet_beim_verlassen_des_reiters(js):
+    block = _block(js, "function zeigeAnsicht(")
+    zeile = next(z for z in block.splitlines() if "fzErgebnisWeg()" in z)
+    assert 'ANSICHT === "extern"' in zeile and 'name !== "extern"' in zeile
+    weg = _block(js, "function fzErgebnisWeg(")
+    assert '$("#fz-text").textContent = ""' in weg
+    assert '$("#fz-qr").textContent = ""' in weg
+
+
+def test_der_schluessel_wird_nur_als_text_gesetzt(js):
+    """Er kommt vom Server, aber als Text -- nie als HTML."""
+    block = _block(js, "async function geraetErstellen(")
+    assert '$("#fz-text").textContent = d.verbindung' in block
+    assert "innerHTML" not in block
+    assert "innerHTML" not in _block(js, "function zeichneFzListe(")

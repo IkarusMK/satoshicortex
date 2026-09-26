@@ -23,6 +23,7 @@ import asyncio
 import contextlib
 
 from . import (auth, beitrag, betriebslog, coinbase, dyndns, erreichbar,
+               fernzugang,
                gebiete, gebuehren as netzgebuehren, geo, karte,
                kennzahlen, kurs, lnd, logs, mempoolstrom, merker,
                nachrichten, nodeconfig,
@@ -113,6 +114,13 @@ WACHTURM_PRUEF_HOECHSTENS = 3
 ONION_FRIST_WAECHTER_SEKUNDEN = 45.0
 ONION_FRIST_ANFRAGE_SEKUNDEN = 12.0
 
+# Wie lange das Anlegen eines Tor-Geraets auf die Onion-Adresse wartet. Beim
+# ERSTEN Tor-Geraet kommt der Dienst neu in die torrc; der Waechter im
+# Tor-Container sieht das innerhalb von zehn Sekunden und startet Tor neu,
+# und Tor schreibt die Adresse gleich beim Start. Laenger als das Anfragen
+# oben, weil hier ein Neustart dazwischen liegt.
+FZ_ONION_FRIST_SEKUNDEN = 40.0
+
 # Wie lange Tors Freigabe fehlen muss, damit der Waechter im Container es
 # bemerkt. Er sieht alle zwei Sekunden nach (entrypoint.sh, INTERVAL); drei
 # Durchgaenge sind sicher.
@@ -154,7 +162,7 @@ def _heimnetz_pruefen(wert: str) -> str:
         netz = ipaddress.ip_network(roh, strict=False)
     except ValueError as fehler:
         raise ValueError("Das ist kein gueltiges Netz (etwa "
-                         "192.168.178.0/24).") from fehler
+                         "192.168.1.0/24).") from fehler
     if netz.prefixlen == 0 or not netz.is_private:
         raise ValueError("Nur private Heimnetze -- eine Freigabe ins offene "
                          "Internet gibt es hier nicht.")
@@ -543,6 +551,36 @@ class Pinwechsel(BaseModel):
 
 class Pineingabe(BaseModel):
     pin: str = Field(max_length=32)
+
+
+class Geraetewunsch(BaseModel):
+    """Ein Geraet fuer eine externe Wallet (Zeus) verbinden.
+
+    Stufe und Weg sind hier bewusst schlichte Zeichenketten und KEIN
+    Literal: sonst wiese Pydantic eine unsinnige Stufe ab, bevor die PIN
+    geprueft ist -- und die PIN kommt vor allem anderen (AGENTS.md, "Money
+    paths"). Geprueft wird im Endpunkt, nach der PIN.
+    """
+    name: str = Field("", max_length=64)
+    stufe: str = Field("", max_length=16)
+    weg: str = Field("", max_length=8)
+    # Nur fuer den VPN-Weg: wie das Telefon den Server im Heimnetz erreicht.
+    host: str = Field("", max_length=255)
+    pin: str = Field("", max_length=32)
+
+
+class Rpcfreigabe(BaseModel):
+    """Nur die Freigabe fuer Wallet-Software -- sonst nichts.
+
+    Seit dem 26.09.2026 steht sie im Reiter "Externe Wallets". Bis dahin
+    schickte ihr Speichern ALLE Netzwege mit, aus Feldern der
+    Einstellungsseite -- solange die Karte dort stand, waren sie geladen. Im
+    neuen Reiter waeren es Felder einer Ansicht, die vielleicht nie geoeffnet
+    wurde, und deren Vorgaben waeren mitgespeichert worden.
+    """
+    rpc_heimnetz: str = Field("", max_length=64)
+
+    _pruefe_heimnetz = field_validator("rpc_heimnetz")(_heimnetz_pruefen)
 
 
 class Wallettilgung(BaseModel):
@@ -1752,6 +1790,18 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
             "port": konf.bitcoind_rpc_port,
             "heimnetz": _wege(zustand.laden().knotenwahl)["rpc_heimnetz"],
         }
+
+    @api.post("/knoten/rpc-freigabe", dependencies=geschuetzt)
+    def rpc_freigabe_setzen(wahl: Rpcfreigabe) -> Dict:
+        """Nur das Heimnetz fuer Wallet-Software -- alle anderen Wege bleiben.
+
+        Derselbe schmale Zuschnitt wie beim Nachtragen der Adresse: die
+        gespeicherte Wahl lesen, genau eine Angabe aendern, durch denselben
+        Trichter schreiben.
+        """
+        wege = _wege(zustand.laden().knotenwahl)
+        wege["rpc_heimnetz"] = wahl.rpc_heimnetz
+        return netzwege_schreiben(wege)
 
     @api.post("/knoten/adresse", dependencies=geschuetzt)
     def adresse_setzen(wahl: Adresswahl) -> Dict:
@@ -3426,6 +3476,183 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
             return False
 
     app.state.macaroon_sicherstellen = macaroon_sicherstellen
+
+    # ── Externe Wallets: Zeus als Fernbedienung ─────────────────────────
+    #
+    # Aus dem Betrieb, 26.09.2026: "also wenn dann will ich vollen
+    # umfangreichen funktionen also alles weil du ja gesagt hast wir koennen
+    # dann die rechte fuer zeus in der app steuern! ... und es wird dann nur
+    # tor und vpn angeboten".
+    #
+    # Was ein Schluessel darf und was nicht, steht in fernzugang.py. Hier
+    # gilt: ein Schluessel mit Geldrechten ist so viel wert wie das
+    # Guthaben. Ausstellen und Widerrufen stehen deshalb hinter der PIN, und
+    # die kommt vor allem anderen. Der Schluessel selbst wird genau einmal
+    # herausgegeben und nirgends aufgehoben.
+
+    # Anlegen und Widerrufen nacheinander, nie gleichzeitig. Zwei Anfragen
+    # zugleich zoegen sonst dieselbe naechste Wurzelkennung -- und zwei
+    # Geraete teilten sich einen Schluessel, den ein Widerruf fuer beide
+    # zugleich loeschte. FastAPI fuehrt diese Endpunkte in einem Faden-Pool
+    # aus; die Sperre ist also noetig und nicht Zierde.
+    fz_sperre = threading.Lock()
+
+    def _fz_lesen() -> Dict:
+        fz = dict(zustand.laden().fernzugang or {})
+        fz["geraete"] = list(fz.get("geraete") or [])
+        return fz
+
+    def _fz_tor_moeglich(e) -> bool:
+        return bool(e.eingerichtet
+                    and _nach_sichtbarkeit(_wege(e.knotenwahl))["tor"])
+
+    def _fz_tor_nachziehen(fz: Dict) -> None:
+        """Den Onion-Dienst an die Geraeteliste anpassen."""
+        fz["tor"] = any(g.get("weg") == "tor" for g in fz["geraete"])
+        zustand.merke_fernzugang(fz)
+        e = zustand.laden()
+        if _fz_tor_moeglich(e):
+            _tor_ablegen(_nach_sichtbarkeit(_wege(e.knotenwahl)))
+
+    @api.get("/fernzugang", dependencies=geschuetzt)
+    def fernzugang_lesen() -> Dict:
+        e = zustand.laden()
+        fz = _fz_lesen()
+        try:
+            stand = lnd.zustand(lndverbindung())["stand"]
+        except (lnd.NichtErreichbar, lnd.LndFehler):
+            stand = "aus"
+        return {
+            "lightning": stand,
+            "tor": {
+                "moeglich": _fz_tor_moeglich(e),
+                "aktiv": bool(fz.get("tor")),
+                "adresse": (onion.lies_adresse(konf.fast, onion.FERNZUGANG)
+                            if fz.get("tor") else ""),
+                "port": fernzugang.ONION_PORT,
+            },
+            "vpn": fernzugang.vpn_lage(konf.lnd_lan_bind, konf.lnd_lan_port),
+            "geraete": fz["geraete"],
+            "stufen": list(fernzugang.STUFEN_REIHENFOLGE),
+            "hoechstens": fernzugang.HOECHSTENS_GERAETE,
+        }
+
+    def _fz_ziel(wunsch: Geraetewunsch, e, fz: Dict) -> Tuple[str, int]:
+        """Wohin Zeus sich verbindet: Onion-Adresse oder Heimnetz."""
+        if wunsch.weg == "vpn":
+            lage = fernzugang.vpn_lage(konf.lnd_lan_bind, konf.lnd_lan_port)
+            if lage["stand"] != "bereit":
+                raise HTTPException(409, {"meldung": "fz_vpn_nicht_frei",
+                                          "stand": lage["stand"]})
+            try:
+                return fernzugang.pruefe_host(wunsch.host), lage["port"]
+            except ValueError:
+                raise HTTPException(400, {"meldung": "fz_host_ungueltig"})
+        if not _fz_tor_moeglich(e):
+            raise HTTPException(409, {"meldung": "fz_tor_aus"})
+        if not fz.get("tor"):
+            # Beim ersten Tor-Geraet kommt der Dienst in die torrc, und Tor
+            # startet einmal neu. Gemerkt wird das VOR dem Warten: kommt die
+            # Adresse nicht rechtzeitig, findet ein zweiter Versuch sie vor.
+            fz["tor"] = True
+            zustand.merke_fernzugang(fz)
+            _tor_ablegen(_nach_sichtbarkeit(_wege(e.knotenwahl)))
+        adresse = onion.abwarten(konf.fast, (onion.FERNZUGANG,),
+                                 FZ_ONION_FRIST_SEKUNDEN)[onion.FERNZUGANG]
+        if not adresse:
+            raise HTTPException(503, {"meldung": "fz_onion_fehlt"})
+        return adresse, fernzugang.ONION_PORT
+
+    @api.post("/fernzugang/geraet", dependencies=geschuetzt)
+    def geraet_verbinden(wunsch: Geraetewunsch) -> Dict:
+        """Einen Schluessel fuer ein Geraet ausstellen. Gibt ihn EINMAL heraus.
+
+        Die PIN zuerst, vor jeder anderen Pruefung. Gebacken wird zuletzt --
+        erst, wenn feststeht, dass es einen Weg gibt, ueber den der
+        Schluessel ueberhaupt ankommt. Ein Schluessel ohne Weg waere einer,
+        der irgendwo herumliegt.
+        """
+        freigabe_pruefen(wunsch.pin)
+        with fz_sperre:
+            return _geraet_verbinden(wunsch)
+
+    def _geraet_verbinden(wunsch: Geraetewunsch) -> Dict:
+        try:
+            name = fernzugang.pruefe_name(wunsch.name)
+        except ValueError:
+            raise HTTPException(400, {"meldung": "fz_name_ungueltig"})
+        if wunsch.stufe not in fernzugang.STUFEN:
+            raise HTTPException(400, {"meldung": "fz_stufe_unbekannt"})
+        if wunsch.weg not in fernzugang.WEGE:
+            raise HTTPException(400, {"meldung": "fz_weg_unbekannt"})
+        e = zustand.laden()
+        fz = _fz_lesen()
+        if len(fz["geraete"]) >= fernzugang.HOECHSTENS_GERAETE:
+            raise HTTPException(409, {
+                "meldung": "fz_zu_viele",
+                "hoechstens": fernzugang.HOECHSTENS_GERAETE})
+        knoten = lndverbindung()
+        try:
+            if lnd.zustand(knoten)["stand"] != "bereit":
+                raise HTTPException(409, {"meldung": "lightning_nicht_bereit"})
+            host, port = _fz_ziel(wunsch, e, fz)
+            kennung = fernzugang.naechste_kennung(
+                lnd.geraeteschluessel_kennungen(knoten),
+                [g["kennung"] for g in fz["geraete"]])
+            hexwert = lnd.geraeteschluessel_backen(
+                knoten, fernzugang.rechte(wunsch.stufe), kennung)
+        except lnd.NichtErreichbar:
+            raise HTTPException(503, {"meldung": "lnd_antwortet_nicht"})
+        except lnd.LndFehler as fehler:
+            log.warning("Schluessel fuer externe Wallet abgelehnt: %s", fehler)
+            raise HTTPException(502, {"meldung": "fz_lnd_abgelehnt",
+                                      "einzelheit": str(fehler)})
+        geraet = {"kennung": kennung, "name": name, "stufe": wunsch.stufe,
+                  "weg": wunsch.weg,
+                  "angelegt": time.strftime("%Y-%m-%dT%H:%M:%SZ",
+                                            time.gmtime())}
+        fz["geraete"].append(geraet)
+        zustand.merke_fernzugang(fz)
+        log.info("Externe Wallet verbunden: %s, Stufe %s, ueber %s "
+                 "(Wurzel %d).", name, wunsch.stufe, wunsch.weg, kennung)
+        return {"geraet": geraet,
+                "verbindung": fernzugang.verbindungstext(host, port, hexwert)}
+
+    @api.post("/fernzugang/geraet/{kennung}/widerrufen",
+              dependencies=geschuetzt)
+    def geraet_widerrufen(kennung: int, eingabe: Pineingabe) -> Dict:
+        """Den Schluessel eines Geraets wertlos machen.
+
+        Aus der Liste verschwindet es ERST, wenn LND die Wurzel geloescht
+        hat. Ein Eintrag, der verschwindet, waehrend der Schluessel noch
+        gilt, waere die gefaehrlichste Luege dieser Ansicht.
+
+        Nur Kennungen aus der eigenen Liste: eine fremde -- oder gar 0, an
+        der die Anwendung selbst haengt -- wird nie weitergereicht.
+        """
+        freigabe_pruefen(eingabe.pin)
+        with fz_sperre:
+            return _geraet_widerrufen(kennung)
+
+    def _geraet_widerrufen(kennung: int) -> Dict:
+        fz = _fz_lesen()
+        if not any(g.get("kennung") == kennung for g in fz["geraete"]):
+            raise HTTPException(404, {"meldung": "fz_unbekannt"})
+        try:
+            geloescht = lnd.geraeteschluessel_widerrufen(lndverbindung(),
+                                                         kennung)
+        except lnd.NichtErreichbar:
+            raise HTTPException(503, {"meldung": "lnd_antwortet_nicht"})
+        except lnd.LndFehler as fehler:
+            log.warning("Widerruf abgelehnt: %s", fehler)
+            raise HTTPException(502, {"meldung": "fz_lnd_abgelehnt",
+                                      "einzelheit": str(fehler)})
+        fz["geraete"] = [g for g in fz["geraete"]
+                         if g.get("kennung") != kennung]
+        _fz_tor_nachziehen(fz)
+        log.info("Externe Wallet widerrufen (Wurzel %d)%s.", kennung,
+                 "" if geloescht else " -- LND kannte sie schon nicht mehr")
+        return {"ok": True, "geloescht": geloescht}
 
     @api.post("/lightning/einzahladresse", dependencies=geschuetzt)
     def einzahladresse(art: str = lnd.ADRESSART_VORGABE,
@@ -5698,6 +5925,12 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         """Die torrc zur Wahl ablegen. Gibt zurueck, ob sie sich geaendert hat."""
         dienste = onion.dienste_fuer(wege["tor"], wege["sichtbarkeit"])
         _schluessel_uebernehmen(dienste)
+        # Der Zugang fuer externe Wallets -- solange ein Geraet ihn braucht.
+        # HIER und nirgends sonst: jeder Weg zur torrc fuehrt durch diese
+        # Stelle, auch der des Waechters. Stuende er nur beim Anlegen des
+        # Geraets, nahme der naechste Waechterdurchgang ihn wieder heraus.
+        if (zustand.laden().fernzugang or {}).get("tor"):
+            dienste = dienste + (onion.FERNZUGANG,)
         soll = nodeconfig.baue_tor(dienste, konf.netz_praefix)
         if ablage.lies("tor") == soll:
             return False

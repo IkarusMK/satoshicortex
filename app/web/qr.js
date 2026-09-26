@@ -15,22 +15,33 @@
        Grossbuchstaben.
      * ALPHANUMERISCH fuer Texte aus Ziffern, Grossbuchstaben und einer
        Handvoll Zeichen. Er packt zwei Zeichen in 11 Bit statt 16. Eine
-       Lightning-Rechnung passt im Byte-Modus NICHT (ueber 213 Byte), in
-       Grossbuchstaben und alphanumerisch dagegen schon -- bech32 ist
-       gegenueber Gross- und Kleinschreibung gleichgueltig, und genau dafuer
-       sieht BOLT 11 die Grossschreibung im QR-Code vor.
+       Lightning-Rechnung passte bis Version 10 im Byte-Modus NICHT (ueber
+       213 Byte), in Grossbuchstaben und alphanumerisch dagegen schon. Seit
+       es bis Version 20 geht, passt sie auch klein -- aber in einen
+       dichteren Code, und der scannt schlechter. bech32 ist gegenueber
+       Gross- und Kleinschreibung gleichgueltig, und genau dafuer sieht
+       BOLT 11 die Grossschreibung im QR-Code vor.
 
-   Fehlerkorrektur M (etwa 15 %), Versionen 1 bis 10: bis 213 Byte oder 311
-   alphanumerische Zeichen. Aufbau nach ISO/IEC 18004; die Maske wird nach den
+   Fehlerkorrektur M (etwa 15 %), Versionen 1 bis 20: bis 666 Byte oder 970
+   alphanumerische Zeichen (bis zum 26.09.2026: Version 10, 213 Byte). Aufbau nach ISO/IEC 18004; die Maske wird nach den
    Strafpunkten der Norm gewaehlt. Geprueft in tests/test_qr.py gegen feste
    Werte der Norm und durch Zuruecklesen. */
 (function (umgebung) {
   "use strict";
 
   // Fehlerkorrektur M, Index = Version: ECC-Bytes je Block, Anzahl Bloecke.
-  const ECC_JE_BLOCK = [0, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26];
-  const BLOECKE = [0, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5];
-  const HOECHSTE_VERSION = 10;
+  //
+  // Bis zum 26.09.2026 endete die Tabelle bei Version 10 (213 Byte). Ein
+  // Schluessel fuer eine externe Wallet -- lndconnect mit Onion-Adresse und
+  // Macaroon -- ist rund 450 Zeichen lang und passte nicht hinein. Die
+  // Versionen 11 bis 20 brauchen nichts Neues ausser diesen Zahlen: Laenge
+  // der Laengenangabe (16 Bit ab Version 10), Ausrichtungsmuster und
+  // Versionsinformation rechnet der Code schon allgemein.
+  const ECC_JE_BLOCK = [0, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26,
+                        30, 22, 22, 24, 24, 28, 28, 26, 26, 26];
+  const BLOECKE = [0, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5,
+                   5, 8, 9, 9, 10, 10, 11, 13, 14, 16];
+  const HOECHSTE_VERSION = 20;
   const STUFE_M = 0;           // Formatbits der Stufe: L=01, M=00, Q=11, H=10
   const RUHEZONE = 4;          // helle Module rundherum, so verlangt es die Norm
   // Die 45 Zeichen des alphanumerischen Modus, in der Reihenfolge der Norm.

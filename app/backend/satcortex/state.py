@@ -83,6 +83,11 @@ class Einrichtung:
     # ist, waere genau die Art Ueberraschung, die hier nichts zu suchen hat.
     # Der Nutzer schaltet sie ein, nicht wir.
     gebuehrenwahl: Dict = field(default_factory=dict)
+    # Externe Wallets (Zeus): welche Geraete verbunden sind, mit Name, Stufe,
+    # Weg und Wurzelkennung -- und ob der Onion-Dienst dafuer stehen soll.
+    # NIE der Schluessel selbst: der wird einmal angezeigt und dann
+    # vergessen. Diese Datei ist fuer die Gruppe lesbar.
+    fernzugang: Dict = field(default_factory=dict)
 
     # ------------------------------------------------------------ Ablauf
     @property
@@ -183,6 +188,7 @@ class Ablage:
                 walletwahl=roh.get("walletwahl", {}),
                 knotenausweis=roh.get("knotenausweis", {}),
                 gebuehrenwahl=roh.get("gebuehrenwahl", {}),
+                fernzugang=roh.get("fernzugang", {}),
             )
         except (json.JSONDecodeError, ValueError):
             # Lieber von vorn anfangen als mit kaputtem Zustand weitermachen.
@@ -237,6 +243,21 @@ class Ablage:
         e.gebuehrenwahl = dict(wahl)
         self.speichern(e)
 
+    # Was von einem Geraet festgehalten wird -- und nichts sonst. Eine
+    # Liste statt "alles ausser dem Macaroon": kommt spaeter ein Feld dazu,
+    # das nicht hierher gehoert, faellt es heraus, statt still mitzureisen.
+    GERAETEFELDER = ("kennung", "name", "stufe", "weg", "angelegt")
+
+    def merke_fernzugang(self, wahl: Dict) -> None:
+        """Die verbundenen Geraete festhalten -- ohne ihre Schluessel."""
+        e = self.laden()
+        e.fernzugang = {
+            "tor": bool(wahl.get("tor")),
+            "geraete": [{k: g[k] for k in self.GERAETEFELDER if k in g}
+                        for g in wahl.get("geraete") or []],
+        }
+        self.speichern(e)
+
     def merke_nachrichtenwahl(self, wahl: Dict) -> None:
         e = self.laden()
         e.nachrichtenwahl = dict(wahl)
@@ -261,6 +282,7 @@ class Ablage:
                     "walletwahl": e.walletwahl,
                     "knotenausweis": e.knotenausweis,
                     "gebuehrenwahl": e.gebuehrenwahl,
+                    "fernzugang": e.fernzugang,
                 },
                 indent=2, ensure_ascii=False,
             ),

@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import dataclass
+from typing import Optional
 
 from . import netz
 
@@ -70,6 +71,13 @@ class Einstellungen:
     # Compose-Datei von vor dem 23.09.2026. Dann nennt der Fassungskasten
     # beide Wege, statt einen zu raten.
     abbild_tag: str = os.environ.get("SATCORTEX_ABBILD_TAG", "").strip()
+    # Externe Wallets ueber VPN (seit dem 26.09.2026): ob und unter welchem
+    # Port LNDs Schnittstelle im Heimnetz steht. None heisst NICHT "aus",
+    # sondern "die Compose reicht es nicht durch" -- sie ist dann aelter, und
+    # die Oberflaeche sagt das, statt einen Schalter zu behaupten, den es
+    # nicht gibt. Ausgewertet in fernzugang.vpn_lage.
+    lnd_lan_bind: Optional[str] = os.environ.get("LND_REST_BIND")
+    lnd_lan_port: Optional[str] = os.environ.get("LND_REST_LAN_PORT")
     # Verschluesselung ist FREIWILLIG und ausdruecklich nicht die Vorgabe.
     # Ein selbstsigniertes Zertifikat wuerde beim ersten Aufruf eine
     # Sicherheitswarnung erzeugen -- ausgerechnet auf der Seite, auf der man

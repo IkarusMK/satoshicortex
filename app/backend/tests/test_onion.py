@@ -251,3 +251,40 @@ def test_was_kein_schluessel_ist_bleibt_liegen(tmp_path, inhalt):
 def test_ohne_alten_schluessel_passiert_nichts(tmp_path):
     assert onion.uebernimm_schluessel(str(tmp_path), "bitcoind") is False
     assert not onion.verzeichnis(str(tmp_path), "bitcoind").exists()
+
+
+# ── Der Zugang fuer externe Wallets ─────────────────────────────────────────
+#
+# Seit dem 26.09.2026: ein vierter Onion-Dienst fuer LNDs REST-Schnittstelle,
+# ueber den Zeus den Knoten bedient. Er wird NICHT angekuendigt -- er steht
+# nicht in dienste_fuer und damit weder in bitcoind noch in LND als
+# externalip. Seine Adresse kennt nur, wem man den Verbindungstext gibt.
+
+def test_der_fernzugang_wird_nie_angekuendigt():
+    for sicht in ("tor", "hybrid", "still"):
+        assert "fernzugang" not in onion.dienste_fuer(True, sicht)
+
+
+def test_der_fernzugang_zeigt_auf_lnds_rest_schnittstelle():
+    block = onion.torrc_block(("fernzugang",), "10.83.33")
+    zeilen = block.splitlines()
+    assert "HiddenServiceDir /fast/tor/onion-fernzugang" in zeilen
+    assert "HiddenServicePort 8080 10.83.33.12:8080" in zeilen
+    assert "onion-lnd" not in block
+
+
+def test_der_fernzugang_steht_immer_zuletzt():
+    """Feste Reihenfolge, damit dieselbe Wahl dieselbe Datei ergibt -- und
+    damit die torrc aller, die ihn NICHT nutzen, Byte fuer Byte bleibt, wie
+    sie war. Sonst startete jedes Update Tor ohne Anlass neu."""
+    mit = onion.torrc_block(("fernzugang", "lnd", "bitcoind", "wachturm"),
+                            "10.83.33")
+    ohne = onion.torrc_block(("bitcoind", "lnd", "wachturm"), "10.83.33")
+    assert mit.startswith(ohne)
+    assert mit.index("onion-wachturm") < mit.index("onion-fernzugang")
+
+
+def test_der_fernzugang_hat_keinen_alten_schluessel(tmp_path):
+    """Es gab ihn vor 0.63.0 nicht -- nichts zu uebernehmen."""
+    assert onion.DIENSTE["fernzugang"].alter_schluessel == ()
+    assert onion.uebernimm_schluessel(str(tmp_path), "fernzugang") is False

@@ -711,7 +711,7 @@ class Knoteneinstellungen:
     onion_adresse: str = ""
     # Nur das Compose-Netz darf an die RPC-Schnittstelle.
     rpc_netz: str = RPC_COMPOSE_NETZ
-    # Leer heisst: nur das Compose-Netz. Sonst ein CIDR wie 192.168.178.0/24.
+    # Leer heisst: nur das Compose-Netz. Sonst ein CIDR wie 192.168.1.0/24.
     rpc_heimnetz: str = ""
     zugang: rpcauth.RpcZugang = field(default=None)
 

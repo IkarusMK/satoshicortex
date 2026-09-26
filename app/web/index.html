@@ -211,7 +211,7 @@
       <label class="feld unterschalter">
         <b data-i18n="wsw_netz"></b>
         <input type="text" id="n-rpc-netz" autocomplete="off"
-               spellcheck="false" placeholder="192.168.178.0/24">
+               spellcheck="false" placeholder="192.168.1.0/24">
       </label>
       <p class="dim small unterschalter" data-i18n="wsw_netz_d"></p>
       <div class="note warn hidden" id="n-rpc-fehlt" data-i18n="wsw_netz_fehlt"></div>
@@ -290,6 +290,14 @@
         <button data-ansicht="ln-kanaele"     data-i18n="nav_kanaele"></button>
         <button data-ansicht="ln-knoten"      data-i18n="nav_knoten"></button>
         <button data-ansicht="ln-einrichtung" data-i18n="nav_einrichtung"></button>
+      </div>
+      <!-- Aus dem Betrieb, 26.09.2026: "dann solte es links einen neuen
+           reiter geben externe wallet oder so wo mann dann die sachen
+           findet!" Eine eigene Gruppe, weil sie beides traegt: Lightning
+           (Zeus) und On-Chain (Sparrow). -->
+      <div class="abschnitte">
+        <h2 class="leiste-titel" data-i18n="nav_verbinden"></h2>
+        <button data-ansicht="extern" data-i18n="nav_extern"></button>
       </div>
       <div class="abschnitte">
         <h2 class="leiste-titel" data-i18n="nav_karte"></h2>
@@ -1708,6 +1716,171 @@
            Vier Unterschiede zum ueblichen Satoshi-Rechner stehen in app.js
            bei den Rechenfunktionen; der sichtbarste ist die Reihenfolge:
            Satoshi zuerst. -->
+      <!-- ── Externe Wallets ─────────────────────────────────────────────
+           Aus dem Betrieb, 26.09.2026. Zwei Karten: Zeus bedient LND vom
+           Telefon aus (ueber Tor oder VPN, mit Rechten je Geraet), Sparrow
+           nutzt bitcoind als Kettenquelle fuer eine Hardware-Wallet. Die
+           Sparrow-Karte stand bis dahin in den Einstellungen. -->
+      <section data-ansicht="extern" class="hidden">
+        <div class="panel" id="fz-panel">
+          <h3 data-i18n="fz_titel"></h3>
+          <p class="dim small" data-i18n="fz_lead"></p>
+          <div class="note warn hidden" id="fz-lightning"></div>
+
+          <h4 style="margin-top:22px" data-i18n="fz_neu_titel"></h4>
+          <label class="feld">
+            <b data-i18n="fz_name"></b>
+            <input type="text" id="fz-name" maxlength="40" autocomplete="off"
+                   spellcheck="false" data-i18n-attr="placeholder=fz_name_platz">
+          </label>
+
+          <div class="wahlgruppe" role="radiogroup" aria-labelledby="fz-weg-titel">
+            <b id="fz-weg-titel" data-i18n="fz_weg"></b>
+            <label class="wahl">
+              <input type="radio" name="fz-weg" value="vpn" checked>
+              <span><b data-i18n="fz_weg_vpn"></b>
+                <span class="dim small" id="fz-weg-vpn-d"></span></span>
+            </label>
+            <label class="wahl">
+              <input type="radio" name="fz-weg" value="tor">
+              <span><b data-i18n="fz_weg_tor"></b>
+                <span class="dim small" id="fz-weg-tor-d"></span></span>
+            </label>
+          </div>
+          <label class="feld" id="fz-host-zeile">
+            <b data-i18n="fz_host"></b>
+            <span class="dim small" data-i18n="fz_host_d"></span>
+            <input type="text" id="fz-host" autocomplete="off" spellcheck="false"
+                   maxlength="255">
+          </label>
+
+          <!-- Die vier Stufen. Was jede darf, ist in LNDs Rechtetabelle
+               nachgeschlagen (fernzugang.py) -- der Text daneben muss genau
+               das sagen, nicht mehr und nicht weniger. -->
+          <div class="wahlgruppe" role="radiogroup" aria-labelledby="fz-stufe-titel">
+            <b id="fz-stufe-titel" data-i18n="fz_stufe"></b>
+            <label class="wahl">
+              <input type="radio" name="fz-stufe" value="ansehen">
+              <span><b data-i18n="fz_stufe_ansehen"></b>
+                <span class="dim small" data-i18n="fz_stufe_ansehen_d"></span></span>
+            </label>
+            <label class="wahl">
+              <input type="radio" name="fz-stufe" value="empfangen">
+              <span><b data-i18n="fz_stufe_empfangen"></b>
+                <span class="dim small" data-i18n="fz_stufe_empfangen_d"></span></span>
+            </label>
+            <label class="wahl">
+              <input type="radio" name="fz-stufe" value="lightning">
+              <span><b data-i18n="fz_stufe_lightning"></b>
+                <span class="dim small" data-i18n="fz_stufe_lightning_d"></span></span>
+            </label>
+            <label class="wahl">
+              <input type="radio" name="fz-stufe" value="voll" checked>
+              <span><b data-i18n="fz_stufe_voll"></b>
+                <span class="dim small" data-i18n="fz_stufe_voll_d"></span></span>
+            </label>
+          </div>
+          <!-- Sichtbar bei "voll" -- und das ist die Vorgabe, weil der
+               Betreiber genau das will. Gesagt werden muss es trotzdem. -->
+          <div class="note warn" id="fz-voll-warnung" data-i18n="fz_voll_warnung"></div>
+
+          <label class="feld hidden" id="fz-pin-zeile">
+            <b data-i18n="tg_pin"></b>
+            <span class="dim small" data-i18n="fz_pin_d"></span>
+            <input type="password" id="fz-pin" inputmode="numeric"
+                   autocomplete="off" maxlength="12">
+          </label>
+          <div style="display:flex;gap:12px;align-items:center;margin-top:14px">
+            <button type="button" class="btn" id="fz-erstellen"
+                    data-i18n="fz_erstellen"></button>
+            <span class="dim small" id="fz-meldung"></span>
+          </div>
+
+          <!-- Der Schluessel -- genau EINMAL. Die Anwendung hebt ihn nicht
+               auf; wer die Seite verlaesst, muss ein neues Geraet anlegen. -->
+          <div class="hidden" id="fz-ergebnis" style="margin-top:14px">
+            <div class="note warn" data-i18n="fz_einmal"></div>
+            <div class="ez-qr" id="fz-qr"></div>
+            <div class="adresse" id="fz-text"></div>
+            <div style="display:flex;gap:12px;align-items:center;margin-top:8px">
+              <button type="button" class="btn ghost" id="fz-kopieren"
+                      data-i18n="lgi_kopieren"></button>
+              <button type="button" class="btn ghost" id="fz-fertig"
+                      data-i18n="fz_fertig"></button>
+              <span class="dim small" id="fz-kopiert"></span>
+            </div>
+            <ol class="dim small anleitung">
+              <li data-i18n="fz_zeus_1"></li>
+              <li data-i18n="fz_zeus_2"></li>
+              <li data-i18n="fz_zeus_3"></li>
+            </ol>
+          </div>
+
+          <h4 style="margin-top:22px" data-i18n="fz_liste_titel"></h4>
+          <div id="fz-liste"></div>
+          <p class="dim small" id="fz-liste-meldung"></p>
+
+          <details class="erklaerung">
+            <summary data-i18n="fz_anleitung_vpn"></summary>
+            <ol class="dim small anleitung">
+              <li data-i18n="fz_vpn_1"></li>
+              <li data-i18n="fz_vpn_2"></li>
+              <li data-i18n="fz_vpn_3"></li>
+              <li data-i18n="fz_vpn_4"></li>
+            </ol>
+            <p class="dim small" data-i18n="fz_vpn_nie"></p>
+          </details>
+          <details class="erklaerung">
+            <summary data-i18n="fz_anleitung_tor"></summary>
+            <p class="dim small" data-i18n="fz_tor_erklaerung"></p>
+          </details>
+          <details class="erklaerung">
+            <summary data-i18n="fz_grenzen"></summary>
+            <p class="dim small" data-i18n="fz_grenzen_d"></p>
+          </details>
+        </div>
+
+        <!-- Wallet-Software im Heimnetz. Eigener Kasten, nicht bei den
+             Netzwegen: dort geht es darum, wie der Knoten nach AUSSEN
+             auftritt -- hier darum, wer ihn von INNEN benutzen darf. -->
+        <div class="panel">
+          <h3 data-i18n="wsw_titel"></h3>
+          <p class="dim small" data-i18n="wsw_lead"></p>
+          <label class="switch">
+            <input type="checkbox" id="e-rpc-an">
+            <span><b data-i18n="wsw_schalter"></b></span>
+          </label>
+          <details class="erklaerung">
+            <summary data-i18n="mehr_dazu"></summary>
+            <p class="dim small" data-i18n="wsw_erklaerung"></p>
+          </details>
+          <label class="feld unterschalter">
+            <b data-i18n="wsw_netz"></b>
+            <input type="text" id="e-rpc-netz" autocomplete="off"
+                   spellcheck="false" placeholder="192.168.1.0/24">
+          </label>
+          <p class="dim small unterschalter" data-i18n="wsw_netz_d"></p>
+
+          <div id="e-rpc-daten" class="hidden" style="margin-top:14px">
+            <b data-i18n="wsw_daten"></b>
+            <div class="adresse" id="e-rpc-feld"></div>
+            <div style="display:flex;gap:12px;align-items:center;margin-top:8px">
+              <button type="button" class="btn ghost" id="e-rpc-kopieren"
+                      data-i18n="lgi_kopieren"></button>
+              <span class="dim small" id="e-rpc-meldung"></span>
+            </div>
+            <p class="dim small" data-i18n="wsw_hinweis" style="margin-top:10px"></p>
+          </div>
+          <div class="note warn hidden" id="e-rpc-port" data-i18n="wsw_port"></div>
+          <div style="display:flex;gap:12px;align-items:center;margin-top:12px">
+            <button type="button" class="btn" id="e-rpc-speichern"
+                    data-i18n="e_speichern"></button>
+            <span class="dim small" id="e-rpc-status"></span>
+          </div>
+        </div>
+
+      </section>
+
       <section data-ansicht="rechner" class="hidden">
         <div class="panel">
           <h3 data-i18n="rn_titel"></h3>
@@ -1909,45 +2082,6 @@
             <span class="dim small" id="e-adresse-meldung"></span>
           </div>
         </div>
-        <!-- Wallet-Software im Heimnetz. Eigener Kasten, nicht bei den
-             Netzwegen: dort geht es darum, wie der Knoten nach AUSSEN
-             auftritt -- hier darum, wer ihn von INNEN benutzen darf. -->
-        <div class="panel">
-          <h3 data-i18n="wsw_titel"></h3>
-          <p class="dim small" data-i18n="wsw_lead"></p>
-          <label class="switch">
-            <input type="checkbox" id="e-rpc-an">
-            <span><b data-i18n="wsw_schalter"></b></span>
-          </label>
-          <details class="erklaerung">
-            <summary data-i18n="mehr_dazu"></summary>
-            <p class="dim small" data-i18n="wsw_erklaerung"></p>
-          </details>
-          <label class="feld unterschalter">
-            <b data-i18n="wsw_netz"></b>
-            <input type="text" id="e-rpc-netz" autocomplete="off"
-                   spellcheck="false" placeholder="192.168.178.0/24">
-          </label>
-          <p class="dim small unterschalter" data-i18n="wsw_netz_d"></p>
-
-          <div id="e-rpc-daten" class="hidden" style="margin-top:14px">
-            <b data-i18n="wsw_daten"></b>
-            <div class="adresse" id="e-rpc-feld"></div>
-            <div style="display:flex;gap:12px;align-items:center;margin-top:8px">
-              <button type="button" class="btn ghost" id="e-rpc-kopieren"
-                      data-i18n="lgi_kopieren"></button>
-              <span class="dim small" id="e-rpc-meldung"></span>
-            </div>
-            <p class="dim small" data-i18n="wsw_hinweis" style="margin-top:10px"></p>
-          </div>
-          <div class="note warn hidden" id="e-rpc-port" data-i18n="wsw_port"></div>
-          <div style="display:flex;gap:12px;align-items:center;margin-top:12px">
-            <button type="button" class="btn" id="e-rpc-speichern"
-                    data-i18n="e_speichern"></button>
-            <span class="dim small" id="e-rpc-status"></span>
-          </div>
-        </div>
-
         <!-- ── Die PIN ────────────────────────────────────────────────
              Aus dem Betrieb, 08.09.2026: "eine art: PIN. fuer Zahlungen ansich
              also knoten oeffnen oder schliessen geld transferieren".

@@ -576,7 +576,7 @@ def _mit_oidc(tmp_path, monkeypatch, **zusatz):
     app = api.baue_app(settings.Einstellungen(
         bulk=str(tmp_path / "bulk"), fast=str(tmp_path / "fast"),
         config_dir=str(tmp_path / "config"), **{**OIDC, **zusatz}))
-    return TestClient(app, client=("192.168.178.20", 51234))
+    return TestClient(app, client=("192.168.1.20", 51234))
 
 
 def test_ohne_ausweisdienst_bleibt_alles_wie_es_war(client):
