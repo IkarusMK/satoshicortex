@@ -38,6 +38,18 @@ class Knoten(rpc.Knoten):
         return wert(*params) if callable(wert) else wert
 
 
+def _melden(lauf, teile):
+    """Eine Meldung verarbeiten UND schreiben.
+
+    Seit dem 26.09.2026 sammelt der Zulauf im Speicher und schreibt
+    gebuendelt. Wer gleich danach in der Ablage nachsieht, muss vorher
+    schreiben lassen -- sonst waere ein "0 Luecken" hier auch dann gruen,
+    wenn der Zulauf gar nichts geschrieben haette.
+    """
+    lauf._eine_nachricht(teile)
+    assert lauf._sichern(trotz_pause=True), "die Ablage nahm nichts an"
+
+
 @pytest.fixture
 def z(tmp_path):
     ablage = store.Ablage(str(tmp_path / "a.db"))
@@ -49,7 +61,7 @@ def z(tmp_path):
 
 
 def test_aufnahme_wird_mit_zeitstempel_festgehalten(z):
-    z._eine_nachricht(nachricht(HASH_A, "A", folge=7, nummer=1))
+    _melden(z, nachricht(HASH_A, "A", folge=7, nummer=1))
     eintrag = z.ablage.eine_tx(HASH_A)
     assert eintrag is not None and eintrag["folge"] == 7
     assert eintrag["zuerst_ms"] > 0
@@ -59,7 +71,7 @@ def test_hashes_werden_nicht_noch_einmal_gedreht(z):
     """doc/zmq.md: die Hashes kommen BEREITS in umgekehrter Byte-Reihenfolge,
     also so, wie sie ueberall angezeigt werden. Sie erneut zu drehen ist der
     naheliegende Fehler -- dann waere jede txid falsch."""
-    z._eine_nachricht(nachricht("01" + "00" * 31, "A", folge=1, nummer=1))
+    _melden(z, nachricht("01" + "00" * 31, "A", folge=1, nummer=1))
     assert z.ablage.eine_tx("01" + "00" * 31) is not None
     assert z.ablage.eine_tx("00" * 31 + "01") is None
 
@@ -68,13 +80,13 @@ def test_entfernen_wird_vermerkt(z):
     """ZMQ sagt nur "ohne Block entfernt", nicht warum. Bis zum 15.09.2026
     stand hier fest "verdraengt" -- auch fuer Abgelaufenes und wegen Platz
     Hinausgeworfenes."""
-    z._eine_nachricht(nachricht(HASH_A, "A", folge=1, nummer=1))
-    z._eine_nachricht(nachricht(HASH_A, "R", folge=2, nummer=2))
+    _melden(z, nachricht(HASH_A, "A", folge=1, nummer=1))
+    _melden(z, nachricht(HASH_A, "R", folge=2, nummer=2))
     assert z.ablage.eine_tx(HASH_A)["grund"] == "ohne_block"
 
 
 def test_eine_reorg_ist_kein_verlust(z):
-    z._eine_nachricht(nachricht(HASH_A, "D", nummer=1))
+    _melden(z, nachricht(HASH_A, "D", nummer=1))
     d = z.ablage.eckdaten()
     assert d["luecken_24h"] == 0 and d["reorgs_24h"] == 1
 
@@ -82,8 +94,8 @@ def test_eine_reorg_ist_kein_verlust(z):
 def test_luecke_im_zmq_strom_wird_festgehalten(z):
     """Verwirft ZMQ Nachrichten, fehlen uns Zeitstempel -- und jeder
     Durchschnitt daneben ist ab da geraten. Das gehoert vermerkt."""
-    z._eine_nachricht(nachricht(HASH_A, "A", folge=1, nummer=41))
-    z._eine_nachricht(nachricht(HASH_B, "A", folge=2, nummer=43))   # 42 fehlt
+    _melden(z, nachricht(HASH_A, "A", folge=1, nummer=41))
+    _melden(z, nachricht(HASH_B, "A", folge=2, nummer=43))   # 42 fehlt
     assert z.ablage.eckdaten()["luecken_24h"] == 1
 
 
@@ -91,8 +103,8 @@ def test_zaehlerueberlauf_ist_keine_luecke(z):
     """Die Nachrichtennummer ist 4 Byte breit und laeuft irgendwann ueber.
     Wer das nicht bedenkt, meldet an dieser Stelle eine Luecke, die keine
     ist."""
-    z._eine_nachricht(nachricht(HASH_A, "A", folge=1, nummer=2**32 - 1))
-    z._eine_nachricht(nachricht(HASH_B, "A", folge=2, nummer=0))
+    _melden(z, nachricht(HASH_A, "A", folge=1, nummer=2**32 - 1))
+    _melden(z, nachricht(HASH_B, "A", folge=2, nummer=0))
     assert z.ablage.eckdaten()["luecken_24h"] == 0
 
 
@@ -113,8 +125,8 @@ def test_ein_sprung_in_der_mempoolfolge_ist_KEIN_verlust(z):
     ein Verlust. Die Zeitstempel sind alle da: vom A-Ereignis der Zeitpunkt,
     vom C-Ereignis der Block.
     """
-    z._eine_nachricht(nachricht(HASH_A, "A", folge=10, nummer=1))
-    z._eine_nachricht(nachricht(HASH_B, "A", folge=2014, nummer=2))
+    _melden(z, nachricht(HASH_A, "A", folge=10, nummer=1))
+    _melden(z, nachricht(HASH_B, "A", folge=2014, nummer=2))
     assert z.ablage.eckdaten()["luecken_24h"] == 0, \
         "ein Sprung in der Mempoolfolge ist Cores Normalbetrieb"
 
@@ -123,15 +135,15 @@ def test_die_zmq_zaehlung_meldet_weiterhin_echten_verlust(z):
     """Die bleibt, denn sie ist genau dafuer gemacht: "message sequence
     number represents message count to detect lost messages" (doc/zmq.md).
     Sie ist je Thema fortlaufend und springt NICHT von allein."""
-    z._eine_nachricht(nachricht(HASH_A, "A", folge=10, nummer=1))
-    z._eine_nachricht(nachricht(HASH_B, "A", folge=2014, nummer=9))
+    _melden(z, nachricht(HASH_A, "A", folge=10, nummer=1))
+    _melden(z, nachricht(HASH_B, "A", folge=2014, nummer=9))
     assert z.ablage.eckdaten()["luecken_24h"] == 1
 
 
 def test_kurze_oder_fremde_nachrichten_kippen_nichts(z):
-    z._eine_nachricht([b"hashblock", b"x" * 32, b"\0\0\0\0"])
-    z._eine_nachricht([b"sequence", b"zu kurz", b"\0\0\0\0"])
-    z._eine_nachricht([b"sequence"])
+    _melden(z, [b"hashblock", b"x" * 32, b"\0\0\0\0"])
+    _melden(z, [b"sequence", b"zu kurz", b"\0\0\0\0"])
+    _melden(z, [b"sequence"])
     assert z.ablage.eckdaten()["transaktionen"] == 0
 
 
@@ -330,8 +342,10 @@ def test_eine_nachricht_aus_dem_strom_landet_in_der_ablage(z, monkeypatch):
 
 def test_kehrt_der_knoten_in_den_abgleich_zurueck_pausiert_der_zulauf(
         z, monkeypatch, caplog):
-    """Reindex oder grosse Reorg: dann gehoert der Zulauf wieder schlafen."""
-    monkeypatch.setattr(z, "_im_erstsync", lambda: True)
+    """Reindex oder grosse Reorg: dann gehoert der Zulauf wieder schlafen --
+    auf ein klares Ja von bitcoind, nicht auf ein Schweigen."""
+    monkeypatch.setattr(zulauf, "ABGLEICH_PRUEFEN_SEKUNDEN", 0)
+    z.knoten.antworten["getblockchaininfo"] = {"initialblockdownload": True}
     z._zuletzt_schnappschuss = time.time()
     with caplog.at_level(logging.INFO):
         z._lausche(FakeZmq(FakeSteckdose()))
@@ -340,27 +354,31 @@ def test_kehrt_der_knoten_in_den_abgleich_zurueck_pausiert_der_zulauf(
 
 # ── Nebenher: sichern und Schnappschuss ───────────────────────────────────
 
-def test_ein_volles_buendel_wird_weggeschrieben(z, monkeypatch):
-    z._offen = zulauf.BUENDEL
-    gesichert = []
-    monkeypatch.setattr(z.ablage, "sichern", lambda: gesichert.append(1))
+def test_ein_volles_buendel_wird_weggeschrieben(z):
+    z._zuletzt_gesichert = time.time()          # die Zeit ist es nicht
+    z._zuletzt_schnappschuss = time.time()
+    for i in range(zulauf.BUENDEL):
+        z._eine_nachricht(nachricht(f"{i:064x}", "A", folge=i, nummer=i))
     z._zwischendurch()
-    assert gesichert and z._offen == 0
+    assert z._stapel == []
+    assert z.ablage.eckdaten()["transaktionen"] == zulauf.BUENDEL
 
 
-def test_offene_zeilen_werden_auch_nach_zeit_weggeschrieben(z, monkeypatch):
-    z._offen = 1
+def test_offene_zeilen_werden_auch_nach_zeit_weggeschrieben(z):
+    z._zuletzt_schnappschuss = time.time()
+    z._eine_nachricht(nachricht(HASH_A, "A", folge=1, nummer=1))
     z._zuletzt_gesichert = time.time() - zulauf.BUENDEL_SEKUNDEN - 1
-    gesichert = []
-    monkeypatch.setattr(z.ablage, "sichern", lambda: gesichert.append(1))
     z._zwischendurch()
-    assert gesichert, "eine einzelne offene Zeile blieb liegen"
+    assert z.ablage.eine_tx(HASH_A) is not None, \
+        "eine einzelne offene Zeile blieb liegen"
 
 
 def test_ohne_offene_zeilen_wird_nicht_gesichert(z, monkeypatch):
     gesichert = []
-    monkeypatch.setattr(z.ablage, "sichern", lambda: gesichert.append(1))
+    monkeypatch.setattr(z.ablage, "ereignisse",
+                        lambda liste: gesichert.append(liste) or [])
     z._zuletzt_schnappschuss = time.time()
+    z._zuletzt_gesichert = 0
     z._zwischendurch()
     assert not gesichert
 
@@ -391,4 +409,243 @@ def test_ein_fehlendes_feerate_diagramm_meldet_sich_nur_einmal(tmp_path, caplog)
         lauf._schnappschuss()
     gemeldet = [r for r in caplog.records if "Diagramm" in r.message]
     assert len(gemeldet) == 1, [r.message for r in gemeldet]
+    ablage.schliesse()
+
+
+# ═══════════════ Die Ablage frei halten (Befund 26.09.2026) ═══════════════
+#
+# Aus dem Betrieb, 26.09.2026, zwei Zeilen kurz hintereinander:
+#
+#     sqlite3.OperationalError: database is locked
+#     Luecke im zmq-Strom: erwartet ..., bekommen ...
+#
+# Beide hatten dieselbe Wurzel im Zulauf. Er fragte bei JEDER Meldung aus dem
+# Strom den Knoten, ob er wieder im Abgleich ist -- ueber rpc.kettenlage(),
+# also fuenf Aufrufe, darunter getblockchaininfo, das auf cs_main wartet.
+# Waehrend eines Blocks sind das bis zu fuenfzehn Sekunden. Und das alles mit
+# offener Schreibtransaktion: die Zeilen der letzten zwei Sekunden waren
+# eingetragen, aber noch nicht gesichert. Jeder andere Schreibende wartete
+# zwanzig Sekunden und gab auf. Riss dem Zulauf selbst die Geduld, hielt er
+# das fuer "wieder im Abgleich", legte die Steckdose weg, verband sich neu --
+# und alles, was dazwischen kam, war verloren.
+
+import sqlite3                                            # noqa: E402
+
+
+class Pruefknoten(Knoten):
+    """Sieht bei JEDEM Aufruf nach, ob ein anderer jetzt schreiben koennte.
+
+    Ein Aufruf an den Knoten kann Sekunden dauern. Waehrenddessen darf der
+    Zulauf niemandem die Ablage versperren.
+    """
+
+    def __init__(self, pfad, antworten=None):
+        super().__init__(antworten)
+        self.pfad = str(pfad)
+        self.gesperrt = []
+
+    def ruf(self, methode, *params, zeitlimit=None):
+        fremd = sqlite3.connect(self.pfad, timeout=0.2)
+        try:
+            fremd.execute("BEGIN IMMEDIATE")
+            fremd.rollback()
+        except sqlite3.OperationalError:
+            self.gesperrt.append(methode)
+        finally:
+            fremd.close()
+        return super().ruf(methode, *params, zeitlimit=zeitlimit)
+
+
+BLOCK_ANTWORTEN = {
+    "getblockchaininfo": {"initialblockdownload": False, "blocks": 900000,
+                          "headers": 900000, "verificationprogress": 1.0},
+    "getmempoolinfo": {"size": 2, "bytes": 500, "mempoolminfee": 0.00001},
+    "getblock": {"height": 900000, "time": 1756000000, "weight": 4000,
+                 "nTx": 2, "tx": ["cb" + "0" * 62, HASH_A],
+                 "coinbase_tx": {"coinbase": "03a0bb0d"}},
+    "getblockstats": {"totalfee": 1000},
+}
+
+
+def _bis_der_strom_leer_ist(lauf, steckdose, monkeypatch):
+    """Die Schleife endet sonst nie -- sie wartet ja auf die naechste Meldung."""
+    echtes = lauf._zwischendurch
+
+    def dann_schluss():
+        echtes()
+        if not steckdose._nachrichten:
+            lauf._ende.set()
+    monkeypatch.setattr(lauf, "_zwischendurch", dann_schluss)
+
+
+def test_waehrend_der_zulauf_den_knoten_fragt_ist_die_ablage_frei(
+        tmp_path, monkeypatch):
+    monkeypatch.setattr(zulauf, "ABGLEICH_PRUEFEN_SEKUNDEN", 0, raising=False)
+    pfad = tmp_path / "a.db"
+    ablage = store.Ablage(str(pfad))
+    knoten = Pruefknoten(pfad, BLOCK_ANTWORTEN)
+    lauf = zulauf.Zulauf(ablage, lambda: knoten, "tcp://x:1")
+    steckdose = FakeSteckdose([
+        nachricht(HASH_A, "A", folge=1, nummer=1),
+        nachricht(HASH_B, "A", folge=2, nummer=2),
+        nachricht("cc" * 32, "C", nummer=3),
+        nachricht("dd" * 32, "A", folge=3, nummer=4),
+    ])
+    _bis_der_strom_leer_ist(lauf, steckdose, monkeypatch)
+
+    lauf._lausche(FakeZmq(steckdose))
+
+    assert knoten.aufrufe, "der Knoten wurde nie gefragt -- Test prueft nichts"
+    assert not knoten.gesperrt, (
+        "waehrend dieser Aufrufe war die Ablage fuer alle anderen gesperrt: "
+        + repr(knoten.gesperrt))
+    # Und angekommen ist trotzdem alles.
+    assert ablage.eine_tx(HASH_A)["hoehe"] == 900000
+    assert ablage.eine_tx("dd" * 32) is not None
+    assert ablage.letzte_bloecke(1)[0]["bekannte_tx"] == 1
+    ablage.schliesse()
+
+
+def test_der_zulauf_fragt_nicht_bei_jeder_meldung_nach_dem_abgleich(
+        tmp_path, monkeypatch):
+    """Bei einem vollen Mempool kommen Dutzende Meldungen je Sekunde. Je
+    Meldung fuenf Aufrufe waren eine Last, die der Knoten nicht braucht --
+    und die den Zulauf selbst so ausbremste, dass er hinterherhinkte."""
+    ablage = store.Ablage(str(tmp_path / "a.db"))
+    knoten = Knoten(BLOCK_ANTWORTEN)
+    lauf = zulauf.Zulauf(ablage, lambda: knoten, "tcp://x:1")
+    steckdose = FakeSteckdose([
+        nachricht(f"{i:064x}", "A", folge=i, nummer=i) for i in range(1, 31)])
+    _bis_der_strom_leer_ist(lauf, steckdose, monkeypatch)
+
+    lauf._lausche(FakeZmq(steckdose))
+
+    gefragt = knoten.aufrufe.count("getblockchaininfo")
+    assert gefragt <= 1, f"{gefragt} Mal nach dem Abgleich gefragt bei 30 Meldungen"
+    assert ablage.eckdaten()["transaktionen"] == 30
+    ablage.schliesse()
+
+
+def test_ein_kurzer_aussetzer_beim_abgleich_legt_den_zulauf_nicht_schlafen(
+        z, monkeypatch, caplog):
+    """Keine Antwort heisst "weiss nicht", nicht "wieder im Abgleich". Wer
+    darauf die Steckdose weglegt, verliert alles, was bis zum Wiederverbinden
+    kommt -- genau die Luecke vom 26.09.2026."""
+    monkeypatch.setattr(zulauf, "ABGLEICH_PRUEFEN_SEKUNDEN", 0, raising=False)
+    steckdose = FakeSteckdose([nachricht(HASH_A, "A", folge=1, nummer=1)])
+    _bis_der_strom_leer_ist(z, steckdose, monkeypatch)
+    with caplog.at_level(logging.INFO):
+        z._lausche(FakeZmq(steckdose))       # der Knoten antwortet auf nichts
+    assert not any("pausiert" in r.message for r in caplog.records)
+    assert z.ablage.eine_tx(HASH_A) is not None
+
+
+def test_eine_gesperrte_ablage_verliert_keine_meldung(tmp_path, monkeypatch):
+    """Haelt ein anderer die Sperre, wartet das Gesammelte und wird spaeter
+    geschrieben -- mit dem Zeitpunkt, zu dem es ankam, nicht dem des
+    Schreibens. Vorher flog der Fehler aus dem Faden, und der Zulauf war
+    tot, bis jemand die Anwendung neu startete."""
+    monkeypatch.setattr(store, "WARTEN_AUF_SPERRE_SEKUNDEN", 0.2,
+                        raising=False)
+    monkeypatch.setattr(zulauf, "NEUER_VERSUCH_SEKUNDEN", 0, raising=False)
+    pfad = tmp_path / "a.db"
+    ablage = store.Ablage(str(pfad))
+    lauf = zulauf.Zulauf(ablage, lambda: Knoten(), "tcp://x:1")
+    lauf._zuletzt_schnappschuss = time.time()          # kein Schnappschuss
+    fremd = sqlite3.connect(str(pfad), timeout=0.2)
+    fremd.execute("BEGIN IMMEDIATE")
+
+    lauf._eine_nachricht(nachricht(HASH_A, "A", folge=1, nummer=1))
+    angekommen = ablage.eine_tx(HASH_A)
+    lauf._zuletzt_gesichert = 0
+    lauf._zwischendurch()                              # scheitert, bleibt liegen
+
+    fremd.rollback()
+    fremd.close()
+    lauf._zuletzt_gesichert = 0
+    lauf._zwischendurch()                              # jetzt geht es
+
+    assert angekommen is None
+    tx = ablage.eine_tx(HASH_A)
+    assert tx is not None, "die Meldung ging verloren"
+    assert time.time() * 1000 - tx["zuerst_ms"] < 60_000
+    ablage.schliesse()
+
+
+def test_ein_ueberlaufender_stapel_wird_als_luecke_vermerkt(
+        tmp_path, monkeypatch):
+    """Nimmt die Ablage lange nichts an -- Platte voll, Datei kaputt --, darf
+    der Zulauf den Speicher nicht volllaufen lassen. Was er wegwerfen muss,
+    steht danach als Luecke da, statt still zu fehlen."""
+    monkeypatch.setattr(zulauf, "STAPEL_HOECHSTENS", 5, raising=False)
+    monkeypatch.setattr(zulauf, "NEUER_VERSUCH_SEKUNDEN", 0, raising=False)
+    ablage = store.Ablage(str(tmp_path / "a.db"))
+    lauf = zulauf.Zulauf(ablage, lambda: Knoten(), "tcp://x:1")
+    lauf._zuletzt_schnappschuss = time.time()
+    echtes = ablage.ereignisse
+    gesperrt = {"ja": True}
+
+    def vielleicht(liste):
+        if gesperrt["ja"]:
+            raise sqlite3.OperationalError("database is locked")
+        return echtes(liste)
+    monkeypatch.setattr(ablage, "ereignisse", vielleicht)
+
+    for i in range(1, 13):
+        lauf._eine_nachricht(nachricht(f"{i:064x}", "A", folge=i, nummer=i))
+        lauf._zuletzt_gesichert = 0
+        lauf._zwischendurch()
+    gesperrt["ja"] = False
+    lauf._zuletzt_gesichert = 0
+    lauf._zwischendurch()
+
+    assert ablage.eckdaten()["luecken_24h"] == 1
+    assert ablage.eine_tx(f"{12:064x}") is not None, "das Neueste fehlt"
+    assert ablage.eine_tx(f"{1:064x}") is None
+    ablage.schliesse()
+
+
+def test_ein_unerwarteter_fehler_beendet_den_zulauf_nicht(z, monkeypatch,
+                                                            caplog):
+    """Der Zulauf laeuft nicht unter dem Auffangbuegel der anderen
+    Hintergrundfaeden. Eine Ausnahme hiess bisher: Faden tot, Auswertung
+    steht still, und niemand startet ihn wieder."""
+    import sys
+    monkeypatch.setitem(sys.modules, "zmq", FakeZmq(FakeSteckdose()))
+    monkeypatch.setattr(z, "_im_erstsync", lambda: False)
+    monkeypatch.setattr(z._ende, "wait", lambda _s: False)
+    anlaeufe = []
+
+    def lausche(_zmq):
+        anlaeufe.append(1)
+        if len(anlaeufe) == 1:
+            raise RuntimeError("etwas Unvorhergesehenes")
+        z._ende.set()
+    monkeypatch.setattr(z, "_lausche", lausche)
+
+    with caplog.at_level(logging.ERROR):
+        z.run()
+    assert len(anlaeufe) == 2, "nach dem Fehler kam kein neuer Anlauf"
+    assert any("Zulauf" in r.message for r in caplog.records)
+
+
+def test_ein_unlesbares_buendel_blockiert_nicht_alles_danach(
+        tmp_path, monkeypatch, caplog):
+    """Scheitert das Schreiben NICHT an der Sperre, sondern an einem Fehler
+    im Gesammelten, hilft kein zweiter Versuch -- derselbe Stapel scheiterte
+    sonst bei jedem Anlauf wieder, und es wuerde nie mehr etwas geschrieben.
+    Er wird verworfen, als Luecke vermerkt und gemeldet."""
+    ablage = store.Ablage(str(tmp_path / "a.db"))
+    lauf = zulauf.Zulauf(ablage, lambda: Knoten(), "tcp://x:1")
+    lauf._zuletzt_schnappschuss = time.time()
+    lauf._stapel.append(("?", "kaputt"))
+    lauf._eine_nachricht(nachricht(HASH_A, "A", folge=1, nummer=1))
+    with caplog.at_level(logging.ERROR):
+        assert lauf._sichern() is False
+    assert any("verworfen" in r.message for r in caplog.records)
+
+    lauf._eine_nachricht(nachricht(HASH_B, "A", folge=2, nummer=2))
+    assert lauf._sichern() is True
+    assert ablage.eine_tx(HASH_B) is not None, "danach kam nichts mehr an"
+    assert ablage.eckdaten()["luecken_24h"] == 1
     ablage.schliesse()

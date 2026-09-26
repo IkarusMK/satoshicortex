@@ -583,3 +583,148 @@ def test_kein_aufraeumer_leert_bei_null_tagen_die_ganze_tabelle(ablage):
     assert ablage.htlc_aufraeumen(0) == 0
     assert ablage.htlc_aufraeumen(-5) == 0
     assert ablage.nachrichten_aufraeumen(0) == 0
+
+
+# ═══════════════ Die Schreibsperre (Befund 26.09.2026) ═════════════════════
+#
+# Aus dem Betrieb, 26.09.2026: "sqlite3.OperationalError: database is locked".
+# Gemessen, nicht vermutet: SQLite beginnt eine Transaktion von sich aus als
+# LESENDE. Liest sie erst und schreibt dann -- wie tx_bestaetigt() bei jedem
+# Block --, und hat dazwischen ein anderer Faden etwas gespeichert, scheitert
+# das Schreiben SOFORT. Die zwanzig Sekunden Geduld greifen dabei nicht: der
+# Stand, auf dem gelesen wurde, ist schlicht nicht mehr der aktuelle.
+
+def _fremd(pfad, geduld=0.2):
+    import sqlite3
+    return sqlite3.connect(str(pfad), timeout=geduld)
+
+
+def test_lesen_dann_schreiben_scheitert_nicht_an_einem_fremden_schreiber(
+        tmp_path):
+    """Genau im Moment zwischen Lesen und Schreiben speichert ein anderer
+    Faden etwas. Das ist kein Sonderfall: HTLC-Strom, Nachrichten und die
+    Oberflaeche schreiben jederzeit."""
+    import sqlite3
+    pfad = tmp_path / "a.db"
+    a = store.Ablage(str(pfad))
+    a.tx_aufgenommen("aa" * 32, 1000, 1)
+    a.sichern()
+    fremd = _fremd(pfad)
+    zwischendurch = []
+
+    def spur(sql):
+        if sql.startswith("UPDATE tx_gesehen SET hoehe"):
+            try:
+                fremd.execute("INSERT INTO luecken (zeit_ms, art) "
+                              "VALUES (1, 'fremd')")
+                fremd.commit()
+                zwischendurch.append("kam durch")
+            except sqlite3.OperationalError:
+                zwischendurch.append("musste warten")
+
+    a.v.set_trace_callback(spur)
+    try:
+        lage = a.tx_bestaetigt(["aa" * 32], 5, 2000)
+        a.sichern()
+    finally:
+        a.v.set_trace_callback(None)
+        fremd.close()
+    assert zwischendurch, "der Zwischenschritt lief gar nicht -- Test prueft nichts"
+    assert lage == {"bekannt": 1, "median_ms": 1000}
+    assert a.eine_tx("aa" * 32)["hoehe"] == 5
+    a.schliesse()
+
+
+def test_ein_gescheiterter_schreibversuch_hinterlaesst_keine_offene_transaktion(
+        tmp_path, monkeypatch):
+    """Bleibt nach einem Fehler eine Transaktion offen, liest dieser Faden
+    danach auf einem eingefrorenen Stand -- und jeder seiner naechsten
+    Schreibversuche scheitert wieder. Ausserdem kann SQLite das
+    Schreibprotokoll nicht mehr einarbeiten, und es waechst ohne Ende."""
+    import sqlite3
+    monkeypatch.setattr(store, "WARTEN_AUF_SPERRE_SEKUNDEN", 0.2,
+                        raising=False)
+    pfad = tmp_path / "a.db"
+    a = store.Ablage(str(pfad))
+    fremd = _fremd(pfad)
+    fremd.execute("BEGIN IMMEDIATE")            # haelt die Schreibsperre
+    with pytest.raises(sqlite3.OperationalError):
+        a.htlc_merken(_htlc_zeile(int(time.time() * 1000)))
+    fremd.rollback()
+    fremd.close()
+    assert not a.v.in_transaction, "nach dem Fehler blieb eine Transaktion offen"
+    a.htlc_merken(_htlc_zeile(int(time.time() * 1000)))
+    assert len(a.htlc_lesen()) == 1
+    a.schliesse()
+
+
+def test_aufraeumen_gibt_die_sperre_zwischendurch_frei(tmp_path, monkeypatch):
+    """Einmal am Tag fliegt ein Tag Transaktionen raus -- rund 400.000
+    Zeilen aus zwoelf Millionen. In EINEM Rutsch haelt das die
+    Schreibsperre so lange, wie das Loeschen dauert, und auf einem NAS
+    kann das die zwanzig Sekunden reissen, die jeder andere Schreibende
+    wartet. In Happen ist die Sperre zwischendurch frei."""
+    monkeypatch.setattr(store, "AUFRAEUMEN_HAPPEN", 10, raising=False)
+    a = store.Ablage(str(tmp_path / "a.db"))
+    alt = int((time.time() - 40 * 86400) * 1000)
+    neu = int(time.time() * 1000)
+    for i in range(35):
+        a.tx_aufgenommen(f"{i:064x}", alt + i, i)
+    for i in range(3):
+        a.tx_aufgenommen(f"{100 + i:064x}", neu, 100 + i)
+    a.sichern()
+
+    freigaben = []
+    a.v.set_trace_callback(
+        lambda sql: freigaben.append(sql) if sql.strip().upper() == "COMMIT"
+        else None)
+    try:
+        weg = a.aufraeumen()
+    finally:
+        a.v.set_trace_callback(None)
+    assert weg == 35
+    assert a.eckdaten()["transaktionen"] == 3
+    assert len(freigaben) >= 4, (
+        f"in einem Rutsch geloescht ({len(freigaben)} Freigabe(n))")
+    a.schliesse()
+
+
+def test_ein_buendel_wird_ganz_oder_gar_nicht_geschrieben(ablage):
+    """Der Zulauf schreibt, was er gesammelt hat, in EINER kurzen
+    Transaktion. Geht darin etwas schief, darf nichts halb stehen bleiben --
+    sonst waere nach dem naechsten Versuch die Haelfte doppelt da."""
+    with pytest.raises(ValueError):
+        ablage.ereignisse([("A", "aa" * 32, 1000, 1),
+                           ("?", "unbekannte Art")])
+    assert not ablage.v.in_transaction
+    assert ablage.eine_tx("aa" * 32) is None
+
+
+def test_ein_buendel_traegt_alles_ein_und_meldet_die_bloecke(ablage):
+    jetzt_ms = int(time.time() * 1000)
+    bloecke = ablage.ereignisse([
+        ("A", "aa" * 32, 1000, 1),
+        ("A", "bb" * 32, 3000, 2),
+        ("R", "bb" * 32, 3500, "ohne_block"),
+        ("L", jetzt_ms, "zmq", 7, 9),
+        ("M", 1_756_000_000, 2, 900, 1.0, None),
+        ("C", {"hoehe": 900001, "hash": "cc" * 32, "blockzeit": 1,
+               "empfangen_ms": 5000, "gewicht": 4, "txzahl": 2,
+               "gebuehren_sat": 10, "pool": "Testpool", "botschaft": None},
+         ["aa" * 32, "dd" * 32]),
+        ("D", jetzt_ms),
+    ])
+    assert not ablage.v.in_transaction, "das Buendel wurde nicht abgeschlossen"
+    assert bloecke == [{"hoehe": 900001, "txzahl": 2, "bekannt": 1}]
+    assert ablage.eine_tx("aa" * 32)["verweildauer_ms"] == 4000
+    assert ablage.eine_tx("bb" * 32)["grund"] == "ohne_block"
+    assert ablage.letzte_bloecke(1)[0]["bekannte_tx"] == 1
+    assert ablage.mempool_verlauf(0)[-1]["txzahl"] == 2
+    d = ablage.eckdaten()
+    assert d["luecken_24h"] == 1 and d["reorgs_24h"] == 1
+
+
+def test_die_leere_ablage_nimmt_auch_buendel_an():
+    """Ohne Datenbank laeuft der Zulauf gar nicht erst -- aber wer ihn
+    trotzdem an eine leere Ablage haengt, darf keinen Absturz bekommen."""
+    assert store.LeereAblage("x").ereignisse([("A", "aa" * 32, 1, 1)]) == []

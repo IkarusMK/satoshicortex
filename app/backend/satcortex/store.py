@@ -18,13 +18,14 @@ und die Uebersicht bliebe bei jedem Block kurz stehen.
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import sqlite3
 import threading
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
 
 log = logging.getLogger(__name__)
 
@@ -52,6 +53,23 @@ NACHRICHTEN_TAGE = 60
 # Werk eingeschalteten Quellen bringt EIN Abrufdurchgang leicht mehr als
 # sechzig Meldungen -- der Rest fiel sofort unter die Grenze.
 NACHRICHTEN_FENSTER = 60
+
+# Wie lange ein Schreibender auf die Sperre wartet, bevor er aufgibt.
+#
+# Die Zahl allein schuetzt vor nichts. DER BEFUND VOM 26.09.2026, aus dem
+# Betrieb: "sqlite3.OperationalError: database is locked". Ursache war nicht
+# eine zu kurze Geduld, sondern jemand, der die Sperre laenger hielt -- der
+# Zulauf fragte bei offener Transaktion den Knoten, und das dauert waehrend
+# eines Blocks gern fuenfzehn Sekunden. Die Regel dahinter steht bei
+# _schreibend(): eine Schreibtransaktion enthaelt Datenbankarbeit und sonst
+# nichts.
+WARTEN_AUF_SPERRE_SEKUNDEN = 20.0
+
+# In wie grossen Happen aufgeraeumt wird. Ein Tag Transaktionen sind rund
+# 400.000 Zeilen; in EINEM Rutsch hielte das die Schreibsperre so lange, wie
+# das Loeschen auf dem NAS eben dauert. Zwischen den Happen kommt jeder andere
+# Schreibende dran.
+AUFRAEUMEN_HAPPEN = 5000
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS tx_gesehen (
@@ -265,7 +283,18 @@ class Ablage:
                     f"ALTER TABLE {tabelle} ADD COLUMN {spalte} {typ}")
 
     def _neu(self) -> sqlite3.Connection:
-        v = sqlite3.connect(str(self.pfad), timeout=20.0)
+        # IMMEDIATE: jede Transaktion, die Python von sich aus beginnt, holt
+        # sich die Schreibsperre GLEICH am Anfang -- und wartet dort, wenn
+        # jemand anders sie hat.
+        #
+        # DER BEFUND VOM 26.09.2026, gemessen: Ohne das beginnt SQLite eine
+        # Transaktion als lesende. tx_bestaetigt() liest erst und schreibt
+        # dann; speichert dazwischen ein anderer Faden etwas, ist der
+        # gelesene Stand veraltet, und das Schreiben scheitert SOFORT mit
+        # "database is locked". Die Geduld oben greift dabei gar nicht --
+        # Warten wuerde den Stand ja nicht wieder aktuell machen.
+        v = sqlite3.connect(str(self.pfad), timeout=WARTEN_AUF_SPERRE_SEKUNDEN,
+                            isolation_level="IMMEDIATE")
         v.row_factory = sqlite3.Row
         v.execute("PRAGMA journal_mode=WAL")
         # NORMAL statt FULL: bei WAL bleibt die Datenbank auch so nach einem
@@ -289,6 +318,29 @@ class Ablage:
         if verbindung is not None:
             verbindung.close()
             self._oertlich.verbindung = None
+
+    @contextlib.contextmanager
+    def _schreibend(self) -> Iterator[sqlite3.Connection]:
+        """Eine Schreibtransaktion: ganz oder gar nicht, und KURZ.
+
+        Kurz heisst: darin steht Datenbankarbeit und sonst nichts. Kein
+        Aufruf an den Knoten, kein Warten auf das Netz. Wer die Sperre haelt,
+        haelt sie fuer alle -- den HTLC-Strom, die Nachrichten, die
+        Oberflaeche.
+
+        Und bei einem Fehler wird zurueckgerollt. Vorher blieb eine
+        Transaktion, deren Schreiben gescheitert war, einfach offen: der
+        Faden las danach auf einem eingefrorenen Stand, jeder weitere
+        Schreibversuch scheiterte wieder, und SQLite konnte sein
+        Schreibprotokoll nicht mehr einarbeiten -- es waechst dann ohne Ende.
+        """
+        v = self.v
+        try:
+            yield v
+            v.commit()
+        except BaseException:
+            v.rollback()
+            raise
 
     # ── Schreiben ──────────────────────────────────────────────────────────
 
@@ -371,12 +423,73 @@ class Ablage:
         Wird angezeigt, nicht versteckt: ab hier fehlen Zeitstempel, und jeder
         Durchschnitt daneben ist ein Stueck weit geraten.
         """
-        self.v.execute(
-            "INSERT INTO luecken (zeit_ms, art, erwartet, bekommen) "
-            "VALUES (?, ?, ?, ?)",
-            (int(time.time() * 1000), art, erwartet, bekommen))
+        self._luecke_eintragen(int(time.time() * 1000), art, erwartet, bekommen)
         log.warning("Luecke im %s-Strom: erwartet %s, bekommen %s",
                     art, erwartet, bekommen)
+
+    def _luecke_eintragen(self, zeit_ms: int, art: str,
+                          erwartet: Optional[int],
+                          bekommen: Optional[int]) -> None:
+        self.v.execute(
+            "INSERT INTO luecken (zeit_ms, art, erwartet, bekommen) "
+            "VALUES (?, ?, ?, ?)", (zeit_ms, art, erwartet, bekommen))
+
+    def ereignisse(self, liste: Sequence[Tuple]) -> List[Dict]:
+        """Was der Zulauf gesammelt hat -- in EINER kurzen Transaktion.
+
+        Der Zulauf haelt seine Ereignisse im Speicher und reicht sie hier
+        gebuendelt herein. So steht die Schreibsperre nur fuer die Dauer des
+        Schreibens, nie fuer die Zeit dazwischen, in der er auf den Strom
+        oder auf den Knoten wartet. Bis zum 26.09.2026 trug er jede Zeile
+        sofort ein und sicherte erst Sekunden spaeter -- dazwischen war die
+        Ablage fuer alle anderen zu.
+
+        Ganz oder gar nicht: scheitert es, steht nichts davon in der Datei,
+        und der Zulauf kann dasselbe Buendel spaeter noch einmal reichen,
+        ohne dass etwas doppelt ankommt.
+
+        Die Eintraege, jeweils ein Tupel mit der Art vorne:
+
+            ("A", txid, zeit_ms, folge)       in den Mempool aufgenommen
+            ("R", txid, zeit_ms, grund)       ohne Block entfernt
+            ("C", block, txids)               Block verbunden; block traegt
+                                              die Spalten ausser bekannte_tx
+                                              und verweildauer_ms
+            ("D", zeit_ms)                    Block getrennt (Reorg)
+            ("L", zeit_ms, art, erwartet, bekommen)   Luecke
+            ("M", zeit_s, txzahl, bytes, mindestgebuehr, diagramm)
+                                              Mempool-Schnappschuss
+
+        Gibt je Block zurueck, wie viele seiner Transaktionen wir vorher
+        kannten -- das ist die Zeile, die der Zulauf ins Protokoll schreibt.
+        """
+        bloecke: List[Dict] = []
+        with self._schreibend():
+            for eintrag in liste:
+                art, werte = eintrag[0], eintrag[1:]
+                if art == "A":
+                    self.tx_aufgenommen(*werte)
+                elif art == "R":
+                    self.tx_entfernt(*werte)
+                elif art == "C":
+                    block, txids = werte
+                    lage = self.tx_bestaetigt(txids, block["hoehe"],
+                                              block["empfangen_ms"])
+                    self.block_eingetragen({
+                        **block, "bekannte_tx": lage["bekannt"],
+                        "verweildauer_ms": lage["median_ms"]})
+                    bloecke.append({"hoehe": block["hoehe"],
+                                    "txzahl": block["txzahl"],
+                                    "bekannt": lage["bekannt"]})
+                elif art == "D":
+                    self._reorg_eintragen(*werte)
+                elif art == "L":
+                    self._luecke_eintragen(*werte)
+                elif art == "M":
+                    self.mempool_punkt(*werte)
+                else:
+                    raise ValueError(f"unbekannte Ereignisart {art!r}")
+        return bloecke
 
     def sichern(self) -> None:
         self.v.commit()
@@ -465,10 +578,13 @@ class Ablage:
         Meldung". Eine Reorg ist das Gegenteil: bitcoind hat sauber gemeldet,
         dass ein Block nicht mehr gilt.
         """
+        self._reorg_eintragen(int(time.time() * 1000))
+        log.info("Reorg: ein Block wurde von der Kette getrennt.")
+
+    def _reorg_eintragen(self, zeit_ms: int) -> None:
         self.v.execute(
             "INSERT INTO luecken (zeit_ms, art, erwartet, bekommen) "
-            "VALUES (?, 'reorg', NULL, NULL)", (int(time.time() * 1000),))
-        log.info("Reorg: ein Block wurde von der Kette getrennt.")
+            "VALUES (?, 'reorg', NULL, NULL)", (zeit_ms,))
 
     def pool_anteile(self, letzte: int = 0) -> Dict:
         """Wer die aufgezeichneten Bloecke gefunden hat.
@@ -543,16 +659,16 @@ class Ablage:
         Ueberschrift darf die Meldung nicht wieder nach oben spuelen und
         schon gar nicht als ungelesen zurueckkehren lassen.
         """
-        c = self.v.execute(
-            """INSERT OR IGNORE INTO nachrichten
-               (kennung, quelle, quellenname, titel, anriss, verweis,
-                zeitpunkt, geholt_s, sprache, bezahlschranke)
-               VALUES (?,?,?,?,?,?,?,?,?,?)""",
-            (b["kennung"], b["quelle"], b["quellenname"], b["titel"],
-             b.get("anriss", ""), b["verweis"], b.get("zeitpunkt"),
-             geholt_s, b.get("sprache", ""),
-             1 if b.get("bezahlschranke") else 0))
-        self.v.commit()
+        with self._schreibend() as v:
+            c = v.execute(
+                """INSERT OR IGNORE INTO nachrichten
+                   (kennung, quelle, quellenname, titel, anriss, verweis,
+                    zeitpunkt, geholt_s, sprache, bezahlschranke)
+                   VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                (b["kennung"], b["quelle"], b["quellenname"], b["titel"],
+                 b.get("anriss", ""), b["verweis"], b.get("zeitpunkt"),
+                 geholt_s, b.get("sprache", ""),
+                 1 if b.get("bezahlschranke") else 0))
         return c.rowcount > 0
 
     def nachrichten_lesen(self, grenze: int = NACHRICHTEN_FENSTER,
@@ -577,13 +693,13 @@ class Ablage:
             werte).fetchall()]
 
     def nachricht_gelesen(self, kennung: str) -> None:
-        self.v.execute("UPDATE nachrichten SET gelesen=1 WHERE kennung=?",
-                       (kennung,))
-        self.v.commit()
+        with self._schreibend() as v:
+            v.execute("UPDATE nachrichten SET gelesen=1 WHERE kennung=?",
+                      (kennung,))
 
     def nachrichten_alle_gelesen(self) -> None:
-        self.v.execute("UPDATE nachrichten SET gelesen=1 WHERE gelesen=0")
-        self.v.commit()
+        with self._schreibend() as v:
+            v.execute("UPDATE nachrichten SET gelesen=1 WHERE gelesen=0")
 
     def nachrichten_ungelesen(self, quellen: Optional[List[str]] = None,
                               grenze: int = NACHRICHTEN_FENSTER) -> int:
@@ -609,11 +725,11 @@ class Ablage:
 
     # ── Der HTLC-Strom ────────────────────────────────────────────────
     def htlc_merken(self, e: Dict) -> None:
-        self.v.execute(
-            "INSERT INTO htlc (zeit_ms, art, rein_kanal, raus_kanal, betrag,"
-            " gebuehr, grund) VALUES (:zeit_ms, :art, :rein_kanal,"
-            " :raus_kanal, :betrag, :gebuehr, :grund)", e)
-        self.v.commit()
+        with self._schreibend() as v:
+            v.execute(
+                "INSERT INTO htlc (zeit_ms, art, rein_kanal, raus_kanal,"
+                " betrag, gebuehr, grund) VALUES (:zeit_ms, :art,"
+                " :rein_kanal, :raus_kanal, :betrag, :gebuehr, :grund)", e)
 
     def htlc_lesen(self, grenze: int = 100) -> List[Dict]:
         return [dict(r) for r in self.v.execute(
@@ -636,18 +752,19 @@ class Ablage:
     def netzgebuehren_merken(self, tag: str, zeit_s: int,
                              werte: Dict) -> None:
         """Die Tagesmessung festhalten -- oder die des Tages ersetzen."""
-        self.v.execute(
-            "INSERT OR REPLACE INTO netzgebuehren "
-            "(tag, zeit_s, median_ppm, p25_ppm, p75_ppm, basis_median_msat,"
-            " linien, kanaele, eigen_ppm, stufen)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?)",
-            (str(tag), int(zeit_s), werte.get("median_ppm"),
-             werte.get("p25_ppm"), werte.get("p75_ppm"),
-             werte.get("basis_median_msat"), werte.get("linien"),
-             werte.get("kanaele"),
-             (werte.get("eigen") or {}).get("satz_ppm"),
-             json.dumps(werte["stufen"]) if werte.get("stufen") else None))
-        self.v.commit()
+        with self._schreibend() as v:
+            v.execute(
+                "INSERT OR REPLACE INTO netzgebuehren "
+                "(tag, zeit_s, median_ppm, p25_ppm, p75_ppm,"
+                " basis_median_msat, linien, kanaele, eigen_ppm, stufen)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?)",
+                (str(tag), int(zeit_s), werte.get("median_ppm"),
+                 werte.get("p25_ppm"), werte.get("p75_ppm"),
+                 werte.get("basis_median_msat"), werte.get("linien"),
+                 werte.get("kanaele"),
+                 (werte.get("eigen") or {}).get("satz_ppm"),
+                 json.dumps(werte["stufen"]) if werte.get("stufen")
+                 else None))
 
     def netzgebuehren_verlauf(self, tage: int = 28) -> List[Dict]:
         """Die letzten Messtage, der juengste zuerst.
@@ -665,11 +782,11 @@ class Ablage:
 
     def netzgebuehren_aufraeumen(self, behalten: int = 400) -> int:
         """Alte Tageszeilen wegwerfen. Ein gutes Jahr bleibt stehen."""
-        weg = self.v.execute(
-            "DELETE FROM netzgebuehren WHERE tag NOT IN "
-            "(SELECT tag FROM netzgebuehren ORDER BY tag DESC LIMIT ?)",
-            (max(1, int(behalten)),)).rowcount
-        self.v.commit()
+        with self._schreibend() as v:
+            weg = v.execute(
+                "DELETE FROM netzgebuehren WHERE tag NOT IN "
+                "(SELECT tag FROM netzgebuehren ORDER BY tag DESC LIMIT ?)",
+                (max(1, int(behalten)),)).rowcount
         return weg
 
     def htlc_aufraeumen(self, tage: int = NACHRICHTEN_TAGE) -> int:
@@ -677,25 +794,39 @@ class Ablage:
         # die ganze Tabelle ab. Heute ruft das niemand mit einer Null -- und
         # "heute ruft das niemand so" ist keine Eigenschaft, auf die man baut.
         grenze = int((time.time() - max(1, int(tage)) * 86400) * 1000)
-        c = self.v.execute("DELETE FROM htlc WHERE zeit_ms < ?", (grenze,))
-        self.v.commit()
+        with self._schreibend() as v:
+            c = v.execute("DELETE FROM htlc WHERE zeit_ms < ?", (grenze,))
         return c.rowcount
 
     def nachrichten_aufraeumen(self, tage: int = NACHRICHTEN_TAGE) -> int:
         grenze = int(time.time()) - max(1, int(tage)) * 86400
-        c = self.v.execute(
-            "DELETE FROM nachrichten WHERE COALESCE(zeitpunkt, geholt_s) < ?",
-            (grenze,))
-        self.v.commit()
+        with self._schreibend() as v:
+            c = v.execute(
+                "DELETE FROM nachrichten "
+                "WHERE COALESCE(zeitpunkt, geholt_s) < ?", (grenze,))
         return c.rowcount
 
     def aufraeumen(self, tage: int = AUFBEWAHRUNG_TAGE) -> int:
-        """Alte Transaktionszeilen wegwerfen. Bloecke bleiben."""
+        """Alte Transaktionszeilen wegwerfen. Bloecke bleiben.
+
+        In Happen, jeder in seiner eigenen kurzen Transaktion -- siehe
+        AUFRAEUMEN_HAPPEN. Ueber rowid statt ueber die Zeit allein, weil
+        DELETE ... LIMIT in SQLite eine Uebersetzungsoption braucht, die
+        Pythons SQLite nicht mitbringt.
+        """
         grenze = int((time.time() - tage * 86400) * 1000)
-        weg = self.v.execute("DELETE FROM tx_gesehen WHERE zuerst_ms < ?",
-                             (grenze,)).rowcount
-        self.v.execute("DELETE FROM luecken WHERE zeit_ms < ?", (grenze,))
-        self.v.commit()
+        weg = 0
+        while True:
+            with self._schreibend() as v:
+                happen = v.execute(
+                    "DELETE FROM tx_gesehen WHERE rowid IN (SELECT rowid "
+                    "FROM tx_gesehen WHERE zuerst_ms < ? LIMIT ?)",
+                    (grenze, AUFRAEUMEN_HAPPEN)).rowcount
+            weg += happen
+            if happen < AUFRAEUMEN_HAPPEN:
+                break
+        with self._schreibend() as v:
+            v.execute("DELETE FROM luecken WHERE zeit_ms < ?", (grenze,))
         if weg:
             log.info("Aufgeraeumt: %d Transaktionszeilen aelter als %d Tage.",
                      weg, tage)
@@ -730,6 +861,9 @@ class LeereAblage:
 
     tx_aufgenommen = tx_entfernt = block_eingetragen = _nichts
     mempool_punkt = luecke = sichern = schliesse = _nichts
+
+    def ereignisse(self, liste) -> List[Dict]:
+        return []
 
     def tx_bestaetigt(self, txids, hoehe, zeit_ms) -> Dict:
         return {"bekannt": 0, "median_ms": None}

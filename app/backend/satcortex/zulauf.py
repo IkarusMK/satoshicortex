@@ -47,10 +47,11 @@ eine Luege. Die Geschichte faengt an, wenn die Kette steht.
 from __future__ import annotations
 
 import logging
+import sqlite3
 import struct
 import threading
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from . import rpc
 
@@ -69,10 +70,42 @@ SCHNAPPSCHUSS_SEKUNDEN = 60
 # Wie oft nachgesehen wird, ob der Erstabgleich vorbei ist.
 WARTELAUF_SEKUNDEN = 30
 
+# Und wie oft, waehrend der Strom laeuft, ob der Knoten WIEDER im Abgleich
+# ist (Reindex, grosse Reorg).
+#
+# DER BEFUND VOM 26.09.2026: Das wurde bei JEDER Meldung aus dem Strom
+# gefragt, und zwar ueber rpc.kettenlage() -- fuenf Aufrufe, darunter
+# getblockchaininfo und getnetworkinfo, die beide auf cs_main warten. Bei
+# einem vollen Mempool sind das Dutzende Meldungen je Sekunde, also Hunderte
+# Aufrufe, und waehrend eines Blocks haengt jeder davon bis zu fuenfzehn
+# Sekunden. Ein Reindex kommt nicht ueberraschend in der naechsten
+# Millisekunde; einmal je halbe Minute reicht.
+ABGLEICH_PRUEFEN_SEKUNDEN = 30
+
 # Nach so vielen Ereignissen wird geschrieben. Jede Zeile einzeln zu sichern
-# hiesse bei jedem Block Tausende fsync -- das haelt keine Platte aus.
+# hiesse bei jedem Block Tausende Schreibvorgaenge.
+#
+# Gesammelt wird im SPEICHER, nicht in einer offenen Transaktion. Bis zum
+# 26.09.2026 trug der Zulauf jede Zeile sofort ein und sicherte erst Sekunden
+# spaeter; dazwischen hielt er die Schreibsperre -- auch dann, wenn er
+# gerade den Knoten fragte. Siehe store.Ablage.ereignisse().
 BUENDEL = 200
 BUENDEL_SEKUNDEN = 2.0
+
+# Nimmt die Ablage gerade nichts an, bleibt das Gesammelte liegen und wird
+# nach dieser Pause noch einmal versucht. Ohne Pause stuende der Zulauf bei
+# jeder Meldung die volle Geduld der Ablage lang still und kaeme mit dem
+# Lesen nicht mehr nach.
+NEUER_VERSUCH_SEKUNDEN = 30
+
+# Hoechstens so viele Ereignisse warten im Speicher. Bei einem vollen Mempool
+# ist das rund eine halbe Stunde. Nimmt die Ablage laenger nichts an -- Platte
+# voll, Datei kaputt --, wird verworfen und als Luecke vermerkt, statt den
+# Speicher des Containers volllaufen zu lassen.
+STAPEL_HOECHSTENS = 50_000
+
+# Nach einem unerwarteten Fehler: so lange warten, dann neu anlaufen.
+NEUER_ANLAUF_SEKUNDEN = 10
 
 
 class Zulauf(threading.Thread):
@@ -89,7 +122,13 @@ class Zulauf(threading.Thread):
         self._ende = threading.Event()
         self._letzte_nachricht: Optional[int] = None
         self._letzte_mempoolfolge: Optional[int] = None
-        self._offen = 0
+        # Was gesammelt, aber noch nicht geschrieben ist. Eintraege wie in
+        # store.Ablage.ereignisse() beschrieben.
+        self._stapel: List[Tuple] = []
+        self._verworfen = 0
+        self._naechster_versuch: Optional[float] = None     # monotonic
+        self._sperre_gemeldet = False
+        self._abgleich_geprueft: Optional[float] = None     # monotonic
         self._zuletzt_gesichert = 0.0
         self._zuletzt_schnappschuss = 0.0
         self.laeuft_mit = False              # steht der Strom gerade?
@@ -100,10 +139,24 @@ class Zulauf(threading.Thread):
     def beende(self) -> None:
         self._ende.set()
 
+    def _abgleichstand(self) -> Optional[bool]:
+        """Ist der Knoten im Abgleich? None heisst: weiss ich gerade nicht.
+
+        EIN Aufruf, nicht rpc.kettenlage() mit fuenf -- gebraucht wird hier
+        genau ein Feld.
+        """
+        try:
+            kette = self._knoten_hole().ruf("getblockchaininfo",
+                                            zeitlimit=rpc.GEDULD_SEKUNDEN)
+        except (rpc.NichtErreichbar, rpc.RpcFehler):
+            return None
+        if not isinstance(kette, dict):
+            return None
+        return bool(kette.get("initialblockdownload", True))
+
     def _im_erstsync(self) -> bool:
-        lage = rpc.kettenlage(self._knoten_hole())
-        # Kein Kontakt: lieber warten als blind loslegen.
-        return True if lage is None else bool(lage["im_erstsync"])
+        # Vor dem Anlaufen: kein Kontakt heisst warten, nicht blind loslegen.
+        return self._abgleichstand() is not False
 
     def run(self) -> None:
         try:
@@ -114,20 +167,30 @@ class Zulauf(threading.Thread):
 
         gemeldet = False
         while not self._ende.is_set():
-            if self._im_erstsync():
-                # Einmal sagen, nicht alle dreissig Sekunden. Auf des Betreibers
-                # Knoten waren das 120 gleiche Zeilen je Stunde -- und
-                # dazwischen gingen die zwei unter, die wirklich etwas
-                # meldeten. Ein Protokoll, das man durchblaettern muss, ist
-                # keines.
-                if not gemeldet:
-                    log.info("Erstabgleich laeuft -- der Zulauf wartet.")
-                    gemeldet = True
-                if self._ende.wait(WARTELAUF_SEKUNDEN):
+            # Dieser Faden laeuft NICHT unter dem Auffangbuegel der anderen
+            # Hintergrundfaeden, und niemand startet ihn neu. Eine Ausnahme
+            # hiess bis zum 26.09.2026: Faden tot, Auswertung steht, bis
+            # jemand die Anwendung neu startet -- und nichts sagt es einem.
+            try:
+                if self._im_erstsync():
+                    # Einmal sagen, nicht alle dreissig Sekunden. Auf des
+                    # Betreibers Knoten waren das 120 gleiche Zeilen je
+                    # Stunde -- und dazwischen gingen die zwei unter, die
+                    # wirklich etwas meldeten. Ein Protokoll, das man
+                    # durchblaettern muss, ist keines.
+                    if not gemeldet:
+                        log.info("Erstabgleich laeuft -- der Zulauf wartet.")
+                        gemeldet = True
+                    if self._ende.wait(WARTELAUF_SEKUNDEN):
+                        return
+                    continue
+                gemeldet = False
+                self._lausche(zmq)
+            except Exception:                                # nosec B902
+                log.exception("Zulauf unterbrochen -- neuer Anlauf in %d s.",
+                              NEUER_ANLAUF_SEKUNDEN)
+                if self._ende.wait(NEUER_ANLAUF_SEKUNDEN):
                     return
-                continue
-            gemeldet = False
-            self._lausche(zmq)
 
     def _lausche(self, zmq) -> None:
         zusammenhang = zmq.Context.instance()
@@ -141,6 +204,8 @@ class Zulauf(threading.Thread):
         steckdose.connect(self.adresse)
         log.info("Zulauf verbunden mit %s.", self.adresse)
         self.laeuft_mit = True
+        # run() hat eben erst gefragt.
+        self._abgleich_geprueft = time.monotonic()
 
         try:
             while not self._ende.is_set():
@@ -149,13 +214,28 @@ class Zulauf(threading.Thread):
                 self._zwischendurch()
                 # Kehrt der Knoten in den Abgleich zurueck -- Reindex, grosse
                 # Reorg --, gehoert der Zulauf wieder schlafen gelegt.
-                if self._zuletzt_schnappschuss and self._im_erstsync():
+                #
+                # Aber NUR auf ein klares Ja. Bis zum 26.09.2026 galt auch
+                # "keine Antwort" als Abgleich: haengt getblockchaininfo
+                # waehrend eines Blocks einmal an cs_main, legte der Zulauf
+                # die Steckdose weg und verband sich neu -- und alles, was
+                # dazwischen kam, war verloren. Aus dem Betrieb, 26.09.2026:
+                # eine "Luecke im zmq-Strom" gleich nach dem Sperrfehler.
+                if self._abgleich_faellig() and self._abgleichstand() is True:
                     log.info("Knoten ist wieder im Abgleich -- Zulauf pausiert.")
                     return
         finally:
             self.laeuft_mit = False
             steckdose.close()
-            self._sichern()
+            self._sichern(trotz_pause=True)
+
+    def _abgleich_faellig(self) -> bool:
+        jetzt = time.monotonic()
+        if (self._abgleich_geprueft is not None
+                and jetzt - self._abgleich_geprueft < ABGLEICH_PRUEFEN_SEKUNDEN):
+            return False
+        self._abgleich_geprueft = jetzt
+        return True
 
     # ── Ereignisse ─────────────────────────────────────────────────────────
 
@@ -169,7 +249,11 @@ class Zulauf(threading.Thread):
         if nummer is not None:
             if (self._letzte_nachricht is not None
                     and nummer != (self._letzte_nachricht + 1) % 2**32):
-                self.ablage.luecke("zmq", self._letzte_nachricht + 1, nummer)
+                erwartet = self._letzte_nachricht + 1
+                log.warning("Luecke im zmq-Strom: erwartet %s, bekommen %s",
+                            erwartet, nummer)
+                self._vormerken(("L", int(time.time() * 1000), "zmq",
+                                 erwartet, nummer))
             self._letzte_nachricht = nummer
 
         if len(rumpf) < 33:
@@ -214,8 +298,7 @@ class Zulauf(threading.Thread):
         jetzt_ms = int(time.time() * 1000)
         self.gesehen += 1
         if art == "A":
-            self.ablage.tx_aufgenommen(kennung, jetzt_ms, folge)
-            self._offen += 1
+            self._vormerken(("A", kennung, jetzt_ms, folge))
         elif art == "R":
             # Ohne Block entfernt -- WARUM, sagt ZMQ nicht. Bis zum 15.09.2026
             # stand hier fest "verdraengt". "R" deckt aber alles ab, was
@@ -223,16 +306,29 @@ class Zulauf(threading.Thread):
             # hinausgeworfen, im Konflikt mit einer bestaetigten Transaktion.
             # Aeltere Zeilen tragen noch "verdraengt"; angezeigt wird der
             # Grund nirgends.
-            self.ablage.tx_entfernt(kennung, jetzt_ms, "ohne_block")
-            self._offen += 1
+            self._vormerken(("R", kennung, jetzt_ms, "ohne_block"))
         elif art == "C":
             self._block(kennung, jetzt_ms)
         elif art == "D":
             # Eine Reorg. Der Block, den wir eingetragen haben, gilt nicht
             # mehr -- das gehoert festgehalten, nicht stillschweigend
             # ueberschrieben.
-            self.ablage.reorg_vermerken()
-            self._offen += 1
+            log.info("Reorg: ein Block wurde von der Kette getrennt.")
+            self._vormerken(("D", jetzt_ms))
+
+    def _vormerken(self, eintrag: Tuple) -> None:
+        """Ein Ereignis zum Schreiben vormerken -- im Speicher."""
+        if len(self._stapel) >= STAPEL_HOECHSTENS:
+            # Die Ablage nimmt seit langem nichts an. Weitersammeln hiesse,
+            # den Container am Speicherlimit sterben zu lassen. Was hier
+            # wegfaellt, steht danach als Luecke in der Ablage -- sobald sie
+            # wieder etwas annimmt.
+            log.error("Die Ablage nimmt seit langem nichts an -- %d "
+                      "gesammelte Ereignisse werden verworfen.",
+                      len(self._stapel))
+            self._verworfen += len(self._stapel)
+            self._stapel = []
+        self._stapel.append(eintrag)
 
     def _block(self, blockhash: str, jetzt_ms: int) -> None:
         """Einen verbundenen Block auswerten.
@@ -261,12 +357,17 @@ class Zulauf(threading.Thread):
         # RPC-Aufrufe mit 30 und 20 Sekunden Zeitlimit. Die Transaktion stand
         # also bis zu fuenfzig Sekunden offen, waehrend jeder andere
         # Schreibende nur zwanzig Sekunden Geduld hat ("database is locked").
+        #
+        # Und DER BEFUND VOM 26.09.2026 dazu: die Reihenfolge allein genuegte
+        # nicht. Die Aufnahmen der letzten Sekunden waren zu diesem Zeitpunkt
+        # schon EINGETRAGEN, aber noch nicht gesichert -- die Transaktion
+        # war also bereits offen, als die Aufrufe hier begannen. Seitdem
+        # liegt alles bis zum Schreiben im Speicher.
         gebuehren = self._gebuehren(knoten, blockhash)
         pool = self._pool(knoten, blockhash, txids, coinbase_hex)
         botschaft = self._botschaft(coinbase_hex)
 
-        lage = self.ablage.tx_bestaetigt(txids, block.get("height", 0), jetzt_ms)
-        self.ablage.block_eingetragen({
+        self._vormerken(("C", {
             "hoehe": block.get("height", 0),
             "hash": blockhash,
             "blockzeit": block.get("time"),
@@ -276,13 +377,8 @@ class Zulauf(threading.Thread):
             "gebuehren_sat": gebuehren,
             "pool": pool,
             "botschaft": botschaft,
-            "bekannte_tx": lage["bekannt"],
-            "verweildauer_ms": lage["median_ms"],
-        })
-        self._offen += 1
+        }, txids))
         self._sichern()
-        log.info("Block %s (%s Transaktionen, davon %s vorher bei uns).",
-                 block.get("height"), len(txids), lage["bekannt"])
 
     def _gebuehren(self, knoten, blockhash: str) -> Optional[int]:
         try:
@@ -318,18 +414,69 @@ class Zulauf(threading.Thread):
 
     def _zwischendurch(self) -> None:
         jetzt = time.time()
-        if (self._offen >= BUENDEL
-                or (self._offen and jetzt - self._zuletzt_gesichert > BUENDEL_SEKUNDEN)):
+        if (len(self._stapel) >= BUENDEL
+                or (self._stapel
+                    and jetzt - self._zuletzt_gesichert > BUENDEL_SEKUNDEN)):
             self._sichern()
         if jetzt - self._zuletzt_schnappschuss > SCHNAPPSCHUSS_SEKUNDEN:
             self._zuletzt_schnappschuss = jetzt
             self._schnappschuss()
 
-    def _sichern(self) -> None:
-        if self._offen:
-            self.ablage.sichern()
-            self._offen = 0
+    def _sichern(self, trotz_pause: bool = False) -> bool:
+        """Das Gesammelte schreiben. Gibt zurueck, ob es geklappt hat.
+
+        Klappt es nicht, bleibt alles liegen und wird nach
+        NEUER_VERSUCH_SEKUNDEN noch einmal versucht -- mit den Zeitpunkten,
+        zu denen es ankam, nicht denen des Schreibens. Bis zum 26.09.2026
+        flog der Fehler aus dem Faden, und der Zulauf war tot.
+        """
         self._zuletzt_gesichert = time.time()
+        if not self._stapel and not self._verworfen:
+            return True
+        if (not trotz_pause and self._naechster_versuch is not None
+                and time.monotonic() < self._naechster_versuch):
+            return False
+        eintraege = list(self._stapel)
+        if self._verworfen:
+            # Voran, damit sie mit dem Rest steht oder faellt. In "erwartet"
+            # steht bei dieser Art die Zahl der verworfenen Ereignisse --
+            # eine Nachrichtennummer wie beim zmq-Strom gibt es hier nicht.
+            eintraege.insert(0, ("L", int(time.time() * 1000), "ablage",
+                                 self._verworfen, None))
+        try:
+            bloecke = self.ablage.ereignisse(eintraege)
+        except sqlite3.Error as fehler:
+            self._naechster_versuch = time.monotonic() + NEUER_VERSUCH_SEKUNDEN
+            if not self._sperre_gemeldet:
+                log.warning("Die Ablage nimmt gerade nichts an (%s) -- %d "
+                            "Ereignisse warten und werden in %d s erneut "
+                            "geschrieben.", fehler, len(self._stapel),
+                            NEUER_VERSUCH_SEKUNDEN)
+                self._sperre_gemeldet = True
+            return False
+        except Exception:                                    # nosec B902
+            # Kein Sperrproblem, sondern etwas im Gesammelten selbst. Dann
+            # hilft kein zweiter Versuch: derselbe Stapel scheiterte bei
+            # jedem Anlauf wieder, und es kaeme nie mehr etwas an. Also
+            # verwerfen -- und als Luecke vermerken, beim naechsten
+            # Schreiben, statt es still fehlen zu lassen.
+            log.exception("Gesammelte Ereignisse liessen sich nicht "
+                          "schreiben -- %d werden verworfen.",
+                          len(self._stapel))
+            self._verworfen += len(self._stapel)
+            self._stapel = []
+            return False
+        if self._sperre_gemeldet:
+            log.info("Die Ablage nimmt wieder an -- alles Gesammelte ist "
+                     "geschrieben.")
+            self._sperre_gemeldet = False
+        self._stapel = []
+        self._verworfen = 0
+        self._naechster_versuch = None
+        for block in bloecke:
+            log.info("Block %s (%s Transaktionen, davon %s vorher bei uns).",
+                     block["hoehe"], block["txzahl"], block["bekannt"])
+        return True
 
     def _schnappschuss(self) -> None:
         """Groesse und Verwerfungsgrenze des Mempools festhalten.
@@ -369,7 +516,7 @@ class Zulauf(threading.Thread):
         except (TypeError, ValueError):
             grenze = 0.0
 
-        self.ablage.mempool_punkt(
-            int(time.time()), int(info.get("size", 0)),
-            int(info.get("bytes", 0)), round(grenze, 3), diagramm)
-        self.ablage.sichern()
+        self._vormerken(("M", int(time.time()), int(info.get("size", 0)),
+                         int(info.get("bytes", 0)), round(grenze, 3),
+                         diagramm))
+        self._sichern()
