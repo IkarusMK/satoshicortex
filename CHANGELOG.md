@@ -4,6 +4,70 @@ All notable changes to SatoshiCortex. Format loosely after
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning after
 [SemVer](https://semver.org/).
 
+## [1.3.1] — 2026-09-26
+
+### Fixed: "database is locked" and lost messages in the evaluation
+
+Seen on a running node: `sqlite3.OperationalError: database is locked`, and
+shortly after a gap in bitcoind's event stream.
+Both had the same root in the part that records what bitcoind reports.
+
+- **It asked the node about its sync state for every single message** —
+  through the full status query, five RPC calls, two of which wait for
+  Bitcoin Core's main lock. With a busy mempool that is dozens of messages a
+  second, and during a new block each of those calls can hang for up to
+  fifteen seconds. It now asks once every thirty seconds, with one call.
+- **It held the database's write lock while it waited.** Rows of the last
+  seconds were written but not yet committed when those calls started, so
+  every other writer — the HTLC stream, the news, the interface — waited
+  twenty seconds and gave up. Events are now collected in memory and written
+  in one short transaction that contains database work and nothing else.
+- **No answer was taken for "back in sync".** When that status call timed
+  out, the recorder put its connection down and reconnected — and everything
+  published in between was lost. Only a clear "yes" from bitcoind pauses it
+  now.
+- **A locked database no longer kills the recorder.** Before, the error
+  ended its thread, and the evaluation stood still until the application was
+  restarted. Now the collected events wait and are written on the next
+  attempt, with the time they arrived. Should the database stay unwritable
+  for a long time, what has to be dropped is recorded as a gap instead of
+  missing silently.
+- **Two more ways to the same error are closed.** SQLite starts a
+  transaction as a reader; one that read and then wrote — every block does —
+  failed at once if anyone else had saved something in between, however long
+  it was willing to wait. Transactions now take the write lock at their
+  start. And a failed write no longer leaves its transaction open.
+- **The daily clean-up deletes in portions**, so it no longer holds the lock
+  for as long as removing a whole day of transactions takes.
+
+### Fixed: the fee fields showed a default instead of your fees
+
+After every restart or reload the fee fields read 100 ppm and 0, whatever
+the channels actually charged. The fees themselves were never lost — LND
+keeps them — the interface just never asked.
+
+- The fields are now filled with what the selected channel charges, taken
+  from LND's fee report (`FeeReport`, checked in v0.21.3-beta), and a line
+  below the channel choice says it in words. For *All channels* with
+  different fees per channel, the line names the range and the most common
+  value is filled in.
+- The channel view refreshes itself regularly. What you type is not
+  overwritten by that refresh; choosing another channel or setting the fees
+  shows the current state again.
+- If LND cannot say what the channels charge, the line says so instead of
+  letting the default pass for your setting.
+
+### Changed: the README's diagram shows the phone
+
+*How it works* now draws both routes for Zeus — over Tor, through an onion
+address of its own, and over your router's VPN — and says which ports open
+only when you switch them on.
+
+### Upgrading
+
+Nothing to change in `docker-compose.yml` or `.env`. Pull the new image and
+redeploy.
+
 ## [1.3.0] — 2026-09-26
 
 ### New: external wallets — Zeus on your phone, over Tor or VPN

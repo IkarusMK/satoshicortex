@@ -144,15 +144,15 @@ Two ideas carry the whole project:
 ## How it works
 
 ```
-                    Sparrow (Desktop) ──┐
-                                        │ RPC, txindex
-Tor ── bitcoind ────────────────────────┤
-         │  ▲                           │
-    RPC/ZMQ  │ writes config            │
-         ▼  │                           │
-       SatoshiCortex (app, :3333) ───────┘
-         │
-         └── LND ──(9735)── Lightning network
+               Bitcoin network        Lightning network
+                      │ 8333 · .onion         │ 9735 · .onion
+                      │                       │
+ Sparrow ── RPC ──► bitcoind                 LND ◄── REST ── Zeus (VPN)
+                     ▲   │                   ▲ ▲
+             RPC/ZMQ │   │              REST │ └── REST ── Tor ◄── Zeus (Tor)
+                     │   ▼                   │
+             SatoshiCortex (app, :3333) ─────┘
+             writes the config of every service
 ```
 
 **Four containers**: `app`, `bitcoind`, `lnd`, `tor`. That is all — the news
@@ -172,11 +172,14 @@ key that may move money may move all of it.
 
 Open to the internet: **8333** and **9735** — the two ports that are *supposed*
 to be open, because they are how you take part. On the LAN: **3333** for the
-web interface — and LND's REST port only if you switch on the VPN route for
-external wallets. RPC, ZMQ and gRPC never leave the compose network.
+web interface. Two more only if you switch them on: bitcoind's RPC for Sparrow,
+and LND's REST port for the VPN route to external wallets. The Tor route needs
+no open port — Tor gives LND an onion address of its own for Zeus. ZMQ and
+gRPC never leave the compose network.
 
 **Tor holds the onion services itself.** Three of them — Bitcoin, Lightning and
-the watchtower, each with its own address — defined in Tor's own configuration
+the watchtower, each with its own address, plus a fourth for Zeus while a phone
+uses the Tor route — defined in Tor's own configuration
 and pointing at the fixed addresses of `bitcoind` and `lnd` in the compose
 network. Tor recreates them on every start, whoever restarts when, and there is
 no Tor control port at all. Letting bitcoind and LND create them through
