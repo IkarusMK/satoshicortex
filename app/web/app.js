@@ -1103,7 +1103,10 @@ const I18N = {
     ko_b_ohne_adresse: "Dieser Knoten kündigt keine Adresse an. Dein Knoten kann ihn dann von sich aus nicht erreichen.",
     ko_b_wenig: "Wenige Kanäle — dieser Knoten ist kaum eingebunden. Über ihn führt fast kein Weg ins restliche Netz.",
     ko_b_nur_tor: "Nur über Tor erreichbar. Kein Mangel, aber ein Unterschied: dieser Kanal hängt dann an Tor.",
-    ko_b_unauffaellig: "Nichts Auffälliges: meldet sich regelmäßig, ist erreichbar und gut eingebunden.",
+    ko_b_unauffaellig: "Im Netzverzeichnis unauffällig: meldet sich regelmäßig, gibt eine Adresse an und ist gut eingebunden. Ob er gerade antwortet, sagt das nicht.",
+    ko_b_verbunden: "Gerade verbunden: dein Knoten hat in diesem Moment eine Leitung zu ihm.",
+    ko_b_getrennt_kanal: "Gerade nicht verbunden, obwohl ihr einen Kanal habt. Zu Kanalpartnern baut dein Knoten die Leitung von sich aus immer wieder auf — steht sie nicht, ist er gerade nicht zu erreichen. So lange kann über diesen Kanal nichts laufen.",
+    ko_b_getrennt: "Gerade keine Leitung zu ihm. Ohne gemeinsamen Kanal ist das normal — ob er antwortet, zeigt „Verbinden“.",
     gegenstelle_unlesbar: "Die Gegenstelle ließ sich nicht ansehen: {grund}",
     ks_titel: "Einen Kanal schließen",
     ks_lead: "Das Guthaben aus dem Kanal kommt zurück auf deine On-Chain-Wallet. Einvernehmlich geht das günstig und sofort — beide Seiten unterschreiben gemeinsam.",
@@ -2412,7 +2415,10 @@ const I18N = {
     ko_b_ohne_adresse: "This node announces no address. Your node cannot reach it on its own.",
     ko_b_wenig: "Few channels — this node is barely connected. Almost no path into the rest of the network runs through it.",
     ko_b_nur_tor: "Reachable over Tor only. Not a flaw, but a difference: this channel then depends on Tor.",
-    ko_b_unauffaellig: "Nothing conspicuous: announces regularly, is reachable and well connected.",
+    ko_b_unauffaellig: "Nothing conspicuous in the network directory: announces regularly, lists an address and is well connected. It does not tell whether the node answers right now.",
+    ko_b_verbunden: "Connected right now: your node has a live connection to it at this moment.",
+    ko_b_getrennt_kanal: "Not connected right now, even though you share a channel. Your node keeps re-establishing the connection to channel partners on its own — if it is not up, the node cannot be reached at the moment. Until then nothing can flow through this channel.",
+    ko_b_getrennt: "No connection to it right now. Without a shared channel that is normal — “Connect” shows whether it answers.",
     gegenstelle_unlesbar: "The peer could not be looked up: {grund}",
     ks_titel: "Close a channel",
     ks_lead: "The balance from the channel comes back to your on-chain wallet. Cooperatively that is cheap and immediate — both sides sign together.",
@@ -10034,6 +10040,20 @@ async function rechnungZahlen() {
    Bewusst KEINE Note und kein Vertrauenswert: das waere erfundene
    Genauigkeit. Es stehen Tatsachen da, und die Befunde einzeln daneben --
    wer einen davon hinnehmen will, soll wissen, welchen. */
+
+/* Was GERADE ist, getrennt von allem, was der Graph erzaehlt.
+
+   Bis 1.3.2 stand unter einem unauffaelligen Befund "ist erreichbar" --
+   gemessen war das nie. Eine Kanal-Gegenstelle, die in der Kanalliste als
+   selten erreichbar stand, hiess im selben Moment erreichbar. Jetzt steht
+   hier nur, was LND weiss: ob eine Leitung steht und ob ein Kanal. Weiss er
+   es nicht, steht nichts da. */
+function leitungsHinweis(d) {
+  if (d.verbunden === true) return ["ko_b_verbunden", "ok"];
+  if (d.verbunden !== false) return null;
+  return d.mit_kanal ? ["ko_b_getrennt_kanal", "bad"] : ["ko_b_getrennt", ""];
+}
+
 async function gegenstelleAnsehen() {
   const knopf = $("#ko-ansehen");
   const kasten = $("#ko-befund");
@@ -10043,8 +10063,10 @@ async function gegenstelleAnsehen() {
     const d = await api("/lightning/gegenstelle/ansehen", "POST",
                         { gegenstelle: $("#ko-gegenstelle").value.trim() });
     kasten.textContent = "";
+    const leitung = leitungsHinweis(d);
     if (!d.bekannt) {
       kasten.append(hinweis(t("ko_b_unbekannt"), "warn"));
+      if (leitung) kasten.append(hinweis(t(leitung[0]), leitung[1]));
       kasten.classList.remove("hidden");
       return;
     }
@@ -10069,6 +10091,7 @@ async function gegenstelleAnsehen() {
       kasten.append(hinweis(t(schluessel), art));
     }
     if (!etwas) kasten.append(hinweis(t("ko_b_unauffaellig"), "ok"));
+    if (leitung) kasten.append(hinweis(t(leitung[0]), leitung[1]));
     kasten.classList.remove("hidden");
   } catch (e) {
     if (e && e.abgemeldet) return;

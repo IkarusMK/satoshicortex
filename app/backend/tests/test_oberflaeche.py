@@ -3647,3 +3647,54 @@ def test_die_kanaele_ziehen_den_hinweis_nach(js):
     for schluessel in ("ln_hinweis_laeuft_kurz", "ln_hinweis_bald",
                        "ln_hinweis_sichtbar"):
         assert js.count(schluessel + ":") == 2, schluessel
+
+
+# ── "ist erreichbar" war nie gemessen (27.09.2026) ─────────────────────────
+#
+# Unter einem unauffaelligen Befund stand "meldet sich regelmaessig, ist
+# erreichbar und gut eingebunden". Alle drei Punkte kamen aus dem Graphen,
+# also aus dem, was ein Knoten ueber sich ANKUENDIGT. Eine Kanal-Gegenstelle,
+# die in der Kanalliste als selten erreichbar stand und deren Port
+# eine Verbindung ablehnte, hiess im selben Moment erreichbar.
+
+def test_der_graphbefund_behauptet_keine_erreichbarkeit(js):
+    import re
+    for text in re.findall(r'ko_b_unauffaellig: "([^"]*)"', js):
+        assert "ist erreichbar" not in text and "is reachable" not in text, text
+    assert js.count("ko_b_unauffaellig:") == 2
+
+
+def test_die_leitung_wird_nur_behauptet_wenn_sie_bekannt_ist(js):
+    import json
+    faelle = [
+        {"verbunden": True, "mit_kanal": True},
+        {"verbunden": True, "mit_kanal": False},
+        {"verbunden": False, "mit_kanal": True},
+        {"verbunden": False, "mit_kanal": False},
+        {"verbunden": None, "mit_kanal": None},
+        {},
+    ]
+    ergebnis = _funktionen_ausfuehren(
+        js, ["leitungsHinweis"],
+        f"{json.dumps(faelle)}.map(leitungsHinweis)")
+    assert ergebnis == [
+        ["ko_b_verbunden", "ok"],
+        ["ko_b_verbunden", "ok"],
+        # Kanalpartner ohne Leitung: LND baut sie von sich aus immer wieder
+        # auf -- fehlt sie, antwortet der Knoten gerade nicht.
+        ["ko_b_getrennt_kanal", "bad"],
+        # Ohne Kanal ist keine Leitung Alltag, kein Befund ueber ihn.
+        ["ko_b_getrennt", ""],
+        None,
+        None,
+    ]
+    for schluessel in ("ko_b_verbunden", "ko_b_getrennt_kanal",
+                       "ko_b_getrennt"):
+        assert js.count(schluessel + ":") == 2, schluessel
+
+
+def test_die_ansicht_zeigt_die_leitung_auch_bei_unbekannten_knoten(js):
+    ansehen = _ohne_js_kommentare(_block(js, "async function gegenstelleAnsehen("))
+    assert ansehen.count("leitungsHinweis(d)") == 1
+    # Einmal im Zweig "nicht im Graphen", einmal im Normalfall.
+    assert ansehen.count("hinweis(t(leitung[0]), leitung[1])") == 2

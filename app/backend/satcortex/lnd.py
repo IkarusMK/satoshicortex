@@ -1947,6 +1947,39 @@ STILL_AB_TAGEN = 14
 WENIG_KANAELE = 5
 
 
+def _leitung_zu(knoten: Knoten, kennung: str) -> Dict[str, Optional[bool]]:
+    """Ob GERADE eine Leitung zu diesem Knoten steht -- und ob ein Kanal.
+
+    Aus dem Betrieb, 27.09.2026: unter einem unauffaelligen Befund stand bis
+    dahin "ist erreichbar". Gemessen war das nie; der Graph sagt nur, was ein
+    Knoten ueber sich ANKUENDIGT. Eine Kanal-Gegenstelle, die in der
+    Kanalliste als selten erreichbar stand, hiess im selben Moment
+    erreichbar.
+
+    Beides hier weiss LND ohnehin, es wird nichts gemessen. Zu Kanalpartnern
+    baut LND die Leitung von sich aus immer wieder auf -- fehlt sie dort,
+    antwortet der Knoten gerade nicht. Ohne Kanal ist keine Leitung Alltag.
+
+    Ist das nicht zu erfahren, steht None da: lieber keine Aussage als eine
+    falsche.
+    """
+    try:
+        leitungen = knoten.ruf("/v1/peers", macaroon=EIGENES_MACAROON) or {}
+        kanaele_d = knoten.ruf("/v1/channels",
+                               macaroon=EIGENES_MACAROON) or {}
+    except (NichtErreichbar, LndFehler) as fehler:
+        log.info("Leitung zu %s nicht zu erfahren: %s", kennung[:12], fehler)
+        return {"verbunden": None, "mit_kanal": None}
+    return {
+        "verbunden": any(
+            str(p.get("pub_key", "")).lower() == kennung
+            for p in leitungen.get("peers") or []),
+        "mit_kanal": any(
+            str(k.get("remote_pubkey", "")).lower() == kennung
+            for k in kanaele_d.get("channels") or []),
+    }
+
+
 def gegenstelle_ansehen(knoten: Knoten, zeile: str,
                         jetzt: Optional[float] = None) -> Dict[str, Any]:
     """Was der eigene Graph ueber diese Gegenstelle weiss."""
@@ -1965,7 +1998,10 @@ def gegenstelle_ansehen(knoten: Knoten, zeile: str,
         # "unable to find node" heisst: in UNSEREM Graphen steht er nicht.
         # Das ist eine Auskunft und kein Fehler -- und eine wichtige.
         log.info("Gegenstelle %s nicht im Graphen: %s", kennung[:12], fehler)
-        return {"kennung": kennung, "bekannt": False}
+        # Nicht angekuendigt heisst nicht getrennt: eine Leitung kann trotzdem
+        # stehen, etwa zu einem Knoten mit nur privaten Kanaelen.
+        return {"kennung": kennung, "bekannt": False,
+                **_leitung_zu(knoten, kennung)}
 
     eintrag = d.get("node") or {}
     gemeldet = _zahl(eintrag.get("last_update"))
@@ -1989,6 +2025,8 @@ def gegenstelle_ansehen(knoten: Knoten, zeile: str,
         "ohne_adresse": not adressen,
         "nur_tor": bool(adressen) and all(
             ".onion" in a.lower() for a in adressen),
+        # Was GERADE ist, getrennt von allem, was der Graph erzaehlt.
+        **_leitung_zu(knoten, kennung),
     }
 
 

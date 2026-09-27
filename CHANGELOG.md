@@ -4,6 +4,37 @@ All notable changes to SatoshiCortex. Format loosely after
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning after
 [SemVer](https://semver.org/).
 
+## [1.3.3] — 2026-09-27
+
+### Fixed: *Look at the node* called a node reachable without checking
+
+When a node showed no warnings, *Look at the node* said it "announces
+regularly, is reachable and well connected". The reachable part was never
+checked. Every finding in that box comes from your own graph — what the node
+announces about itself — and announcing an address does not mean anything
+answers there. The channel list could show a partner as rarely online while
+the lookup called it reachable in the same moment.
+
+The verdict now says only what the graph can tell: announces regularly, lists
+an address, is well connected — and that this says nothing about whether the
+node answers right now. Below it, a second line reports what your node
+actually knows at this moment, from LND and without any new measurement:
+
+- **Connected right now** — your node has a live connection to it.
+- **Not connected, even though you share a channel** — LND re-establishes
+  connections to channel partners on its own; if none is up, the node cannot
+  be reached at the moment, and nothing flows through that channel.
+- **No connection, no channel** — normal; *Connect* shows whether it answers.
+
+If LND cannot tell, the line is left out rather than guessed. A node that is
+not in your graph can still show as connected, for example one with only
+private channels.
+
+### Upgrading
+
+Nothing to change in `docker-compose.yml` or `.env`. Pull the new image and
+redeploy.
+
 ## [1.3.2] — 2026-09-26
 
 ### Fixed: "your node appears NOWHERE in the Lightning graph" — on every node

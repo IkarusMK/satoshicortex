@@ -1395,6 +1395,102 @@ def test_nur_ueber_tor_wird_vermerkt():
     assert d["nur_tor"] is True
 
 
+# ── Ob er GERADE antwortet (27.09.2026) ─────────────────────────────────────
+#
+# Bis 1.3.2 stand unter einem unauffaelligen Befund "ist erreichbar". Gemessen
+# war das nie: alle Befunde kommen aus dem Graphen, also aus dem, was der
+# Knoten ueber sich ANKUENDIGT. Aufgefallen an einer Kanal-Gegenstelle, die in
+# der Kanalliste als selten erreichbar stand und deren Port eine
+# Verbindung ablehnte -- die Ansicht nannte sie im selben Moment erreichbar.
+#
+# Was LND wirklich weiss, ohne etwas zu messen: ob gerade eine Leitung steht
+# (/v1/peers), und ob wir einen Kanal mit ihm haben (/v1/channels). Zu
+# Kanalpartnern baut LND die Leitung von sich aus immer wieder auf; fehlt sie
+# dort, antwortet der Knoten gerade nicht. Ohne Kanal ist keine Leitung Alltag.
+
+class Leitungsattrappe(Graphattrappe):
+    def __init__(self, antwort=None, fehler=None, leitungen=(),
+                 kanalpartner=(), leitung_unbekannt=False):
+        super().__init__(antwort, fehler)
+        self.leitungen = leitungen
+        self.kanalpartner = kanalpartner
+        self.leitung_unbekannt = leitung_unbekannt
+        self.gefragt = []
+
+    def ruf(self, pfad, macaroon="readonly", daten=None, zeitlimit=None):
+        self.gefragt.append((pfad, daten))
+        if pfad.startswith(("/v1/peers", "/v1/channels")):
+            if self.leitung_unbekannt:
+                raise lnd.NichtErreichbar("lnd antwortet nicht")
+            if pfad.startswith("/v1/peers"):
+                return {"peers": [{"pub_key": p} for p in self.leitungen]}
+            return {"channels": [{"remote_pubkey": p, "active": True}
+                                 for p in self.kanalpartner]}
+        return super().ruf(pfad, macaroon, daten, zeitlimit)
+
+
+def test_eine_stehende_leitung_wird_gemeldet():
+    d = lnd.gegenstelle_ansehen(
+        Leitungsattrappe(_graph(JETZT), leitungen=[KENNUNG]), KENNUNG,
+        jetzt=JETZT)
+    assert d["verbunden"] is True
+
+
+def test_ein_kanalpartner_ohne_leitung_antwortet_gerade_nicht():
+    """Der Fall aus dem Betrieb: im Graphen unauffaellig, aber keine Leitung,
+    obwohl ein Kanal besteht."""
+    d = lnd.gegenstelle_ansehen(
+        Leitungsattrappe(_graph(JETZT - 3600), leitungen=["03" + "cd" * 32],
+                         kanalpartner=[KENNUNG]),
+        KENNUNG, jetzt=JETZT)
+    assert d["verbunden"] is False
+    assert d["mit_kanal"] is True
+    # Die Graph-Befunde bleiben davon unberuehrt -- sie sagen etwas anderes.
+    assert d["still"] is False
+
+
+def test_ohne_kanal_ist_keine_leitung_kein_befund_ueber_ihn():
+    d = lnd.gegenstelle_ansehen(Leitungsattrappe(_graph(JETZT)), KENNUNG,
+                                jetzt=JETZT)
+    assert d["verbunden"] is False
+    assert d["mit_kanal"] is False
+
+
+def test_die_kennung_wird_ohne_ruecksicht_auf_grossschreibung_verglichen():
+    d = lnd.gegenstelle_ansehen(
+        Leitungsattrappe(_graph(JETZT), leitungen=[KENNUNG],
+                         kanalpartner=[KENNUNG]),
+        KENNUNG.upper(), jetzt=JETZT)
+    assert d["verbunden"] is True and d["mit_kanal"] is True
+
+
+def test_ist_die_leitung_nicht_zu_erfahren_wird_nichts_behauptet():
+    """Lieber keine Aussage als eine falsche -- genau das war der Fehler."""
+    d = lnd.gegenstelle_ansehen(
+        Leitungsattrappe(_graph(JETZT), leitung_unbekannt=True), KENNUNG,
+        jetzt=JETZT)
+    assert d["bekannt"] is True
+    assert d["verbunden"] is None and d["mit_kanal"] is None
+
+
+def test_auch_ein_unbekannter_knoten_kann_verbunden_sein():
+    """Nicht im Graphen heisst nur: er kuendigt sich nicht an. Eine Leitung
+    kann trotzdem stehen, etwa zu einem Knoten mit nur privaten Kanaelen."""
+    d = lnd.gegenstelle_ansehen(
+        Leitungsattrappe(fehler="unable to find node", leitungen=[KENNUNG]),
+        KENNUNG, jetzt=JETZT)
+    assert d["bekannt"] is False
+    assert d["verbunden"] is True
+
+
+def test_die_ansicht_fragt_nur_lesend():
+    a = Leitungsattrappe(_graph(JETZT), leitungen=[KENNUNG])
+    lnd.gegenstelle_ansehen(a, KENNUNG, jetzt=JETZT)
+    assert all(daten is None for _pfad, daten in a.gefragt)
+    assert {p.split("?")[0] for p, _ in a.gefragt} == {
+        f"/v1/graph/node/{KENNUNG}", "/v1/peers", "/v1/channels"}
+
+
 # ── Wachtuerme ─────────────────────────────────────────────────────────────
 #
 # Der Befund vom 12.09.2026: wtclient.active=true stand in der Konfiguration,
@@ -2199,6 +2295,7 @@ AUFRUFE = [
     ("kanal_oeffnen", lambda k: lnd.kanal_oeffnen(
         k, KENNUNG_TEST + "@1.2.3.4:9735", 100_000, 5)),
     ("gegenstelle_ansehen", lambda k: lnd.gegenstelle_ansehen(k, KENNUNG_TEST)),
+    ("_leitung_zu", lambda k: lnd._leitung_zu(k, KENNUNG_TEST)),
     ("wachtuerme", lambda k: lnd.wachtuerme(k)),
     ("wachturm_zaehler", lambda k: lnd.wachturm_zaehler(k)),
     ("eigener_turm", lambda k: lnd.eigener_turm(k)),

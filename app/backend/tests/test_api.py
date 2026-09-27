@@ -6905,6 +6905,10 @@ def test_eine_gegenstelle_laesst_sich_vorher_ansehen(client, lnd_graph):
     # werden -- wer einen hinnehmen will, soll wissen, welchen.
     assert d["still"] is False
     assert d["ohne_adresse"] is False
+    # Und getrennt davon, was GERADE ist (27.09.2026): eine Leitung steht,
+    # ein Kanal nicht.
+    assert d["verbunden"] is True
+    assert d["mit_kanal"] is False
 
 
 def test_die_auskunft_kommt_aus_dem_eigenen_graphen(client, lnd_graph):

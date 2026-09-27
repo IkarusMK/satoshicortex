@@ -65,6 +65,10 @@ ZUSAMMENGESETZT = {
         "ln_hinweis_sync", "ln_hinweis_bereit", "ln_hinweis_gesperrt",
         "ln_hinweis_startet", "ln_hinweis_laeuft_kurz", "ln_hinweis_laeuft",
         "ln_hinweis_bald", "ln_hinweis_sichtbar"],
+    # Ob gerade eine Leitung zur angesehenen Gegenstelle steht -- aus
+    # leitungsHinweis(). Befund vom 27.09.2026.
+    "t(leitung[0])": [
+        "ko_b_verbunden", "ko_b_getrennt_kanal", "ko_b_getrennt"],
     # Die Kopfzeile der Wegwissen-Tafel wird ueber eine Schluesselliste
     # gebaut -- fuenf Spalten, fuenf Texte. Befund vom 22.09.2026.
     "t(k)": ["wg_von", "wg_nach", "wg_trug", "wg_fehl", "wg_wann"],
