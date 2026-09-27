@@ -11,6 +11,7 @@
   <img alt="LND v0.21.3-beta" src="https://img.shields.io/badge/LND-v0.21.3--beta-fbbf24">
   <img alt="No Docker socket" src="https://img.shields.io/badge/Docker_socket-none-2ea043">
   <img alt="Self-hosted" src="https://img.shields.io/badge/self--hosted-yes-2ea043">
+  <a href="https://buymeacoffee.com/ikarusmk"><img alt="Buy me a coffee" src="https://img.shields.io/badge/Buy_me_a_coffee-ikarusmk-fbbf24?logo=buymeacoffee&logoColor=black"></a>
 </p>
 
 <p align="center"><b>A full Bitcoin and Lightning node that takes part in the network — and shows you what only your own node can know.</b></p>
@@ -616,6 +617,25 @@ The same works for `satcortex-bitcoind`, `satcortex-lnd` and `satcortex-tor`.
 It fails loudly if the image was not built by this repository's workflow.
 Releases up to and including 1.2.1 were built before this was in place and
 carry no provenance.
+
+## Support ☕
+
+SatoshiCortex is free and open source, and it will stay that way — no paid
+tier, no features held back.
+
+If it keeps your node running and you feel like saying thanks, a coffee is
+always gladly received:
+
+<p align="center">
+  <a href="https://buymeacoffee.com/ikarusmk"><img alt="Buy me a coffee"
+     src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" height="48"></a>
+</p>
+
+Not in the mood for coffee? These help just as much:
+
+- ⭐ **A star** — so other node runners find the project.
+- 🐛 **An issue** — when something is wrong, unclear or could be better.
+- 💬 **A word to a friend** — who has been meaning to run their own node.
 
 ## License
 
