@@ -455,3 +455,121 @@ def test_das_netz_wird_nicht_erfunden(monkeypatch):
             raise rpc.NichtErreichbar("x")
 
     assert rpc.kettenlage(Knoten())["kette"] == ""
+
+
+# ── Wallet-Pfad und Buendel (28.09.2026, fuer Electrum) ─────────────────────
+#
+# Beides an einer Regtest-Kette mit Core v31.1 gemessen, nicht aus der Doku:
+#
+#   * Sobald mehr als eine Wallet geladen ist, lehnt Core Wallet-Aufrufe an
+#     "/" mit HTTP 500 ab ("Wallet file not specified"). Der Pfad
+#     /wallet/<name> ist dann Pflicht. Eine unbekannte Wallet meldet -18.
+#   * Ein Buendel kommt mit HTTP 200 zurueck, die Fehler stehen EINZELN je
+#     Eintrag darin -- anders als beim Einzelaufruf, der mit 500 kommt.
+
+class Mitschnitt:
+    """Nimmt die Anfrage entgegen und antwortet mit einem festen Rumpf."""
+
+    def __init__(self, antwort):
+        self.antwort = antwort
+        self.urls = []
+        self.ruempfe = []
+
+    def __call__(self, anfrage, timeout=None):
+        import io
+        import json
+        self.urls.append(anfrage.full_url)
+        self.ruempfe.append(json.loads(anfrage.data))
+
+        class Antwort(io.BytesIO):
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+        return Antwort(json.dumps(self.antwort).encode())
+
+
+def test_ohne_wallet_geht_der_aufruf_an_die_wurzel(monkeypatch):
+    m = Mitschnitt({"result": 7, "error": None, "id": "satcortex"})
+    monkeypatch.setattr(rpc.urllib.request, "urlopen", m)
+    assert rpc.Knoten().ruf("getblockcount") == 7
+    assert m.urls == ["http://bitcoind:8332/"]
+
+
+def test_mit_wallet_geht_der_aufruf_an_ihren_pfad(monkeypatch):
+    m = Mitschnitt({"result": {}, "error": None, "id": "satcortex"})
+    monkeypatch.setattr(rpc.urllib.request, "urlopen", m)
+    rpc.Knoten().ruf("getbalances", wallet="satcortex-lesen-ab12")
+    assert m.urls == ["http://bitcoind:8332/wallet/satcortex-lesen-ab12"]
+
+
+def test_der_wallet_name_wird_fuer_den_pfad_kodiert(monkeypatch):
+    """Ein Schraegstrich im Namen darf den Pfad nicht verlassen."""
+    m = Mitschnitt({"result": {}, "error": None, "id": "satcortex"})
+    monkeypatch.setattr(rpc.urllib.request, "urlopen", m)
+    rpc.Knoten().ruf("getbalances", wallet="a b/../c")
+    assert m.urls == ["http://bitcoind:8332/wallet/a%20b%2F..%2Fc"]
+
+
+def test_der_fehlercode_von_core_bleibt_erhalten(monkeypatch):
+    """-18 heisst "Wallet nicht geladen" -- das muss man vom Rest
+    unterscheiden koennen, sonst laedt niemand sie nach."""
+    monkeypatch.setattr(rpc.urllib.request, "urlopen", _fehler(
+        500, b'{"result":null,"error":{"code":-18,"message":"Requested '
+             b'wallet does not exist or is not loaded"},"id":1}'))
+    with pytest.raises(rpc.RpcFehler) as fehler:
+        rpc.Knoten().ruf("getbalances", wallet="weg")
+    assert fehler.value.code == -18
+
+
+def test_ein_buendel_ist_eine_anfrage_in_fester_reihenfolge(monkeypatch):
+    """Core darf die Antworten in beliebiger Folge schicken; zugeordnet wird
+    ueber die Kennung, nicht ueber die Stelle."""
+    m = Mitschnitt([
+        {"result": "b", "error": None, "id": 1},
+        {"result": "a", "error": None, "id": 0},
+    ])
+    monkeypatch.setattr(rpc.urllib.request, "urlopen", m)
+    ergebnis = rpc.Knoten().stapel([("getblockhash", [0]),
+                                    ("getblockhash", [1])])
+    assert ergebnis == ["a", "b"]
+    assert len(m.urls) == 1
+    assert [(r["id"], r["method"], r["params"]) for r in m.ruempfe[0]] == [
+        (0, "getblockhash", [0]), (1, "getblockhash", [1])]
+
+
+def test_ein_fehler_im_buendel_wird_zum_rpcfehler(monkeypatch):
+    m = Mitschnitt([
+        {"result": "a", "error": None, "id": 0},
+        {"result": None, "error": {"code": -8,
+                                   "message": "Block height out of range"},
+         "id": 1},
+    ])
+    monkeypatch.setattr(rpc.urllib.request, "urlopen", m)
+    with pytest.raises(rpc.RpcFehler) as fehler:
+        rpc.Knoten().stapel([("getblockhash", [0]),
+                             ("getblockhash", [99])])
+    assert fehler.value.code == -8
+
+
+def test_ein_leeres_buendel_fragt_nichts(monkeypatch):
+    m = Mitschnitt([])
+    monkeypatch.setattr(rpc.urllib.request, "urlopen", m)
+    assert rpc.Knoten().stapel([]) == []
+    assert m.urls == []
+
+
+def test_das_buendel_geht_auch_an_eine_wallet(monkeypatch):
+    m = Mitschnitt([{"result": 1, "error": None, "id": 0}])
+    monkeypatch.setattr(rpc.urllib.request, "urlopen", m)
+    rpc.Knoten().stapel([("getwalletinfo", [])], wallet="w1")
+    assert m.urls == ["http://bitcoind:8332/wallet/w1"]
+
+
+def test_das_buendel_uebersetzt_ein_zeitlimit_wie_ruf(monkeypatch):
+    def zeitlimit(*_a, **_kw):
+        raise socket.timeout("timed out")
+    monkeypatch.setattr(rpc.urllib.request, "urlopen", zeitlimit)
+    with pytest.raises(rpc.Beschaeftigt):
+        rpc.Knoten().stapel([("getblockhash", [0])])

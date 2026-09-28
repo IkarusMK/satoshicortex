@@ -1,0 +1,34 @@
+name: Electrum apps
+
+# Do BitBoxApp and Trezor Suite still speak what we answer?
+#
+# Reads their protocol version and the Electrum commands they send, straight
+# from their sources, and fails as soon as one sends a command we do not
+# answer or asks for a different protocol version. Also reports which version
+# electrs speaks -- the server behind Umbrel, StartOS and RaspiBlitz.
+# Nothing is stored or published. See tools/electrum_waechter.py.
+
+on:
+  schedule:
+    - cron: "41 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  apps:
+    name: BitBoxApp and Trezor Suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
+        with:
+          python-version: "3.14"
+      - name: Compare with what the application answers
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PYTHONPATH: app/backend
+        run: python tools/electrum_waechter.py

@@ -192,6 +192,74 @@ const I18N = {
     fz_vpn_aus: "In der .env nicht freigegeben – siehe Anleitung unten.",
     fz_vpn_bereit: "Bereit. LND antwortet im Heimnetz auf Port {port}.",
     fz_tor_aus: "Tor ist in diesem Knoten abgeschaltet.",
+    el_titel: "Hardware-Wallets über Electrum (BitBoxApp, Trezor Suite)",
+    el_lead: "BitBoxApp und Trezor Suite verbinden sich nur mit einem Electrum-Server. Das übernimmt bei SatoshiCortex ein Dienst der Anwendung selbst – kein eigener Server, kein zusätzlicher Container, kein eigener Index. In der App trägst du ihn dort ein, wo sie nach einem Electrum-Server fragt. Du meldest ein Konto einmal mit seinem öffentlichen Schlüssel an, danach verfolgt dein Knoten es selbst. Unterschrieben wird weiter nur auf dem Gerät.",
+    el_schalter: "Electrum-Dienst einschalten",
+    el_wege_titel: "So verbindest du die App",
+    el_weg_heimnetz: "Im Heimnetz",
+    el_weg_tor: "Über Tor",
+    el_heimnetz_aus: "Aus. Zum Einschalten in der .env ELECTRUM_BIND=0.0.0.0 und ELECTRUM_LAN_PORT=50001 setzen und neu ausrollen.",
+    el_heimnetz_compose_alt: "Deine docker-compose.yml ist älter und kennt diesen Weg noch nicht. Übernimm die aktuelle Fassung, dann erscheint er hier.",
+    el_tor_aus: "Tor ist in diesem Knoten abgeschaltet.",
+    el_tor_wartet: "Tor legt die Adresse gerade an – das dauert ein bis zwei Minuten.",
+    el_tls_titel: "Zertifikat für die verschlüsselte Verbindung (TLS)",
+    el_tls_d: "Beide Apps können mit und ohne TLS verbinden, über denselben Port. Die BitBoxApp braucht für TLS dieses Zertifikat – kopier es und füg es dort ein. Über Tor ist die Verbindung ohnehin verschlüsselt.",
+    el_fingerabdruck: "Fingerabdruck (SHA-256)",
+    el_zertifikat: "Zertifikat",
+    el_pem_kopieren: "Zertifikat kopieren",
+    el_konten_titel: "Angemeldete Konten",
+    el_keine_konten: "Noch kein Konto angemeldet. Solange zeigt die App deine Wallets leer an.",
+    el_konto_zeile: "{art} · {lage}",
+    el_sucht: "sucht in der Kette …",
+    el_sucht_prozent: "sucht in der Kette … {prozent} %",
+    el_wartet: "wartet, bis die Suche davor fertig ist",
+    el_bereit: "bereit",
+    el_abmelden: "Abmelden",
+    el_abmelden_sicher: "Wirklich abmelden?",
+    el_abgemeldet: "{name} ist abgemeldet.",
+    el_anmelden_titel: "Konto anmelden",
+    el_anmelden_d: "In der App beim Konto die Kontoinformationen öffnen und den erweiterten öffentlichen Schlüssel anzeigen lassen (xpub, ypub oder zpub). Jedes Konto einzeln: Native SegWit und Taproot sind in den Apps getrennte Konten.",
+    el_nie_privat: "Nur den ÖFFENTLICHEN Schlüssel. Niemals einen privaten Schlüssel (xprv, zprv …) und niemals deine Wörter – die gehören auf Papier und nirgendwo sonst hin. Ein privater Schlüssel wird hier ohnehin abgewiesen.",
+    el_name: "Name",
+    el_schluessel: "Öffentlicher Kontoschlüssel",
+    el_schluessel_d: "Beginnt mit xpub, ypub oder zpub. Er kann nichts ausgeben, verrät aber jede Adresse des Kontos – deshalb liegt er nur in deinem Knoten, nicht in den Einstellungen dieser App.",
+    el_art: "Adressart",
+    el_art_d: "Ein xpub sagt nicht, welche Adressen die App daraus macht. Nimm die Art, die die App beim Konto anzeigt.",
+    el_art_tr: "Taproot (bc1p…)",
+    el_art_wpkh: "Native SegWit (bc1q…)",
+    el_art_sh_wpkh: "SegWit in P2SH (3…)",
+    el_art_pkh: "Legacy (1…)",
+    el_seit: "Benutzt seit (freiwillig)",
+    el_seit_d: "Kürzt die Suche ab. Leer lassen, wenn du es nicht genau weißt – dann durchsucht dein Knoten die ganze Kette; mit seinen Blockfiltern geht das trotzdem zügig.",
+    el_anmelden_knopf: "Anmelden",
+    el_angemeldet: "Angemeldet – dein Knoten sucht jetzt die Geschichte des Kontos.",
+    el_bitbox_titel: "BitBoxApp verbinden",
+    el_bitbox_1: "In der BitBoxApp in den Einstellungen unter „Erweiterte Einstellungen“ den eigenen Full Node verbinden.",
+    el_bitbox_2: "Als Adresse die Heimnetz-Adresse von oben eintragen – oder die .onion-Adresse, wenn in der BitBoxApp Tor eingeschaltet ist.",
+    el_bitbox_3: "Für eine verschlüsselte Verbindung das Zertifikat von oben einfügen.",
+    el_bitbox_4: "Verbindet die App, erscheinen die angemeldeten Konten mit ihrem Guthaben.",
+    el_trezor_titel: "Trezor Suite verbinden (Desktop)",
+    el_trezor_1: "Einen eigenen Server kann Trezor Suite nur in der Desktop-Fassung nutzen, nicht im Browser und nicht am Telefon.",
+    el_trezor_2: "In den Einstellungen bei Bitcoin das Backend auf einen eigenen Electrum-Server umstellen – dort gehört dieser Dienst hin.",
+    el_trezor_3: "Die Heimnetz-Adresse von oben mit :t anhängen (ohne TLS) oder mit :s (mit TLS), also host:port:t. Über Tor die .onion-Adresse mit :t, wenn Tor in Trezor Suite eingeschaltet ist.",
+    el_trezor_4: "Den öffentlichen Schlüssel zeigt Trezor Suite beim Konto an; das Gerät fragt dafür einmal nach.",
+    el_grenzen: "Was dieser Dienst kann – und was nicht",
+    el_grenzen_d: "Er kennt nur die Konten, die hier angemeldet sind; ein anderes zeigt die App leer an, bis du es anmeldest. Wer den Dienst erreicht, sieht die Geschichte der angemeldeten Konten – deshalb gibt es ihn nur im Heimnetz und über Tor, und den Port leitest du nie im Router weiter. Senden kann er nur, was dein Gerät schon unterschrieben hat.",
+    el_kein_schluessel: "Das ist kein gültiger öffentlicher Kontoschlüssel. Erwartet wird ein xpub, ypub oder zpub.",
+    el_privat: "Das ist ein PRIVATER Schlüssel. Er wurde weder gespeichert noch an deinen Knoten geschickt. Bitte nur den öffentlichen Schlüssel einfügen – und den privaten als gefährdet betrachten, wenn er irgendwo kopiert herumliegt.",
+    el_mehrfach: "Das ist ein Schlüssel für eine Mehrfachsignatur-Wallet. Die wird hier nicht unterstützt.",
+    el_art_waehlen: "Bitte die Adressart wählen – ein xpub legt sie nicht fest.",
+    el_art_passt_nicht: "Diese Adressart passt nicht zum Schlüssel: ypub und zpub legen sie selbst fest.",
+    el_art_unbekannt: "Unbekannte Adressart.",
+    el_falsches_netz: "Dieser Schlüssel gehört zu einem anderen Netz als dein Knoten – Testnetz statt Hauptnetz oder umgekehrt.",
+    el_zu_viele: "Mehr Konten gehen nicht – melde erst eines ab.",
+    el_name_ungueltig: "Bitte einen Namen angeben, höchstens 40 Zeichen.",
+    el_datum: "Das Datum ist nicht lesbar.",
+    el_bitcoind_weg: "bitcoind antwortet gerade nicht. Bitte gleich noch einmal versuchen.",
+    el_unbekannt: "Dieses Konto ist hier nicht angemeldet.",
+    el_port_belegt: "Der Electrum-Dienst konnte nicht starten: sein Port ist belegt.",
+    el_suche_gescheitert: "Die Suche ist gescheitert. Einzelheiten stehen im Protokoll – melde das Konto ab und wieder an.",
+    el_unterbrochen: "Die Anmeldung wurde durch einen Neustart unterbrochen, bevor die Suche begann. Melde das Konto ab und wieder an.",
     fz_tor_aktiv: "Bereit, die .onion für Zeus steht.",
     fz_tor_bereit: "Bereit. Beim ersten Gerät startet Tor einmal kurz neu.",
     fz_lightning_nicht_bereit: "Lightning ist noch nicht bereit. Schlüssel gibt es erst mit laufender, entsperrter Wallet.",
@@ -1506,6 +1574,74 @@ const I18N = {
     fz_vpn_aus: "Not enabled in the .env – see the instructions below.",
     fz_vpn_bereit: "Ready. LND answers on your home network on port {port}.",
     fz_tor_aus: "Tor is switched off on this node.",
+    el_titel: "Hardware wallets over Electrum (BitBoxApp, Trezor Suite)",
+    el_lead: "BitBoxApp and Trezor Suite connect only to an Electrum server. In SatoshiCortex a service of the application itself does that – no separate server, no extra container, no index of its own. In the app you enter it wherever it asks for an Electrum server. You register an account once with its public key, and from then on your node follows it itself. Signing still happens on the device only.",
+    el_schalter: "Switch on the Electrum service",
+    el_wege_titel: "How to connect the app",
+    el_weg_heimnetz: "On your home network",
+    el_weg_tor: "Over Tor",
+    el_heimnetz_aus: "Off. To switch it on, set ELECTRUM_BIND=0.0.0.0 and ELECTRUM_LAN_PORT=50001 in the .env and redeploy.",
+    el_heimnetz_compose_alt: "Your docker-compose.yml is older and does not know this route yet. Take the current version and it appears here.",
+    el_tor_aus: "Tor is switched off on this node.",
+    el_tor_wartet: "Tor is creating the address – that takes a minute or two.",
+    el_tls_titel: "Certificate for the encrypted connection (TLS)",
+    el_tls_d: "Both apps can connect with or without TLS, on the same port. For TLS the BitBoxApp needs this certificate – copy it and paste it there. Over Tor the connection is encrypted anyway.",
+    el_fingerabdruck: "Fingerprint (SHA-256)",
+    el_zertifikat: "Certificate",
+    el_pem_kopieren: "Copy certificate",
+    el_konten_titel: "Registered accounts",
+    el_keine_konten: "No account registered yet. Until then the app shows your wallets as empty.",
+    el_konto_zeile: "{art} · {lage}",
+    el_sucht: "searching the chain …",
+    el_sucht_prozent: "searching the chain … {prozent} %",
+    el_wartet: "waiting for the search before it to finish",
+    el_bereit: "ready",
+    el_abmelden: "Remove",
+    el_abmelden_sicher: "Really remove?",
+    el_abgemeldet: "{name} has been removed.",
+    el_anmelden_titel: "Register an account",
+    el_anmelden_d: "In the app, open the account's information and show its extended public key (xpub, ypub or zpub). One account at a time: Native SegWit and Taproot are separate accounts in the apps.",
+    el_nie_privat: "Only the PUBLIC key. Never a private key (xprv, zprv …) and never your words – they belong on paper and nowhere else. A private key is refused here anyway.",
+    el_name: "Name",
+    el_schluessel: "Public account key",
+    el_schluessel_d: "Starts with xpub, ypub or zpub. It cannot spend anything, but it reveals every address of the account – which is why it is kept only in your node, not in this application's settings.",
+    el_art: "Address type",
+    el_art_d: "An xpub does not say which addresses the app derives from it. Pick the type the app shows for the account.",
+    el_art_tr: "Taproot (bc1p…)",
+    el_art_wpkh: "Native SegWit (bc1q…)",
+    el_art_sh_wpkh: "SegWit in P2SH (3…)",
+    el_art_pkh: "Legacy (1…)",
+    el_seit: "In use since (optional)",
+    el_seit_d: "Shortens the search. Leave it empty if you are not sure – your node then searches the whole chain; with its block filters that is still quick.",
+    el_anmelden_knopf: "Register",
+    el_angemeldet: "Registered – your node is now searching the account's history.",
+    el_bitbox_titel: "Connect the BitBoxApp",
+    el_bitbox_1: "In the BitBoxApp settings, under “Advanced settings”, connect your own full node.",
+    el_bitbox_2: "Enter the home network address from above – or the .onion address if Tor is switched on in the BitBoxApp.",
+    el_bitbox_3: "For an encrypted connection, paste the certificate from above.",
+    el_bitbox_4: "Once the app connects, the registered accounts appear with their balance.",
+    el_trezor_titel: "Connect Trezor Suite (desktop)",
+    el_trezor_1: "Trezor Suite can use a server of your own only in its desktop version, not in the browser and not on the phone.",
+    el_trezor_2: "In the settings for Bitcoin, switch the backend to a custom Electrum server – that is where this service goes.",
+    el_trezor_3: "Append :t to the home network address from above (no TLS) or :s (with TLS), i.e. host:port:t. Over Tor, the .onion address with :t, with Tor switched on in Trezor Suite.",
+    el_trezor_4: "Trezor Suite shows the public key with the account; the device asks once to confirm.",
+    el_grenzen: "What this service can do – and what not",
+    el_grenzen_d: "It knows only the accounts registered here; any other account shows as empty in the app until you register it. Anyone who reaches the service sees the history of the registered accounts – which is why it exists only on your home network and over Tor, and you never forward its port in your router. It can only send what your device has already signed.",
+    el_kein_schluessel: "That is not a valid public account key. An xpub, ypub or zpub is expected.",
+    el_privat: "That is a PRIVATE key. It was neither stored nor sent to your node. Please paste only the public key – and treat the private one as exposed if a copy of it is lying around anywhere.",
+    el_mehrfach: "That is a key for a multisig wallet. Those are not supported here.",
+    el_art_waehlen: "Please choose the address type – an xpub does not determine it.",
+    el_art_passt_nicht: "This address type does not match the key: ypub and zpub determine it themselves.",
+    el_art_unbekannt: "Unknown address type.",
+    el_falsches_netz: "This key belongs to a different network than your node – testnet instead of mainnet or the other way round.",
+    el_zu_viele: "No more accounts – remove one first.",
+    el_name_ungueltig: "Please enter a name, at most 40 characters.",
+    el_datum: "The date cannot be read.",
+    el_bitcoind_weg: "bitcoind is not answering right now. Please try again in a moment.",
+    el_unbekannt: "This account is not registered here.",
+    el_port_belegt: "The Electrum service could not start: its port is in use.",
+    el_suche_gescheitert: "The search failed. Details are in the log – remove the account and register it again.",
+    el_unterbrochen: "A restart interrupted the registration before its search began. Remove the account and register it again.",
     fz_tor_aktiv: "Ready, the .onion for Zeus is up.",
     fz_tor_bereit: "Ready. With the first device, Tor restarts once briefly.",
     fz_lightning_nicht_bereit: "Lightning is not ready yet. Keys are available only with a running, unlocked wallet.",
@@ -5711,7 +5847,9 @@ function zeigeAnsicht(name) {
   }
   // Externe Wallets: Zeus und Sparrow. Die PIN, weil Anlegen und
   // Widerrufen hier nach ihr fragen.
-  if (name === "extern") { fernzugangLaden(); ladeRpcZugang(); pinLaden(); }
+  if (name === "extern") {
+    fernzugangLaden(); ladeRpcZugang(); pinLaden(); electrumLaden();
+  }
   if (name === "logs") ladeLogs(true);
   if (name === "news") { ladeNews(true); ladeKurs(true); }
   if (name === "rechner") { ladeKurs(true); ladeKanalrechner(); }
@@ -9603,6 +9741,214 @@ function fzErgebnisWeg() {
   $("#fz-kopiert").textContent = "";
 }
 
+/* ── Electrum fuer BitBoxApp und Trezor Suite ─────────────────────────────
+
+   Aus dem Betrieb, 28.09.2026: "was will den trezor haben damit man trezor
+   direkt verbinden kann ???" -- beide Apps sprechen nur Electrum. Der
+   Server laeuft in der Anwendung; angemeldet wird ein Konto mit seinem
+   OEFFENTLICHEN Schluessel. Der steht nach dem Anmelden nirgends mehr auf
+   dieser Seite: das Feld wird geleert, die Liste nennt nur den Namen. */
+
+let EL_DATEN = null;
+let EL_TAKT = null;
+
+// Die Adressarten, als Tabelle mit festen Schluesseln.
+const EL_ARTEN = {
+  tr: "el_art_tr", wpkh: "el_art_wpkh", "sh-wpkh": "el_art_sh_wpkh",
+  pkh: "el_art_pkh",
+};
+
+// Laesst der Praefix die Art offen? Nur xpub und tpub -- ypub/zpub (und
+// upub/vpub) sagen sie selbst. Genau geprueft wird im Server; hier geht es
+// nur darum, ob die Auswahl gezeigt wird.
+function elArtNoetig(text) {
+  const kopf = String(text || "").trim().slice(0, 4);
+  return kopf === "xpub" || kopf === "tpub";
+}
+
+// Die zwei Wege, jeweils mit Adresse -- oder mit dem Grund, warum es ihn
+// gerade nicht gibt. Nichts wird versteckt, was man einschalten koennte.
+function elWege(d, host) {
+  const heim = d.heimnetz || {};
+  const tor = d.tor || {};
+  return [
+    ["el_weg_heimnetz", heim.stand === "bereit"
+      ? { adresse: `${host}:${heim.port}` }
+      : { grund: heim.stand === "compose_alt" ? "el_heimnetz_compose_alt"
+                                              : "el_heimnetz_aus" }],
+    ["el_weg_tor", !tor.moeglich ? { grund: "el_tor_aus" }
+      : tor.adresse ? { adresse: `${tor.adresse}:${tor.port}` }
+                    : { grund: "el_tor_wartet" }],
+  ];
+}
+
+// Was bei einem Konto steht: sucht (mit Fortschritt), gescheitert, bereit.
+function elKontoLage(k) {
+  if (k.sucht) {
+    // Gesucht wird nacheinander -- wer wartet, sagt das.
+    if (k.wartet) return ["el_wartet", {}];
+    return k.fortschritt === null || k.fortschritt === undefined
+      ? ["el_sucht", {}]
+      : ["el_sucht_prozent", { prozent: Math.round(k.fortschritt * 100) }];
+  }
+  if (k.fehler) return [k.fehler, {}];
+  return ["el_bereit", {}];
+}
+
+async function electrumLaden() {
+  clearTimeout(EL_TAKT);
+  let d;
+  try {
+    d = await api("/electrum");
+  } catch (e) {
+    if (e && e.abgemeldet) return;
+    log_fehler("Electrum", e);
+    return;
+  }
+  EL_DATEN = d;
+  zeichneElectrum();
+  // Solange ein Konto sucht, nachsehen -- aber nur, solange der Reiter
+  // offen ist.
+  if ((d.konten || []).some((k) => k.sucht) && ANSICHT === "extern") {
+    EL_TAKT = setTimeout(electrumLaden, 3000);
+  }
+}
+
+function zeichneElectrum() {
+  const d = EL_DATEN;
+  if (!d) return;
+  $("#el-an").checked = !!d.an;
+  $("#el-inhalt").classList.toggle("hidden", !d.an);
+  if (!d.an) return;
+
+  const wege = $("#el-wege");
+  wege.textContent = "";
+  for (const [titel, weg] of elWege(d, location.hostname)) {
+    if (weg.adresse) {
+      const reihe = zeile(t(titel), "");
+      const feld = document.createElement("span");
+      feld.className = "adresse";
+      feld.textContent = weg.adresse;
+      reihe.lastChild.replaceWith(feld);
+      wege.append(reihe);
+    } else {
+      wege.append(zeile(t(titel), t(weg.grund)));
+    }
+  }
+
+  const tls = d.tls;
+  $("#el-tls").classList.toggle("hidden", !tls);
+  $("#el-fingerabdruck").textContent = tls ? tls.fingerabdruck : "";
+  $("#el-pem").textContent = tls ? tls.pem : "";
+
+  const kasten = $("#el-konten");
+  kasten.textContent = "";
+  const konten = d.konten || [];
+  if (!konten.length) {
+    kasten.append(hinweis(t("el_keine_konten"), ""));
+  }
+  for (const k of konten) {
+    const [schluessel, werte] = elKontoLage(k);
+    const reihe = zeile(k.name, t("el_konto_zeile", {
+      art: t(EL_ARTEN[k.art] || "el_art_wpkh"), lage: t(schluessel, werte) }));
+    reihe.append(elAbmeldenKnopf(k));
+    kasten.append(reihe);
+  }
+  $("#el-anmelden").disabled = konten.length >= (d.hoechstens || 10);
+  elFormularFolgen();
+}
+
+function elFormularFolgen() {
+  $("#el-art-gruppe").classList.toggle(
+    "hidden", !elArtNoetig($("#el-schluessel").value));
+}
+
+async function electrumSchalten() {
+  const knopf = $("#el-an");
+  const meldung = $("#el-schalter-meldung");
+  knopf.disabled = true;
+  meldung.textContent = "";
+  try {
+    await api("/electrum/schalter", "POST", { an: knopf.checked });
+    await electrumLaden();
+  } catch (e) {
+    if (e && e.abgemeldet) return;
+    const d = e.detail || {};
+    meldung.textContent = t(d.meldung || "e_fehler");
+    knopf.checked = !knopf.checked;
+  } finally {
+    knopf.disabled = false;
+  }
+}
+
+async function electrumKontoAnmelden() {
+  const knopf = $("#el-anmelden");
+  const meldung = $("#el-meldung");
+  const gewaehlt = document.querySelector('input[name="el-art"]:checked');
+  knopf.disabled = true;
+  meldung.textContent = "";
+  try {
+    await api("/electrum/konto", "POST", {
+      schluessel: $("#el-schluessel").value.trim(),
+      art: elArtNoetig($("#el-schluessel").value) && gewaehlt
+        ? gewaehlt.value : null,
+      name: $("#el-name").value.trim(),
+      seit: $("#el-seit").value || null,
+    });
+    // Der Schluessel verraet jede Adresse des Kontos -- er bleibt nicht
+    // auf der Seite stehen.
+    $("#el-schluessel").value = "";
+    $("#el-name").value = "";
+    $("#el-seit").value = "";
+    meldung.textContent = t("el_angemeldet");
+    await electrumLaden();
+  } catch (e) {
+    if (e && e.abgemeldet) return;
+    const d = e.detail || {};
+    meldung.textContent = t(d.meldung || "e_fehler");
+  } finally {
+    knopf.disabled = false;
+    elFormularFolgen();
+  }
+}
+
+// Zweimal klicken, wie beim Widerruf eines Geraets.
+function elAbmeldenKnopf(konto) {
+  const knopf = document.createElement("button");
+  knopf.type = "button";
+  knopf.className = "btn ghost klein";
+  knopf.textContent = t("el_abmelden");
+  let scharf = null;
+  knopf.addEventListener("click", async () => {
+    const meldung = $("#el-konten-meldung");
+    if (!scharf) {
+      knopf.textContent = t("el_abmelden_sicher");
+      scharf = setTimeout(() => {
+        scharf = null;
+        knopf.textContent = t("el_abmelden");
+      }, 4000);
+      return;
+    }
+    clearTimeout(scharf);
+    scharf = null;
+    knopf.disabled = true;
+    meldung.textContent = "";
+    try {
+      await api("/electrum/konto/" + encodeURIComponent(konto.wallet)
+                + "/abmelden", "POST");
+      meldung.textContent = t("el_abgemeldet", { name: konto.name });
+      await electrumLaden();
+    } catch (e) {
+      if (e && e.abgemeldet) return;
+      const d = e.detail || {};
+      meldung.textContent = t(d.meldung || "e_fehler");
+      knopf.disabled = false;
+      knopf.textContent = t("el_abmelden");
+    }
+  });
+  return knopf;
+}
+
 function lnSichtAusFeldern() {
   const gewaehlt = document.querySelector('input[name="e-ln-sicht"]:checked');
   return gewaehlt ? gewaehlt.value : "tor";
@@ -12476,6 +12822,11 @@ async function start() {
   $("#e-rpc-kopieren").addEventListener("click", () => kopiere(
     $("#e-rpc-feld"), $("#e-rpc-meldung"), "lgi_kopiert"));
   $("#fz-erstellen").addEventListener("click", geraetErstellen);
+  $("#el-an").addEventListener("change", electrumSchalten);
+  $("#el-anmelden").addEventListener("click", electrumKontoAnmelden);
+  $("#el-schluessel").addEventListener("input", elFormularFolgen);
+  $("#el-pem-kopieren").addEventListener("click", () => kopiere(
+    $("#el-pem"), $("#el-pem-meldung"), "lgi_kopiert"));
   $("#fz-fertig").addEventListener("click", fzErgebnisWeg);
   $("#fz-kopieren").addEventListener("click", () => kopiere(
     $("#fz-text"), $("#fz-kopiert"), "lgi_kopiert"));

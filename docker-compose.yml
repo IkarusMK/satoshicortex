@@ -66,6 +66,10 @@ services:
       # says so in the interface.
       LND_REST_BIND: ${LND_REST_BIND:-127.0.0.1}
       LND_REST_LAN_PORT: ${LND_REST_LAN_PORT:-}
+      # The same for the Electrum service built into the application (for
+      # BitBoxApp and Trezor Suite) -- read, never opened by the application.
+      ELECTRUM_BIND: ${ELECTRUM_BIND:-127.0.0.1}
+      ELECTRUM_LAN_PORT: ${ELECTRUM_LAN_PORT:-}
     ports:
       # LAN_BIND controls which interface the web interface listens on.
       # 0.0.0.0 means: reachable from the whole home network — that is
@@ -73,6 +77,18 @@ services:
       # Put it behind a reverse proxy and you set 127.0.0.1 here.
       # dclint disable-line require-quotes-in-ports
       - '${LAN_BIND:-0.0.0.0}:${WEBUI_PORT:-3333}:8000'
+      # The Electrum service for HARDWARE WALLET APPS (BitBoxApp, Trezor Suite)
+      # on your home network. Off by default, exactly like LND's interface
+      # below: 127.0.0.1 with NO fixed port makes Docker pick a random port on
+      # the server itself. A fixed default could collide with something else
+      # on 50001 -- another Electrum server, say -- and then this container,
+      # and with it the whole web interface, would not start. To use it, set
+      # BOTH in the .env:
+      #   ELECTRUM_BIND=0.0.0.0
+      #   ELECTRUM_LAN_PORT=50001    (any port that is free on the server)
+      # NEVER forward this port in your router. Over Tor you need neither.
+      # dclint disable-line require-quotes-in-ports
+      - '${ELECTRUM_BIND:-127.0.0.1}:${ELECTRUM_LAN_PORT:-}:50001'
     networks:
       satcortex:
         ipv4_address: ${NETWORK_PREFIX:-10.83.33}.10
@@ -187,13 +203,16 @@ services:
     # mid-write costs a rebuild that takes days.
     stop_grace_period: 10m
 
-  # There is no Electrum server here, and none is needed: Sparrow and
-  # relatives connect to Bitcoin Core directly (Preferences -> Server ->
-  # Bitcoin Core), and with txindex they even gain features that would
-  # otherwise require one. Address lookups happen here instead:
-  # scantxoutset for the current balance, and our own index built from the
-  # ZMQ feed from commissioning onwards. What that cannot give you is the
-  # history of an address from BEFORE you set the node up.
+  # There is no separate Electrum server (electrs) here, and none is needed.
+  # Sparrow and relatives connect to Bitcoin Core directly (Preferences ->
+  # Server -> Bitcoin Core), and with txindex they even gain features that
+  # would otherwise require one. BitBoxApp and Trezor Suite, which speak only
+  # Electrum, are answered by the Electrum service built into the application
+  # (ELECTRUM_BIND above) -- for the accounts registered there. Lookups of any
+  # other address happen here instead: scantxoutset for the current balance,
+  # and our own index built from the ZMQ feed from commissioning onwards. What
+  # that cannot give you is the history of an arbitrary address from BEFORE
+  # you set the node up.
 
   lnd:
     # The tag carries LND's own release label, including "v" and "-beta".

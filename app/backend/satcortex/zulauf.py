@@ -51,7 +51,7 @@ import sqlite3
 import struct
 import threading
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 from . import rpc
 
@@ -133,6 +133,11 @@ class Zulauf(threading.Thread):
         self._zuletzt_schnappschuss = 0.0
         self.laeuft_mit = False              # steht der Strom gerade?
         self.gesehen = 0
+        # Seit dem 28.09.2026: wer wissen will, dass sich etwas tut -- der
+        # Electrum-Server, der Apps von selbst benachrichtigt. Bekommt True
+        # fuer einen Block (C, D), False fuer den Mempool (A, R). Aufgerufen
+        # aus DIESEM Faden; der Empfaenger muss das vertragen.
+        self.bei_ereignis: Optional[Callable[[bool], None]] = None
 
     # ── Steuerung ──────────────────────────────────────────────────────────
 
@@ -315,6 +320,11 @@ class Zulauf(threading.Thread):
             # ueberschrieben.
             log.info("Reorg: ein Block wurde von der Kette getrennt.")
             self._vormerken(("D", jetzt_ms))
+        if self.bei_ereignis is not None and art in "ARCD":
+            try:
+                self.bei_ereignis(art in "CD")
+            except Exception:  # noqa: BLE001 -- der Zulauf laeuft weiter
+                log.debug("Anstoss fuer Electrum gescheitert", exc_info=True)
 
     def _vormerken(self, eintrag: Tuple) -> None:
         """Ein Ereignis zum Schreiben vormerken -- im Speicher."""

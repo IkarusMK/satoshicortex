@@ -42,7 +42,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, Iterable, Optional, Tuple
 
-from . import fernzugang, netz
+from . import electrum, fernzugang, netz
 
 log = logging.getLogger(__name__)
 
@@ -89,6 +89,11 @@ DIENSTE: Dict[str, Dienst] = {d.name: d for d in (
     # es vor 0.63.0 nicht.
     Dienst("fernzugang", "onion-fernzugang", fernzugang.ONION_PORT, "lnd",
            8080, (), "Externe Wallets: LNDs Schnittstelle fuer Zeus"),
+    # Seit dem 28.09.2026: der Electrum-Server in der Anwendung, fuer
+    # BitBoxApp und Trezor Suite. Wie der Fernzugang nie angekuendigt, mit
+    # eigener Adresse, ohne alten Schluessel.
+    Dienst("electrum", "onion-electrum", electrum.PORT, "app", electrum.PORT,
+           (), "Externe Wallets: Electrum fuer BitBoxApp und Trezor Suite"),
 )}
 
 # Die Reihenfolge, in der sie in der torrc stehen -- fest, damit dieselbe
@@ -100,7 +105,8 @@ REIHENFOLGE = ("bitcoind", "lnd", "wachturm")
 # IMMER hinter den dreien oben: so bleibt die torrc aller, die ihn nicht
 # nutzen, Byte fuer Byte, wie sie war -- sonst startete jedes Update Tor neu.
 FERNZUGANG = "fernzugang"
-ZUSATZDIENSTE = (FERNZUGANG,)
+ELECTRUM = "electrum"
+ZUSATZDIENSTE = (FERNZUGANG, ELECTRUM)
 
 HOSTNAME = "hostname"
 SCHLUESSELDATEI = "hs_ed25519_secret_key"

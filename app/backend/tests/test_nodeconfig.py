@@ -1488,7 +1488,7 @@ def test_jede_fremde_aktion_ist_auf_eine_pruefsumme_genagelt():
     Audit vom 22.09.2026; bis heute bewachte es kein Test."""
     import re
 
-    for datei in ("images.yml", "check.yml"):
+    for datei in ("images.yml", "check.yml", "waechter.yml"):
         for job in _ablauf(datei)["jobs"].values():
             for schritt in job.get("steps", []):
                 aktion = schritt.get("uses")
@@ -1526,3 +1526,29 @@ def test_die_vorlage_nennt_beide_zeilen_und_laesst_sie_aus():
     assert re.search(r"^# LND_REST_BIND=0\.0\.0\.0$", text, re.M)
     assert re.search(r"^# LND_REST_LAN_PORT=8080$", text, re.M)
     assert not re.search(r"^LND_REST_(BIND|LAN_PORT)=", text, re.M)
+
+
+# ── Electrum im Heimnetz (28.09.2026) ──────────────────────────────────────
+#
+# Der Electrum-Server laeuft in der Anwendung. Wie LNDs Schnittstelle: ohne
+# ausdrueckliche Wahl nirgends offen, und KEIN fester Vorgabeport -- laeuft
+# auf dem Server schon etwas auf 50001 (ein anderer Electrum-Server etwa),
+# startete sonst die Anwendung nicht, und mit ihr die ganze Oberflaeche.
+
+def test_electrum_steht_ohne_ausdrueckliche_wahl_nirgends_offen():
+    block = _dienstblock("app")
+    assert "- '${ELECTRUM_BIND:-127.0.0.1}:${ELECTRUM_LAN_PORT:-}:50001'" in block
+
+
+def test_die_app_erfaehrt_ihre_electrum_freigabe():
+    block = _dienstblock("app")
+    assert "ELECTRUM_BIND: ${ELECTRUM_BIND:-127.0.0.1}" in block
+    assert "ELECTRUM_LAN_PORT: ${ELECTRUM_LAN_PORT:-}" in block
+
+
+def test_die_vorlage_nennt_electrum_und_laesst_es_aus():
+    import re
+    text = _lies("example.env")
+    assert re.search(r"^# ELECTRUM_BIND=0\.0\.0\.0$", text, re.M)
+    assert re.search(r"^# ELECTRUM_LAN_PORT=50001$", text, re.M)
+    assert not re.search(r"^ELECTRUM_(BIND|LAN_PORT)=", text, re.M)

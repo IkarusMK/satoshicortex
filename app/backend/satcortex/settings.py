@@ -78,6 +78,11 @@ class Einstellungen:
     # nicht gibt. Ausgewertet in fernzugang.vpn_lage.
     lnd_lan_bind: Optional[str] = os.environ.get("LND_REST_BIND")
     lnd_lan_port: Optional[str] = os.environ.get("LND_REST_LAN_PORT")
+    # Dasselbe fuer den Electrum-Server (seit dem 28.09.2026). Ausgewertet
+    # ebenfalls in fernzugang.vpn_lage -- die Frage ist dieselbe: steht der
+    # Port im Heimnetz, und unter welcher Nummer?
+    electrum_bind: Optional[str] = os.environ.get("ELECTRUM_BIND")
+    electrum_lan_port: Optional[str] = os.environ.get("ELECTRUM_LAN_PORT")
     # Verschluesselung ist FREIWILLIG und ausdruecklich nicht die Vorgabe.
     # Ein selbstsigniertes Zertifikat wuerde beim ersten Aufruf eine
     # Sicherheitswarnung erzeugen -- ausgerechnet auf der Seite, auf der man

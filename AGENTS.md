@@ -126,7 +126,10 @@ material.
 
 - `GUIDE.md` and `ANLEITUNG` — there is no German guide any more, only
   `GUIDE.md`.
-- `images/electrs/` — electrs was removed. There is no Electrum server here;
-  Bitcoin Core with `txindex` covers what wallets need.
+- `images/electrs/` — electrs was removed and stays removed. There is no
+  address index over the whole chain. The application speaks the Electrum
+  protocol itself (`electrum.py`, `electrumserver.py`), and only for accounts
+  registered by their public key: Bitcoin Core follows them as watch-only
+  wallets (`lesewallet.py`), and everything else comes from Core directly.
 - Version numbers below 1.0.0 — they belong to a private phase that is not in
   this repository's history.

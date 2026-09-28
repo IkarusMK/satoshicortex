@@ -69,6 +69,11 @@ ZUSAMMENGESETZT = {
     # leitungsHinweis(). Befund vom 27.09.2026.
     "t(leitung[0])": [
         "ko_b_verbunden", "ko_b_getrennt_kanal", "ko_b_getrennt"],
+    # Electrum: die zwei Wege und warum es einen gerade nicht gibt -- aus
+    # elWege(). Befund vom 28.09.2026.
+    "t(titel)": ["el_weg_heimnetz", "el_weg_tor"],
+    "t(weg.grund)": ["el_heimnetz_compose_alt", "el_heimnetz_aus",
+                     "el_tor_aus", "el_tor_wartet"],
     # Die Kopfzeile der Wegwissen-Tafel wird ueber eine Schluesselliste
     # gebaut -- fuenf Spalten, fuenf Texte. Befund vom 22.09.2026.
     "t(k)": ["wg_von", "wg_nach", "wg_trug", "wg_fehl", "wg_wann"],

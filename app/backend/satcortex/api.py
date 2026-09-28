@@ -22,8 +22,8 @@ from pydantic import BaseModel, Field, field_validator
 import asyncio
 import contextlib
 
-from . import (auth, beitrag, betriebslog, coinbase, dyndns, erreichbar,
-               fernzugang,
+from . import (auth, beitrag, betriebslog, coinbase, dyndns, electrum,
+               electrumbetrieb, erreichbar, fernzugang, lesewallet,
                gebiete, gebuehren as netzgebuehren, geo, karte,
                kennzahlen, kurs, lnd, logs, mempoolstrom, merker,
                nachrichten, nodeconfig,
@@ -551,6 +551,22 @@ class Pinwechsel(BaseModel):
 
 class Pineingabe(BaseModel):
     pin: str = Field(max_length=32)
+
+
+class Electrumschalter(BaseModel):
+    an: bool
+
+
+class Electrumkonto(BaseModel):
+    """Ein Konto fuer Electrum anmelden -- mit dem OEFFENTLICHEN Schluessel.
+
+    Die Grenzen sind grosszuegig fuer echte Schluessel (111 Zeichen) und eng
+    genug, dass niemand Megabytes hineinschiebt.
+    """
+    schluessel: str = Field("", max_length=200)
+    art: Optional[str] = Field(None, max_length=16)
+    name: str = Field("", max_length=64)
+    seit: Optional[str] = Field(None, max_length=16)
 
 
 class Geraetewunsch(BaseModel):
@@ -3477,6 +3493,77 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
 
     app.state.macaroon_sicherstellen = macaroon_sicherstellen
 
+    # ── Externe Wallets: Electrum fuer BitBoxApp und Trezor Suite ───────
+    #
+    # Aus dem Betrieb, 28.09.2026: "was will den trezor haben damit man
+    # trezor direkt verbinden kann ???" -- und kein zweiter Container dafuer.
+    # Der Server spricht Electrum selbst (electrum.py); was er ueber die
+    # Adressen weiss, kommt aus Nur-Lese-Wallets in Core, angelegt mit dem
+    # OEFFENTLICHEN Kontoschluessel (lesewallet.py). Senden kann er nur, was
+    # das Geraet schon unterschrieben hat -- deshalb keine PIN: hier bewegt
+    # nichts Geld, das nicht vorher auf dem Geraet bestaetigt wurde.
+    electrum_betrieb = electrumbetrieb.Betrieb(
+        knotenverbindung, zustand, str(Path(konf.fast) / "app" / "electrum"),
+        version=konf.version)
+    app.state.electrum = electrum_betrieb
+
+    def _el_tor_nachziehen() -> None:
+        e = zustand.laden()
+        if e.eingerichtet and _nach_sichtbarkeit(_wege(e.knotenwahl))["tor"]:
+            _tor_ablegen(_nach_sichtbarkeit(_wege(e.knotenwahl)))
+
+    # Fuer die Pruefung: jeder Weg zur torrc fuehrt durch _tor_ablegen, und
+    # dass Electrum dabei nicht verloren geht, soll sich zeigen lassen.
+    app.state.tor_neu_ablegen = _el_tor_nachziehen
+
+    @api.get("/electrum", dependencies=geschuetzt)
+    def electrum_lesen() -> Dict:
+        e = zustand.laden()
+        lage = electrum_betrieb.lage(konf.electrum_bind, konf.electrum_lan_port)
+        lage["tor"] = {
+            "moeglich": bool(e.eingerichtet and
+                             _nach_sichtbarkeit(_wege(e.knotenwahl))["tor"]),
+            "adresse": (onion.lies_adresse(konf.fast, onion.ELECTRUM)
+                        if lage["an"] else ""),
+            "port": electrum.PORT,
+        }
+        return lage
+
+    @api.post("/electrum/schalter", dependencies=geschuetzt)
+    async def electrum_schalten(wunsch: Electrumschalter) -> Dict:
+        try:
+            if wunsch.an:
+                await electrum_betrieb.einschalten()
+            else:
+                await electrum_betrieb.ausschalten()
+        except OSError as fehler:
+            # Meist: der Port ist im Container schon belegt.
+            log.warning("Electrum nicht eingeschaltet: %s", fehler)
+            raise HTTPException(409, {"meldung": "el_port_belegt"})
+        await asyncio.to_thread(_el_tor_nachziehen)
+        return {"ok": True}
+
+    @api.post("/electrum/konto", dependencies=geschuetzt)
+    def electrum_konto_anmelden(wunsch: Electrumkonto) -> Dict:
+        """Kehrt sofort zurueck; gesucht wird im Hintergrund. Der Schluessel
+        wird an Core gereicht und sonst nirgends abgelegt -- auch nicht im
+        Protokoll."""
+        try:
+            return electrum_betrieb.konto_anmelden(
+                wunsch.schluessel, wunsch.art, wunsch.name, wunsch.seit)
+        except lesewallet.SchluesselFehler as fehler:
+            raise HTTPException(400, {"meldung": fehler.schluessel})
+        except rpc.NichtErreichbar:
+            raise HTTPException(503, {"meldung": "el_bitcoind_weg"})
+
+    @api.post("/electrum/konto/{wallet}/abmelden", dependencies=geschuetzt)
+    def electrum_konto_abmelden(wallet: str) -> Dict:
+        try:
+            electrum_betrieb.konto_abmelden(wallet)
+        except KeyError:
+            raise HTTPException(404, {"meldung": "el_unbekannt"})
+        return {"ok": True}
+
     # ── Externe Wallets: Zeus als Fernbedienung ─────────────────────────
     #
     # Aus dem Betrieb, 26.09.2026: "also wenn dann will ich vollen
@@ -5951,6 +6038,9 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         # Geraets, nahme der naechste Waechterdurchgang ihn wieder heraus.
         if (zustand.laden().fernzugang or {}).get("tor"):
             dienste = dienste + (onion.FERNZUGANG,)
+        # Ebenso der Electrum-Server -- solange er eingeschaltet ist.
+        if (zustand.laden().electrumwahl or {}).get("an"):
+            dienste = dienste + (onion.ELECTRUM,)
         soll = nodeconfig.baue_tor(dienste, konf.netz_praefix)
         if ablage.lies("tor") == soll:
             return False
@@ -6805,6 +6895,13 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         # ist die, auf die die Oberflaeche nach einem Neustart wartet.
         app.state.sammler = asyncio.create_task(lagesammler())
 
+        # Electrum wieder an, wenn er an war. Scheitert es -- Core noch nicht
+        # da, Port belegt --, laeuft der Rest trotzdem.
+        try:
+            await electrum_betrieb.beim_start()
+        except OSError:
+            log.exception("Electrum beim Start nicht eingeschaltet")
+
         # Ohne Ablage gibt es nichts zu sammeln -- dann faengt der Zulauf gar
         # nicht erst an, statt ins Leere zu schreiben.
         if not auswertung.verfuegbar:
@@ -6819,6 +6916,9 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
             f"tcp://{konf.bitcoind_host}:{konf.zmq_sequence_port}",
             poolliste)
         app.state.zulauf = strom
+        # Neue Bloecke und Transaktionen gehen auch an Electrum -- der meldet
+        # sie den verbundenen Apps von selbst.
+        strom.bei_ereignis = electrum_betrieb.anstossen
         strom.start()
 
     @app.on_event("shutdown")
@@ -6827,6 +6927,10 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         # Container, der beim Stoppen wartet, wird nach zehn Sekunden
         # abgewuergt.
         hintergrund_einholen(5.0)
+
+        # Angehalten, nicht ausgeschaltet: nach dem Neustart soll er wieder
+        # laufen, wenn er lief.
+        await electrum_betrieb.anhalten()
 
         for name in ("waechter", "sammler"):
             aufgabe = getattr(app.state, name, None)

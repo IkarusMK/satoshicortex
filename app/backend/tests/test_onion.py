@@ -288,3 +288,36 @@ def test_der_fernzugang_hat_keinen_alten_schluessel(tmp_path):
     """Es gab ihn vor 0.63.0 nicht -- nichts zu uebernehmen."""
     assert onion.DIENSTE["fernzugang"].alter_schluessel == ()
     assert onion.uebernimm_schluessel(str(tmp_path), "fernzugang") is False
+
+
+# ── Electrum fuer BitBoxApp und Trezor Suite (28.09.2026) ─────────────────
+
+def test_electrum_wird_nie_angekuendigt():
+    for sicht in ("tor", "hybrid", "still"):
+        assert "electrum" not in onion.dienste_fuer(True, sicht)
+
+
+def test_electrum_zeigt_auf_den_server_in_der_anwendung():
+    block = onion.torrc_block(("electrum",), "10.83.33")
+    zeilen = block.splitlines()
+    assert "HiddenServiceDir /fast/tor/onion-electrum" in zeilen
+    assert "HiddenServicePort 50001 10.83.33.10:50001" in zeilen
+
+
+def test_electrum_steht_hinter_dem_fernzugang():
+    """Fest am Ende: wer Electrum nicht nutzt, behaelt seine torrc Byte fuer
+    Byte -- sonst startete jedes Update Tor neu."""
+    ohne = onion.torrc_block(("lnd", "bitcoind", "fernzugang"), "10.83.33")
+    mit = onion.torrc_block(("electrum", "lnd", "bitcoind", "fernzugang"),
+                            "10.83.33")
+    assert mit.startswith(ohne)
+    assert mit.index("onion-fernzugang") < mit.index("onion-electrum")
+
+
+def test_electrum_hat_eine_eigene_adresse(tmp_path):
+    """Ueber die Electrum-Adresse soll niemand auf den Knoten schliessen
+    koennen -- und es gab ihn vorher nicht, also keinen alten Schluessel."""
+    d = onion.DIENSTE["electrum"]
+    assert d.verzeichnis not in {x.verzeichnis for n, x in onion.DIENSTE.items()
+                                 if n != "electrum"}
+    assert d.alter_schluessel == ()

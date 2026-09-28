@@ -114,8 +114,12 @@ Two ideas carry the whole project:
 - The key is shown **once**, as a QR code and as text, and never stored. Even
   *full* may not issue new keys, so a stolen phone cannot mint itself a
   replacement that survives its revocation.
-- Sparrow and hardware wallets use the same tab: your node as their backend,
-  released for your home network only.
+- **BitBoxApp and Trezor Suite over Electrum** — built into the application,
+  with no extra container and no address index. Register an account by its
+  **public** key; Bitcoin Core follows it as a watch-only wallet, and the app
+  sees balance and history from your own node. Signing stays on the device.
+- Sparrow uses the same tab: bitcoind as its backend, released for your home
+  network only.
 
 **📦 Set up by a wizard, not by a manual**
 - `cp example.env .env` → `docker compose up -d` → open the browser. That is
@@ -178,15 +182,26 @@ Two ideas carry the whole project:
                      │   ▼                   │
              SatoshiCortex (app, :3333) ─────┘
              writes the config of every service
+                     ▲
+                     └── Electrum (LAN · .onion) ◄── BitBoxApp · Trezor Suite
 ```
 
 **Four containers**: `app`, `bitcoind`, `lnd`, `tor`. That is all — the news
 feed, the price ticker, the map and the analysis all run as background tasks
 **inside** the application, not as extra services.
 
-There is no Electrum server: Sparrow and friends connect straight to Bitcoin
-Core (Settings → Server → Bitcoin Core), and with `txindex` they gain
-functions that would otherwise require one.
+Sparrow connects straight to Bitcoin Core (Settings → Server → Bitcoin Core),
+and with `txindex` it gains functions that would otherwise need an Electrum
+server.
+
+**BitBoxApp and Trezor Suite speak only Electrum** — so SatoshiCortex answers
+it itself, under *External wallets*. There is no electrs and no index over the
+whole chain: you register an account by its **public** key (xpub, ypub or
+zpub), Bitcoin Core follows it as a watch-only wallet, and the search through
+the chain uses the block filters the node builds anyway. Accounts you have not
+registered show as empty. Both apps pin Electrum protocol 1.4 — the version
+electrs speaks too — and a daily check reads their sources and fails the
+moment either asks for something this service does not answer.
 
 A phone wallet can attach: **Zeus**, under *External wallets*, over Tor or
 over your router's VPN — nothing else. Every device gets its own key with the
@@ -197,16 +212,17 @@ key that may move money may move all of it.
 
 Open to the internet: **8333** and **9735** — the two ports that are *supposed*
 to be open, because they are how you take part. On the LAN: **3333** for the
-web interface. Two more only if you switch them on: bitcoind's RPC for Sparrow,
-and LND's REST port for the VPN route to external wallets. The Tor route needs
-no open port — Tor gives LND an onion address of its own for Zeus. ZMQ and
-gRPC never leave the compose network.
+web interface. Three more only if you switch them on: bitcoind's RPC for
+Sparrow, the Electrum port for BitBoxApp and Trezor Suite, and LND's REST port
+for the VPN route to Zeus. The Tor routes need no open port — Tor gives Zeus
+and the Electrum service onion addresses of their own. ZMQ and gRPC never leave
+the compose network.
 
 **Tor holds the onion services itself.** Three of them — Bitcoin, Lightning and
-the watchtower, each with its own address, plus a fourth for Zeus while a phone
-uses the Tor route — defined in Tor's own configuration
-and pointing at the fixed addresses of `bitcoind` and `lnd` in the compose
-network. Tor recreates them on every start, whoever restarts when, and there is
+the watchtower, each with its own address, plus one for Zeus while a phone
+uses the Tor route and one for the Electrum service while it is switched on —
+defined in Tor's own configuration and pointing at the fixed addresses of
+`bitcoind`, `lnd` and `app` in the compose network. Tor recreates them on every start, whoever restarts when, and there is
 no Tor control port at all. Letting bitcoind and LND create them through
 that control port without naming a target, so Tor forwarded to `127.0.0.1` in
 *its own* container, where nothing listens: the addresses were announced and

@@ -847,6 +847,58 @@ application's own macaroon deliberately lacks the right to issue keys.
 In Zeus, leave certificate verification switched off. Your node's certificate
 is self-signed; the connection is protected by the VPN or by Tor.
 
+### Hardware wallet apps (BitBoxApp, Trezor Suite)
+
+BitBoxApp and Trezor Suite connect only to an Electrum server. SatoshiCortex
+answers the Electrum protocol itself — switch it on under **External
+wallets**. There is no electrs and no address index over the whole chain:
+
+1. You **register an account** with its **public** key — the extended public
+   key the app shows in the account's details (xpub, ypub or zpub). For a
+   plain xpub you also choose the address type, because the key alone does not
+   say which addresses the app derives from it.
+2. Bitcoin Core follows that account as a **watch-only wallet** and searches
+   the chain for its history. It uses the block filters the node builds anyway,
+   so this is quick; an optional "in use since" date shortens it further. The
+   tab shows the progress. Register several accounts and they are searched
+   one after another, never at once; the next one says it is waiting.
+3. The app connects and sees balance and history from your own node. Signing
+   still happens on the device only — the service merely passes on transactions
+   the device has already signed.
+
+**Two routes:**
+
+| Route | What you do | What it costs |
+|---|---|---|
+| **Home network** | In the `.env` set `ELECTRUM_BIND=0.0.0.0` and `ELECTRUM_LAN_PORT=50001` (any free port), and redeploy with the current compose file. | Fast. Only at home, or over your router's VPN. |
+| **Tor** | Nothing beyond switching on Tor in the app. The node creates an onion address of its own while the service is on; give Tor a minute or two. | Slower. |
+
+**TLS or not, on the same port.** Both apps can connect either way; the service
+tells them apart by the first byte. The tab shows the service's certificate and
+its fingerprint: the BitBoxApp takes the certificate for an encrypted
+connection. In Trezor Suite — **desktop only**; the browser and phone versions
+cannot use a server of your own — enter `host:port:s` for TLS or `host:port:t`
+without it. Over Tor the connection is encrypted anyway.
+
+**Never paste a private key** (xprv, zprv …) and never your seed words. A
+private key is refused before it goes anywhere — treat it as exposed if a copy
+of it is lying around.
+
+**What this service cannot do, and what that means:**
+
+- **It knows only registered accounts.** Any other account shows as empty in
+  the app until you register it.
+- **Whoever reaches it sees the history of the registered accounts.** That is
+  why it exists only on your home network and over Tor. **Never forward its
+  port in your router.**
+- **The public key stays in the node.** It is not written to the
+  application's settings, which are readable by the group. Removing an account
+  unloads its watch-only wallet; registering the same key again brings it back
+  with its history.
+- **Protocol 1.4 only** — the version both apps and electrs speak. A daily
+  check (`tools/electrum_waechter.py`) reads both apps' sources and fails the
+  moment either asks for something this service does not answer.
+
 ## What needs backing up — and what does not
 
 Three things, three different answers. Confusing them costs money.

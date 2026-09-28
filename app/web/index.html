@@ -1884,6 +1884,107 @@
           </div>
         </div>
 
+        <!-- Electrum fuer BitBoxApp und Trezor Suite. Aus dem Betrieb,
+             28.09.2026: beide Apps sprechen nur Electrum. Der Server laeuft
+             in der Anwendung; was er ueber Adressen weiss, kommt aus
+             Nur-Lese-Wallets in Core, angelegt mit dem OEFFENTLICHEN
+             Kontoschluessel. Unterschrieben wird weiter nur auf dem Geraet. -->
+        <div class="panel" id="el-panel">
+          <h3 data-i18n="el_titel"></h3>
+          <p class="dim small" data-i18n="el_lead"></p>
+          <label class="switch">
+            <input type="checkbox" id="el-an">
+            <span><b data-i18n="el_schalter"></b></span>
+          </label>
+          <span class="dim small" id="el-schalter-meldung"></span>
+
+          <div id="el-inhalt" class="hidden">
+            <h4 style="margin-top:18px" data-i18n="el_wege_titel"></h4>
+            <div id="el-wege"></div>
+            <details class="erklaerung" id="el-tls">
+              <summary data-i18n="el_tls_titel"></summary>
+              <p class="dim small" data-i18n="el_tls_d"></p>
+              <b data-i18n="el_fingerabdruck"></b>
+              <div class="adresse" id="el-fingerabdruck"></div>
+              <b data-i18n="el_zertifikat"></b>
+              <div class="adresse" id="el-pem" style="white-space:pre-wrap"></div>
+              <div style="display:flex;gap:12px;align-items:center;margin-top:8px">
+                <button type="button" class="btn ghost" id="el-pem-kopieren"
+                        data-i18n="el_pem_kopieren"></button>
+                <span class="dim small" id="el-pem-meldung"></span>
+              </div>
+            </details>
+
+            <h4 style="margin-top:22px" data-i18n="el_konten_titel"></h4>
+            <div id="el-konten"></div>
+            <p class="dim small" id="el-konten-meldung"></p>
+
+            <h4 style="margin-top:22px" data-i18n="el_anmelden_titel"></h4>
+            <p class="dim small" data-i18n="el_anmelden_d"></p>
+            <div class="note warn" data-i18n="el_nie_privat"></div>
+            <label class="feld">
+              <b data-i18n="el_name"></b>
+              <input type="text" id="el-name" maxlength="40" autocomplete="off"
+                     spellcheck="false">
+            </label>
+            <label class="feld">
+              <b data-i18n="el_schluessel"></b>
+              <span class="dim small" data-i18n="el_schluessel_d"></span>
+              <textarea id="el-schluessel" rows="3" maxlength="200"
+                        autocomplete="off" spellcheck="false"
+                        placeholder="zpub…"></textarea>
+            </label>
+            <!-- Nur, wenn der Schluessel die Art offenlaesst (xpub/tpub).
+                 Raten hiesse, im Zweifel eine leere Wallet zu zeigen. -->
+            <div class="wahlgruppe hidden" id="el-art-gruppe" role="radiogroup"
+                 aria-labelledby="el-art-titel">
+              <b id="el-art-titel" data-i18n="el_art"></b>
+              <span class="dim small" data-i18n="el_art_d"></span>
+              <label class="wahl"><input type="radio" name="el-art" value="tr">
+                <span><b data-i18n="el_art_tr"></b></span></label>
+              <label class="wahl"><input type="radio" name="el-art" value="wpkh">
+                <span><b data-i18n="el_art_wpkh"></b></span></label>
+              <label class="wahl"><input type="radio" name="el-art" value="sh-wpkh">
+                <span><b data-i18n="el_art_sh_wpkh"></b></span></label>
+              <label class="wahl"><input type="radio" name="el-art" value="pkh">
+                <span><b data-i18n="el_art_pkh"></b></span></label>
+            </div>
+            <label class="feld">
+              <b data-i18n="el_seit"></b>
+              <span class="dim small" data-i18n="el_seit_d"></span>
+              <input type="date" id="el-seit">
+            </label>
+            <div style="display:flex;gap:12px;align-items:center;margin-top:12px">
+              <button type="button" class="btn" id="el-anmelden"
+                      data-i18n="el_anmelden_knopf"></button>
+              <span class="dim small" id="el-meldung"></span>
+            </div>
+
+            <details class="erklaerung" style="margin-top:18px">
+              <summary data-i18n="el_bitbox_titel"></summary>
+              <ol class="dim small anleitung">
+                <li data-i18n="el_bitbox_1"></li>
+                <li data-i18n="el_bitbox_2"></li>
+                <li data-i18n="el_bitbox_3"></li>
+                <li data-i18n="el_bitbox_4"></li>
+              </ol>
+            </details>
+            <details class="erklaerung">
+              <summary data-i18n="el_trezor_titel"></summary>
+              <ol class="dim small anleitung">
+                <li data-i18n="el_trezor_1"></li>
+                <li data-i18n="el_trezor_2"></li>
+                <li data-i18n="el_trezor_3"></li>
+                <li data-i18n="el_trezor_4"></li>
+              </ol>
+            </details>
+            <details class="erklaerung">
+              <summary data-i18n="el_grenzen"></summary>
+              <p class="dim small" data-i18n="el_grenzen_d"></p>
+            </details>
+          </div>
+        </div>
+
       </section>
 
       <section data-ansicht="rechner" class="hidden">

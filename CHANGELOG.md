@@ -4,6 +4,54 @@ All notable changes to SatoshiCortex. Format loosely after
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning after
 [SemVer](https://semver.org/).
 
+## [1.4.0] — 2026-09-28
+
+### Added: BitBoxApp and Trezor Suite over Electrum — without electrs
+
+Both apps connect only to an Electrum server. SatoshiCortex now answers the
+Electrum protocol itself, under *External wallets* — no extra container, no
+address index over the whole chain, no hours of extra syncing.
+
+You register an account with its **public** key (xpub, ypub or zpub; for a
+plain xpub you pick the address type). Bitcoin Core follows it as a watch-only
+wallet and searches the chain with the block filters the node builds anyway.
+Everything else the apps ask — headers, transactions, merkle proofs, fee
+estimates, broadcasting — comes from Bitcoin Core directly. Signing stays on
+the device; the service only passes on what the device has already signed.
+
+- **Two routes:** your home network (opt-in, see *Upgrading*) and Tor, with an
+  onion address of its own while the service is switched on.
+- **TLS and plain TCP on the same port**, told apart by the first byte. The
+  tab shows the self-signed certificate and its fingerprint for the BitBoxApp.
+- **One search at a time.** Registering several accounts queues them; each
+  waits for the one before, so the node is never searching twice at once. An
+  account whose search had not yet started when the application restarted
+  says so and asks to be registered again — and does not hold up the others.
+- **Private keys are refused** before they go anywhere. The public key is kept
+  only in the node, never in the application's settings.
+- **Protocol 1.4**, the version both apps pin and electrs speaks. A daily
+  check reads both apps' sources and fails the moment either asks for a
+  command or version this service does not answer.
+- Tested end to end against a real Bitcoin Core on regtest: the command
+  sequences of both apps, balances, unspent outputs and history against what a
+  wallet holding the keys reports itself, every header linking to the tip and
+  every merkle proof leading to the header's root, and a payment signed by the
+  "device" and broadcast through this service. These tests now run in CI with
+  the same verified Bitcoin Core release as the image.
+
+### Upgrading
+
+Tor works without any change. For the **home network** route, take the new
+`docker-compose.yml` (it adds one port line to `app`, closed by default) and
+set both lines in your `.env`:
+
+```
+ELECTRUM_BIND=0.0.0.0
+ELECTRUM_LAN_PORT=50001
+```
+
+Never forward that port in your router.
+
 ## [1.3.3] — 2026-09-27
 
 ### Fixed: *Look at the node* called a node reachable without checking

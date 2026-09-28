@@ -18,10 +18,11 @@ import logging
 import socket
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from base64 import b64encode
 from dataclasses import dataclass
-from typing import Any, Dict, Iterator, Optional
+from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
 
 
 log = logging.getLogger(__name__)
@@ -54,7 +55,22 @@ class Beschaeftigt(NichtErreichbar):
 
 
 class RpcFehler(Exception):
-    """bitcoind antwortet, lehnt den Aufruf aber ab."""
+    """bitcoind antwortet, lehnt den Aufruf aber ab.
+
+    code ist Cores Fehlernummer, soweit sie mitkam -- etwa -18 fuer "diese
+    Wallet ist nicht geladen". Ohne sie liesse sich dieser Fall nicht vom
+    Rest unterscheiden, und niemand laedt die Wallet nach.
+    """
+
+    def __init__(self, meldung: str, code: Optional[int] = None) -> None:
+        super().__init__(meldung)
+        self.code = code
+
+
+def _rpc_fehler(fehler: Any) -> RpcFehler:
+    """Aus Cores Fehlerobjekt {"code": .., "message": ..} einen RpcFehler."""
+    code = fehler.get("code") if isinstance(fehler, dict) else None
+    return RpcFehler(str(fehler), code if isinstance(code, int) else None)
 
 
 @dataclass
@@ -65,23 +81,28 @@ class Knoten:
     passwort: str = ""
     zeitlimit: float = 5.0
 
-    def ruf(self, methode: str, *params: Any,
-            zeitlimit: Optional[float] = None) -> Any:
-        """Einen RPC-Aufruf machen.
+    def _pfad(self, wallet: Optional[str]) -> str:
+        """Wohin der Aufruf geht: an den Knoten oder an eine seiner Wallets.
 
-        zeitlimit ueberschreibt das der Instanz fuer diesen einen Aufruf.
-        Gedacht fuer die wenigen Abfragen, deren Antwort gross ist -- das
-        Adressbuch etwa -- ohne deswegen allen anderen Aufrufen die kurze
-        Leine zu nehmen, an der sie einen abwesenden Knoten schnell erkennen.
+        Sobald mehr als eine Wallet geladen ist, verlangt Core den Pfad --
+        an "/" lehnt er Wallet-Aufrufe dann mit HTTP 500 ab (am 28.09.2026
+        an einer Regtest-Kette mit Core v31.1 gemessen). Der Name wird
+        vollstaendig kodiert, damit er den Pfad nicht verlassen kann.
         """
-        rumpf = json.dumps({
-            "jsonrpc": "1.0", "id": "satcortex",
-            "method": methode, "params": list(params),
-        }).encode("utf-8")
+        if not wallet:
+            return "/"
+        return "/wallet/" + urllib.parse.quote(wallet, safe="")
 
+    def _sende(self, pfad: str, rumpf: Any,
+               zeitlimit: Optional[float]) -> Any:
+        """Eine Anfrage schicken und die Antwort als JSON zurueckgeben.
+
+        Hier und nur hier werden die Fehler uebersetzt: Einzelaufruf und
+        Buendel sollen dieselben Ausnahmen werfen.
+        """
         anfrage = urllib.request.Request(
-            f"http://{self.host}:{self.port}/",
-            data=rumpf,
+            f"http://{self.host}:{self.port}{pfad}",
+            data=json.dumps(rumpf).encode("utf-8"),
             headers={
                 "Content-Type": "application/json",
                 "Authorization": "Basic " + b64encode(
@@ -89,10 +110,10 @@ class Knoten:
                 ).decode("ascii"),
             },
         )
+        frist = self.zeitlimit if zeitlimit is None else zeitlimit
         try:
-            frist = self.zeitlimit if zeitlimit is None else zeitlimit
             with urllib.request.urlopen(anfrage, timeout=frist) as antwort:  # nosec B310
-                daten = json.loads(antwort.read().decode("utf-8"))
+                return json.loads(antwort.read().decode("utf-8"))
         except urllib.error.HTTPError as fehler:
             # 401 heisst falsche Zugangsdaten, 500 kommt bei abgelehnten
             # Aufrufen -- beides ist etwas anderes als "nicht da".
@@ -121,9 +142,11 @@ class Knoten:
                     "die Warteschlange von bitcoind ist voll") from fehler
             try:
                 inhalt = json.loads(fehler.read().decode("utf-8"))
-                raise RpcFehler(str(inhalt.get("error", fehler.code))) from fehler
             except (ValueError, AttributeError):
                 raise RpcFehler(f"HTTP {fehler.code}") from fehler
+            if isinstance(inhalt, dict) and inhalt.get("error"):
+                raise _rpc_fehler(inhalt["error"]) from fehler
+            raise RpcFehler(f"HTTP {fehler.code}") from fehler
         except (urllib.error.URLError, socket.timeout, ConnectionError,
                 OSError) as fehler:
             # urllib verpackt das Zeitlimit in URLError -- der Grund steckt
@@ -136,9 +159,61 @@ class Knoten:
                     f"antwortet nicht innerhalb von {frist:.0f} s") from fehler
             raise NichtErreichbar(str(fehler)) from fehler
 
+    def ruf(self, methode: str, *params: Any,
+            zeitlimit: Optional[float] = None,
+            wallet: Optional[str] = None) -> Any:
+        """Einen RPC-Aufruf machen.
+
+        zeitlimit ueberschreibt das der Instanz fuer diesen einen Aufruf.
+        Gedacht fuer die wenigen Abfragen, deren Antwort gross ist -- das
+        Adressbuch etwa -- ohne deswegen allen anderen Aufrufen die kurze
+        Leine zu nehmen, an der sie einen abwesenden Knoten schnell erkennen.
+
+        wallet richtet den Aufruf an eine bestimmte Wallet des Knotens.
+        """
+        daten = self._sende(self._pfad(wallet), {
+            "jsonrpc": "1.0", "id": "satcortex",
+            "method": methode, "params": list(params),
+        }, zeitlimit)
         if daten.get("error"):
-            raise RpcFehler(str(daten["error"]))
+            raise _rpc_fehler(daten["error"])
         return daten.get("result")
+
+    def stapel(self, aufrufe: Sequence[Tuple[str, Sequence[Any]]],
+               zeitlimit: Optional[float] = None,
+               wallet: Optional[str] = None) -> List[Any]:
+        """Mehrere Aufrufe in EINER Anfrage, Ergebnisse in derselben Folge.
+
+        Fuer Electrum: die BitBoxApp holt Blockkoepfe zu Zweitausenden, und
+        zweitausend einzelne HTTP-Anfragen je Stueck waeren schlicht zu
+        langsam.
+
+        Core antwortet auf ein Buendel mit HTTP 200 und setzt Fehler EINZELN
+        je Eintrag (gemessen, Core v31.1). Der erste davon wird geworfen --
+        ein halbes Ergebnis wuerde sonst als ganzes weitergereicht. Die
+        Antworten werden ueber ihre Kennung zugeordnet, nicht ueber ihre
+        Stelle; die Folge ist Core freigestellt.
+        """
+        if not aufrufe:
+            return []
+        antworten = self._sende(self._pfad(wallet), [
+            {"jsonrpc": "1.0", "id": i, "method": methode,
+             "params": list(params)}
+            for i, (methode, params) in enumerate(aufrufe)
+        ], zeitlimit)
+        if not isinstance(antworten, list):
+            raise RpcFehler("Buendel ohne Liste beantwortet")
+        nach_kennung: Dict[Any, Dict] = {
+            a.get("id"): a for a in antworten if isinstance(a, dict)}
+        ergebnisse = []
+        for i in range(len(aufrufe)):
+            antwort = nach_kennung.get(i)
+            if antwort is None:
+                raise RpcFehler(f"keine Antwort auf Eintrag {i} des Buendels")
+            if antwort.get("error"):
+                raise _rpc_fehler(antwort["error"])
+            ergebnisse.append(antwort.get("result"))
+        return ergebnisse
 
     # ------------------------------------------------------------ Strom
     #

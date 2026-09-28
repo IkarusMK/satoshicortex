@@ -649,3 +649,34 @@ def test_ein_unlesbares_buendel_blockiert_nicht_alles_danach(
     assert ablage.eine_tx(HASH_B) is not None, "danach kam nichts mehr an"
     assert ablage.eckdaten()["luecken_24h"] == 1
     ablage.schliesse()
+
+
+# ── Anstoss fuer Electrum (28.09.2026) ─────────────────────────────────────
+#
+# Der Electrum-Server meldet Apps von selbst, wenn sich etwas tut. Woher er
+# es weiss: von hier. Ein Block (C, D) soll sofort auffrischen lassen, der
+# Mempool (A, R) nur gedrosselt -- er bringt auf dem echten Netz mehrere
+# Meldungen je Sekunde.
+
+def test_ein_block_und_der_mempool_stossen_electrum_an(z):
+    angestossen = []
+    z.bei_ereignis = angestossen.append
+    z._eine_nachricht(nachricht("aa" * 32, "D", nummer=0))
+    z._eine_nachricht(nachricht("bb" * 32, "A", folge=1, nummer=1))
+    z._eine_nachricht(nachricht("cc" * 32, "R", folge=2, nummer=2))
+    assert angestossen == [True, False, False]
+
+
+def test_ein_scheiternder_anstoss_haelt_den_zulauf_nicht_an(z):
+    """Der Zulauf ist die Quelle der ganzen Auswertung. Ein Fehler im
+    Electrum-Teil darf ihn nicht mitreissen."""
+    def kaputt(_block):
+        raise RuntimeError("kaputt")
+    z.bei_ereignis = kaputt
+    _melden(z, nachricht("bb" * 32, "A", folge=1, nummer=0))
+    assert z.gesehen == 1
+
+
+def test_ohne_electrum_kein_anstoss(z):
+    assert z.bei_ereignis is None
+    _melden(z, nachricht("bb" * 32, "A", folge=1, nummer=0))

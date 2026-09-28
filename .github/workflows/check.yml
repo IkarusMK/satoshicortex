@@ -48,6 +48,15 @@ jobs:
           python-version: "3.14"
       - working-directory: app/backend
         run: pip install -r requirements-dev.txt
+      # The tests against a real node (tests/regtest_kette.py) need bitcoind.
+      # Same version and same trust anchor as the image; without this step
+      # they would be skipped silently. See tools/core_fuer_tests.sh.
+      - name: Bitcoin Core for the tests against a real node
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pfad=$(tools/core_fuer_tests.sh "$RUNNER_TEMP/core")
+          echo "SATCORTEX_BITCOIND=$pfad" >> "$GITHUB_ENV"
       - name: Tests with coverage
         working-directory: app/backend
         run: pytest --cov=satcortex --cov-report=term-missing --cov-fail-under=80
@@ -175,6 +184,7 @@ jobs:
           shellcheck --shell=sh --severity=style images/common/entrypoint.sh
           shellcheck --shell=sh --severity=style images/common/gesund.sh
           shellcheck --shell=sh --severity=style tools/onion_stapeltest.sh
+          shellcheck --shell=sh --severity=style tools/core_fuer_tests.sh
 
       # In JavaScript, when two functions share a name, the last one silently
       # wins. That is exactly what broke the wizard's save step: a new helper

@@ -88,6 +88,12 @@ class Einrichtung:
     # NIE der Schluessel selbst: der wird einmal angezeigt und dann
     # vergessen. Diese Datei ist fuer die Gruppe lesbar.
     fernzugang: Dict = field(default_factory=dict)
+    # Electrum fuer BitBoxApp und Trezor Suite (seit dem 28.09.2026): ob der
+    # Server laufen soll, und welche Konten angemeldet sind -- mit dem Namen
+    # ihrer Nur-Lese-Wallet in Core. NIE der Kontoschluessel: der verraet
+    # jede Adresse des Kontos, und diese Datei ist fuer die Gruppe lesbar.
+    # Er liegt in Cores Wallet, und nur dort.
+    electrumwahl: Dict = field(default_factory=dict)
 
     # ------------------------------------------------------------ Ablauf
     @property
@@ -189,6 +195,7 @@ class Ablage:
                 knotenausweis=roh.get("knotenausweis", {}),
                 gebuehrenwahl=roh.get("gebuehrenwahl", {}),
                 fernzugang=roh.get("fernzugang", {}),
+                electrumwahl=roh.get("electrumwahl", {}),
             )
         except (json.JSONDecodeError, ValueError):
             # Lieber von vorn anfangen als mit kaputtem Zustand weitermachen.
@@ -258,6 +265,19 @@ class Ablage:
         }
         self.speichern(e)
 
+    # Was von einem angemeldeten Konto festgehalten wird -- und nichts sonst.
+    KONTOFELDER = ("wallet", "name", "art", "angelegt")
+
+    def merke_electrumwahl(self, wahl: Dict) -> None:
+        """Den Electrum-Schalter und die Konten festhalten -- ohne Schluessel."""
+        e = self.laden()
+        e.electrumwahl = {
+            "an": bool(wahl.get("an")),
+            "konten": [{k: konto[k] for k in self.KONTOFELDER if k in konto}
+                       for konto in wahl.get("konten") or []],
+        }
+        self.speichern(e)
+
     def merke_nachrichtenwahl(self, wahl: Dict) -> None:
         e = self.laden()
         e.nachrichtenwahl = dict(wahl)
@@ -283,6 +303,7 @@ class Ablage:
                     "knotenausweis": e.knotenausweis,
                     "gebuehrenwahl": e.gebuehrenwahl,
                     "fernzugang": e.fernzugang,
+                    "electrumwahl": e.electrumwahl,
                 },
                 indent=2, ensure_ascii=False,
             ),

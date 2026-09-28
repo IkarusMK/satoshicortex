@@ -159,3 +159,32 @@ def test_die_geraeteliste_enthaelt_nie_einen_schluessel(tmp_path):
     ablage.merke_fernzugang({"geraete": [{"kennung": 1_000_000,
                                           "macaroon": "0201ab"}]})
     assert "0201ab" not in ablage.datei.read_text()
+
+
+# ── Electrum fuer Hardware-Wallets (28.09.2026) ────────────────────────────
+
+def test_die_electrum_wahl_ueberlebt_speichern_und_laden(tmp_path):
+    ablage = Ablage(str(tmp_path))
+    wahl = {"an": True, "konten": [{
+        "wallet": "satcortex-lesen-0123456789abcdef", "name": "BitBox",
+        "art": "wpkh", "angelegt": "2026-09-28T10:00:00+00:00"}]}
+    ablage.merke_electrumwahl(wahl)
+    assert ablage.laden().electrumwahl == wahl
+
+
+def test_eine_alte_datei_ohne_electrum_laedt_aus(tmp_path):
+    ablage = Ablage(str(tmp_path))
+    ablage.datei.write_text(json.dumps({"schritt": "willkommen"}))
+    assert ablage.laden().electrumwahl == {}
+
+
+def test_der_kontoschluessel_steht_nie_in_der_einstellungsdatei(tmp_path):
+    """Der oeffentliche Kontoschluessel verraet jede Adresse des Kontos --
+    und diese Datei ist fuer die Gruppe lesbar. Er liegt in Cores
+    Nur-Lese-Wallet; hier steht nur deren Name."""
+    ablage = Ablage(str(tmp_path))
+    ablage.merke_electrumwahl({"an": True, "konten": [{
+        "wallet": "satcortex-lesen-0123456789abcdef", "name": "BitBox",
+        "art": "wpkh", "schluessel": "zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9x"}]})
+    assert "zpub" not in ablage.datei.read_text()
+    assert ablage.laden().electrumwahl["an"] is True

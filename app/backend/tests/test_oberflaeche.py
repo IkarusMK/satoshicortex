@@ -3698,3 +3698,73 @@ def test_die_ansicht_zeigt_die_leitung_auch_bei_unbekannten_knoten(js):
     assert ansehen.count("leitungsHinweis(d)") == 1
     # Einmal im Zweig "nicht im Graphen", einmal im Normalfall.
     assert ansehen.count("hinweis(t(leitung[0]), leitung[1])") == 2
+
+
+# ── Electrum im Reiter "Externe Wallets" (28.09.2026) ──────────────────────
+
+def test_jeder_fehler_der_electrum_module_ist_uebersetzt(js):
+    """Die Schluessel kommen dynamisch (fehler.schluessel) -- die
+    Uebersetzungspruefung der CI sieht sie deshalb nicht streng. Hier schon:
+    jeder, den lesewallet oder electrumbetrieb werfen oder merken kann, muss
+    in BEIDEN Sprachen stehen."""
+    import re
+    backend = Path(__file__).resolve().parents[1] / "satcortex"
+    schluessel = set()
+    for name in ("lesewallet.py", "electrumbetrieb.py", "api.py"):
+        quelle = (backend / name).read_text(encoding="utf-8")
+        schluessel |= set(re.findall(r'SchluesselFehler\("(el_[a-z_]+)"\)', quelle))
+        schluessel |= set(re.findall(r'= "(el_[a-z_]+)"', quelle))
+        schluessel |= set(re.findall(r'"meldung": "(el_[a-z_]+)"', quelle))
+    assert len(schluessel) >= 14, schluessel
+    for k in sorted(schluessel):
+        assert js.count(f"    {k}:") == 2, k
+
+
+def test_die_art_wird_nur_gefragt_wenn_der_schluessel_sie_offenlaesst(js):
+    import json
+    faelle = ["xpub6CUG", "tpubDC", "zpub6rFR", "ypub6Ww", "vpub5Y",
+              "  xpub6C", "", None]
+    assert _funktionen_ausfuehren(
+        js, ["elArtNoetig"], f"{json.dumps(faelle)}.map(elArtNoetig)") == [
+        True, True, False, False, False, True, False, False]
+
+
+def test_die_wege_nennen_adresse_oder_grund(js):
+    import json
+    faelle = [
+        {"heimnetz": {"stand": "bereit", "port": 50001},
+         "tor": {"moeglich": True, "adresse": "abc.onion", "port": 50001}},
+        {"heimnetz": {"stand": "aus"}, "tor": {"moeglich": True, "adresse": ""}},
+        {"heimnetz": {"stand": "compose_alt"}, "tor": {"moeglich": False}},
+    ]
+    ergebnis = _funktionen_ausfuehren(
+        js, ["elWege"], f"{json.dumps(faelle)}.map(d => elWege(d, 'nas.lan'))")
+    assert ergebnis == [
+        [["el_weg_heimnetz", {"adresse": "nas.lan:50001"}],
+         ["el_weg_tor", {"adresse": "abc.onion:50001"}]],
+        [["el_weg_heimnetz", {"grund": "el_heimnetz_aus"}],
+         ["el_weg_tor", {"grund": "el_tor_wartet"}]],
+        [["el_weg_heimnetz", {"grund": "el_heimnetz_compose_alt"}],
+         ["el_weg_tor", {"grund": "el_tor_aus"}]],
+    ]
+
+
+def test_ein_konto_sagt_ob_es_sucht_scheiterte_oder_bereit_ist(js):
+    import json
+    faelle = [{"sucht": True, "fortschritt": None},
+              {"sucht": True, "fortschritt": 0.426},
+              {"sucht": True, "wartet": True, "fortschritt": None},
+              {"sucht": False, "fehler": "el_suche_gescheitert"},
+              {"sucht": False, "fehler": "el_unterbrochen"},
+              {"sucht": False, "fehler": None}]
+    assert _funktionen_ausfuehren(
+        js, ["elKontoLage"], f"{json.dumps(faelle)}.map(elKontoLage)") == [
+        ["el_sucht", {}], ["el_sucht_prozent", {"prozent": 43}],
+        ["el_wartet", {}],
+        ["el_suche_gescheitert", {}], ["el_unterbrochen", {}],
+        ["el_bereit", {}]]
+
+
+def test_der_schluessel_bleibt_nach_dem_anmelden_nicht_stehen(js):
+    anmelden = _ohne_js_kommentare(_block(js, "async function electrumKontoAnmelden("))
+    assert '$("#el-schluessel").value = "";' in anmelden
