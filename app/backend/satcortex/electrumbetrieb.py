@@ -16,7 +16,9 @@ Wer wartet, steht als "wartet" da.
 from __future__ import annotations
 
 import datetime
+import ipaddress
 import logging
+import re
 import threading
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Set
@@ -29,6 +31,30 @@ log = logging.getLogger(__name__)
 # Wallet kostet Core beim Start Zeit und bei jedem Block einen Blick.
 KONTEN_HOECHSTENS = 10
 NAME_HOECHSTENS = 40
+
+# Ein Name im Heimnetz: Buchstaben, Ziffern, Bindestrich, Punkte dazwischen
+# -- kein Schema, kein Port, keine Leerzeichen. IP-Adressen prueft
+# ipaddress. Was hier durchgeht, landet in einer Zeile, die jemand in eine
+# App kopiert; mehr als eine Adresse darf darin nicht stehen.
+_NAME = re.compile(r"^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
+                   r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$")
+
+
+def heimnetz_host_pruefen(host: str) -> str:
+    """Die Adresse der NAS im Heimnetz, bereinigt -- oder "" fuer "keine"."""
+    host = (host or "").strip()
+    if not host:
+        return ""
+    try:
+        return str(ipaddress.ip_address(host))
+    except ValueError:
+        pass
+    # Nur Ziffern und Punkte, aber keine gueltige IP (192.168.1.300) ist ein
+    # Tippfehler, kein Name.
+    if _NAME.match(host) and not re.fullmatch(r"[0-9.]+", host):
+        return host
+    raise lesewallet.SchluesselFehler("el_heim_host_ungueltig")
+
 
 # Ein Konto, dessen Wallet es in Core nicht gibt: seine Anmeldung wurde nie
 # fertig -- die Anwendung startete neu, waehrend es auf seine Suche wartete.
@@ -215,6 +241,21 @@ class Betrieb:
         self._bestand.veraltet()
         self.anstossen()
 
+    def heimnetz_host_setzen(self, host: str) -> None:
+        """Die Adresse der NAS im Heimnetz merken.
+
+        Aus dem Betrieb, 29.09.2026: die Karte nahm den Namen aus der
+        Adresszeile des Browsers. Ueber eine Domain hinter einem Reverse
+        Proxy geoeffnet, war das die Domain -- und ueber die geht Electrum
+        nicht. Die Anwendung selbst kann die Adresse nicht wissen: im
+        Container sieht sie nur ihr eigenes Docker-Netz.
+        """
+        host = heimnetz_host_pruefen(host)
+        with self._sperre:
+            wahl = dict(self.zustand.laden().electrumwahl or {})
+            wahl["heimnetz_host"] = host
+            self.zustand.merke_electrumwahl(wahl)
+
     # ── Server ─────────────────────────────────────────────────────────────
 
     @property
@@ -300,5 +341,7 @@ class Betrieb:
             "hoechstens": KONTEN_HOECHSTENS,
             "arten": list(lesewallet.ARTEN),
             "heimnetz": fernzugang.vpn_lage(heimnetz_bind, heimnetz_port),
+            "heimnetz_host": (self.zustand.laden().electrumwahl or {}).get(
+                "heimnetz_host", ""),
             "tls": tls,
         }

@@ -246,6 +246,51 @@ def test_eine_schon_vorhandene_wallet_wird_nur_geladen():
     assert not core.gerufen("importdescriptors")
 
 
+def _core_mit_vorhandenem_konto(zeitstempel):
+    empfang, wechsel = lesewallet.deskriptoren(TPUB_SCHLUESSEL.normiert, "wpkh")
+    core = _core_zum_anmelden(
+        createwallet=rpc.RpcFehler("Database already exists.", -4),
+        loadwallet=rpc.RpcFehler("already loaded", -35),
+        listdescriptors={"descriptors": [
+            {"desc": empfang + "#abcdefgh", "active": True, "range": [0, 1003],
+             "timestamp": zeitstempel, "internal": False},
+            {"desc": wechsel + "#abcdefgh", "active": True, "range": [0, 1001],
+             "timestamp": zeitstempel, "internal": True},
+        ]})
+    return core, empfang, wechsel
+
+
+def test_ein_frueheres_datum_sucht_ab_dort_noch_einmal():
+    """Wer beim ersten Mal ein zu spaetes "benutzt seit" angab, dem fehlte
+    die aeltere Geschichte -- und ein zweites Anmelden aenderte nichts, weil
+    es nur lud. Jetzt sucht Core ab dem frueheren Datum noch einmal. Der
+    Bereich schliesst den bisherigen ein, sonst lehnt Core ab."""
+    core, empfang, wechsel = _core_mit_vorhandenem_konto(1_700_000_000)
+    lesewallet.anmelden(core, TPUB_SCHLUESSEL, "wpkh", seit=1_600_000_000)
+    [(params, wallet)] = core.gerufen("importdescriptors")
+    assert wallet == lesewallet.walletname(TPUB_SCHLUESSEL, "wpkh")
+    assert {(d["desc"].split("#")[0], d["timestamp"], tuple(d["range"]),
+             d["internal"], d["active"]) for d in params[0]} == {
+        (empfang, 1_600_000_000, (0, 1003), False, True),
+        (wechsel, 1_600_000_000, (0, 1001), True, True)}
+
+
+def test_ohne_datum_heisst_auch_beim_zweiten_mal_die_ganze_kette():
+    core, _e, _w = _core_mit_vorhandenem_konto(1_700_000_000)
+    lesewallet.anmelden(core, TPUB_SCHLUESSEL, "wpkh", seit=0)
+    [(params, _wallet)] = core.gerufen("importdescriptors")
+    assert all(d["timestamp"] == 0 for d in params[0])
+
+
+@pytest.mark.parametrize("seit", [1_700_000_000, 1_800_000_000])
+def test_ein_gleiches_oder_spaeteres_datum_sucht_nicht_noch_einmal(seit):
+    """Was schon durchsucht ist, bleibt durchsucht -- ein spaeteres Datum
+    kann nichts hinzufuegen."""
+    core, _e, _w = _core_mit_vorhandenem_konto(1_700_000_000)
+    lesewallet.anmelden(core, TPUB_SCHLUESSEL, "wpkh", seit=seit)
+    assert not core.gerufen("importdescriptors")
+
+
 def test_der_vorrat_wird_ausdruecklich_angegeben():
     """Ohne Angabe nimmt Core seinen Vorgabe-Vorrat und warnt ("Range not
     given, using default keypool range"). Lieber sagen, was gemeint ist."""

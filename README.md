@@ -202,6 +202,15 @@ the chain uses the block filters the node builds anyway. Accounts you have not
 registered show as empty. Both apps pin Electrum protocol 1.4 — the version
 electrs speaks too — and a daily check reads their sources and fails the
 moment either asks for something this service does not answer.
+**What is tested.** Trezor Suite on a real device: balance, history and a
+payment signed on the device and sent through the node, over the home
+network. The BitBoxApp with BitBox's own connection code — its Electrum library
+and the app's certificate, header and merkle checks — against a real Bitcoin
+Core; with a BitBox02 itself not yet. Reports are welcome.
+
+How to connect each app — menu by menu, over the home network or Tor — is in
+the [GUIDE](GUIDE.md#connecting-the-apps-step-by-step). The card in the
+interface shows the finished line for each app, ready to copy.
 
 A phone wallet can attach: **Zeus**, under *External wallets*, over Tor or
 over your router's VPN — nothing else. Every device gets its own key with the

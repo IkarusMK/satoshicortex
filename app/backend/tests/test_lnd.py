@@ -2162,6 +2162,53 @@ def test_unbekannte_meldungen_stoeren_den_strom_nicht():
     assert len(list(lnd.htlc_strom(a))) == 1
 
 
+# ── Wofuer ein HTLC war (29.09.2026) ───────────────────────────────────────
+#
+# Aus dem Betrieb: "UNKNOWN_INVOICE 2x · Kanal 0" -- "was soll man mit diesen
+# infos". Kanal 0 heisst bei LND "kein Kanal": beim Senden ist der eingehende
+# 0, beim Empfangen der ausgehende (router.proto v0.21.3, HtlcEvent).
+
+def test_kanal_null_heisst_kein_kanal():
+    d = list(lnd.htlc_strom(Stromattrappe([_ereignis(
+        "link_fail_event", failure_detail="UNKNOWN_INVOICE")])))[0]
+    assert d["raus_kanal"] == "222"
+    roh = _ereignis("link_fail_event", failure_detail="UNKNOWN_INVOICE")
+    roh["result"]["outgoing_channel_id"] = "0"
+    d = list(lnd.htlc_strom(Stromattrappe([roh])))[0]
+    assert d["raus_kanal"] is None and d["rein_kanal"] == "111"
+
+
+@pytest.mark.parametrize("rein, raus, richtung", [
+    ("111", "222", "weiter"), ("0", "222", "von_dir"), (None, "222", "von_dir"),
+    ("111", "0", "an_dich"), ("111", None, "an_dich"), ("0", "0", "unbekannt")])
+def test_die_richtung_folgt_aus_den_kanaelen(rein, raus, richtung):
+    assert lnd.htlc_richtung(rein, raus) == richtung
+
+
+def test_ohne_einzelheit_zaehlt_der_grund_auf_der_leitung():
+    """failure_detail ist die genauere Angabe -- ausser sie sagt "keine".
+    Dann stand bisher "NO_DETAIL" da, und der eigentliche Grund war weg."""
+    d = list(lnd.htlc_strom(Stromattrappe([_ereignis(
+        "link_fail_event", failure_detail="NO_DETAIL",
+        wire_failure="TEMPORARY_CHANNEL_FAILURE")])))[0]
+    assert d["grund"] == "TEMPORARY_CHANNEL_FAILURE"
+
+
+def test_ein_gelungener_ausgang_bekommt_betrag_und_gebuehr_der_weiterleitung():
+    """settle_event traegt keine Betraege -- die stehen beim forward_event
+    derselben HTLC. Ohne das stand bei "Durchgegangen" nichts."""
+    def mit_ids(feld, **rest):
+        e = _ereignis(feld, **rest)
+        e["result"].update(incoming_htlc_id="7", outgoing_htlc_id="9")
+        if feld == "settle_event":
+            e["result"][feld] = {}
+        return e
+    zeilen = list(lnd.htlc_strom(Stromattrappe([
+        mit_ids("forward_event"), mit_ids("settle_event")])))
+    assert [z["art"] for z in zeilen] == ["weiterleiten", "erledigt"]
+    assert (zeilen[1]["betrag"], zeilen[1]["gebuehr"]) == (1000, 5)
+
+
 # ── Verbindungen: Leitungen, nicht Kanaele (14.09.2026) ────────────────────
 
 class Peerattrappe:

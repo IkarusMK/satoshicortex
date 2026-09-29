@@ -380,3 +380,40 @@ def test_wer_neu_anmeldet_raeumt_die_unterbrechung_weg(betrieb):
     _fertig(betrieb)
     wallet = lesewallet.walletname(lesewallet.lies_schluessel(VPUB), "wpkh")
     assert _konto(betrieb, wallet)["fehler"] is None
+
+
+# ── Die Adresse der NAS im Heimnetz ────────────────────────────────────────
+#
+# Aus dem Betrieb, 29.09.2026: die Karte zeigte den Namen aus der
+# Adresszeile -- geoeffnet ueber eine Domain hinter einem Reverse Proxy war
+# das die Domain, und ueber die geht Electrum nicht.
+
+@pytest.mark.parametrize("host", ["192.0.2.20", "nas.local", "nas",
+                                  "fd00::12", "NAS-1.fritz.box"])
+def test_die_heimnetz_adresse_wird_gemerkt(betrieb, host):
+    betrieb.heimnetz_host_setzen(host)
+    assert betrieb.lage()["heimnetz_host"] == host
+
+
+def test_die_heimnetz_adresse_ueberlebt_das_anmelden_eines_kontos(betrieb):
+    betrieb.heimnetz_host_setzen("192.0.2.20")
+    betrieb.konto_anmelden(VPUB, None, "BitBox", None)
+    _fertig(betrieb)
+    asyncio.run(betrieb.einschalten())
+    asyncio.run(betrieb.ausschalten())
+    assert betrieb.lage()["heimnetz_host"] == "192.0.2.20"
+
+
+def test_leer_heisst_wieder_aus_der_adresszeile(betrieb):
+    betrieb.heimnetz_host_setzen("192.0.2.20")
+    betrieb.heimnetz_host_setzen("  ")
+    assert betrieb.lage()["heimnetz_host"] == ""
+
+
+@pytest.mark.parametrize("host", ["http://192.0.2.20", "192.0.2.20:50001",
+                                  "nas lan", "<b>nas</b>", "x" * 254,
+                                  "192.0.2.20/24", "-nas", "192.168.1.300"])
+def test_eine_unbrauchbare_heimnetz_adresse_wird_abgewiesen(betrieb, host):
+    with pytest.raises(lesewallet.SchluesselFehler) as fehler:
+        betrieb.heimnetz_host_setzen(host)
+    assert fehler.value.schluessel == "el_heim_host_ungueltig"

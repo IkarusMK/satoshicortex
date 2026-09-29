@@ -2110,3 +2110,26 @@ ol.anleitung li { margin: 4px 0; }
   align-items: center;
 }
 .nachbessern-reihe .feld.schmal { margin: 0; max-width: 140px; }
+
+/* Electrum: je Weg eine Ueberschrift, je App eine Zeile zum Kopieren
+   (29.09.2026). Die Adresse steht dort in der Zeile, nicht als eigener
+   Kasten darunter -- sonst rueckt der Knopf von ihr weg. */
+h5.el-weg { margin: 16px 0 2px; font-size: 13px; font-weight: 600; color: var(--dim); }
+.stat .v .adresse { display: inline-block; margin-top: 0; padding: 4px 10px; font-size: 13px; }
+
+/* Deine Verbindungen: je Knoten nachschlagen und den vollen Schluessel
+   kopieren (29.09.2026). Die Leiste gehoert sichtbar zur Zeile darueber. */
+.lv-leiste { display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+             margin: -2px 0 10px; }
+.lv-leiste .adresse { flex-basis: 100%; margin-top: 4px; padding: 6px 10px; font-size: 12.5px; }
+
+/* Was durch deinen Knoten ging: Spalten statt Fliesstext (29.09.2026).
+   Grund, Ergebnis und Weg duerfen umbrechen -- sonst schiebt ein langer
+   Grund die Tabelle weit nach rechts. */
+.ausw-tabelle td.text { white-space: normal; min-width: 11em; }
+.ausw-tabelle th.zahl { text-align: right; padding-right: 0; padding-left: 16px; }
+/* Nach einer rechtsbuendigen Zahl Luft, sonst klebt sie an der naechsten
+   Spalte: "3Beispiel-Knoten". */
+.ausw-tabelle td.zahl + td, .ausw-tabelle th.zahl + th { padding-left: 16px; }
+.ausw-tabelle td.ok { color: var(--ok); }
+.ausw-tabelle td.bad { color: var(--danger); }

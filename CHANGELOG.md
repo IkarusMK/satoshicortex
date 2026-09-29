@@ -4,6 +4,69 @@ All notable changes to SatoshiCortex. Format loosely after
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning after
 [SemVer](https://semver.org/).
 
+## [1.4.1] — 2026-09-29
+
+### Fixed: the Electrum card gives each app the line it accepts
+
+Found at the first test with a real device.
+
+- The card offered `host:port`, and Trezor Suite answers that with *Invalid
+  URL* — it wants `host:port:t`. Each route now shows one line per app, ready
+  to copy: Trezor Suite with `:t`, the BitBoxApp without; an IPv6 address in
+  brackets.
+- The home network address came from the browser's address bar. Opened
+  through a domain behind a reverse proxy, that was the domain — useless for
+  Electrum. The card now takes an IP address or a home-network name from the
+  address bar, and otherwise asks for the server's address once and keeps it.
+- The steps in the interface name the apps' real menus — checked against
+  Trezor Suite 26.9.2 and the BitBoxApp's source — in German and English, and
+  say that a BitBoxApp account can hold a Native SegWit and a Taproot key.
+
+### Fixed: an earlier "in use since" date searches again
+
+Registering an account again with an earlier date now makes the node search
+from that date. Before, a second registration only loaded the wallet, and
+history older than the first date stayed missing. Checked against a real
+Bitcoin Core with the chain's clock moved ten days forward.
+
+### Changed: "What went through your node" says what it means
+
+- Forwarded, to you and from you are shown apart. LND says it in the channel
+  numbers: no incoming channel for a payment you send, no outgoing one for a
+  payment to you. So "channel 0" is gone — also for entries recorded before
+  this version.
+- Every reason LND knows, all 53, in plain language. A warning colour and a
+  concrete step only where there is something to do: a channel out of
+  balance on your side, an amount above your channel maximum, a peer that is
+  not connected.
+- Probes — payments without an invoice that others send to test a route to
+  you — are counted on their own. They are not a fault; nothing to do.
+- Both lists are tables now, like the routes your node has learned: what was
+  turned down (direction, reason, route, count) and the latest events (time,
+  direction, result, amount, fee, route). Channels by name; a forward that
+  went through shows the fee you earned.
+- Where LND's detailed reason says "no detail", the reason on the wire is
+  shown instead of nothing.
+
+### Added: look up and copy every connection
+
+Each line under *Your connections* now has *Look at the node* and *Copy key*.
+Nodes without a name showed only a shortened key before — neither to look up
+nor to copy.
+
+### Fixed: copy buttons never stay silent
+
+Where the clipboard asks for permission and never answers, every copy button
+on the page stayed silent. After a second and a half the text is now marked
+and the button says so. Lists that refresh on their own — the Electrum routes
+while an account is searching, *Your connections* — are only rebuilt when
+something changed, so the *Copied* note stays.
+
+### Upgrading
+
+Only the application image is new; Bitcoin Core, LND and Tor keep running.
+Nothing to change in `docker-compose.yml` or `.env`.
+
 ## [1.4.0] — 2026-09-28
 
 ### Added: BitBoxApp and Trezor Suite over Electrum — without electrs

@@ -2812,6 +2812,59 @@ def _htlc_betrag(roh: Dict) -> tuple:
     return raus // 1000, max(0, rein - raus) // 1000
 
 
+def htlc_kanal(wert: Any) -> Optional[str]:
+    """LNDs Kanalnummer -- None fuer "kein Kanal".
+
+    LND schreibt dafuer 0: beim Senden ist der eingehende Kanal 0, beim
+    Empfangen der ausgehende (router.proto v0.21.3, HtlcEvent). Bis 1.4.0
+    stand deshalb "Kanal 0" in der Oberflaeche (aus dem Betrieb, 29.09.2026).
+    """
+    text = str(wert or "").strip()
+    return None if text in ("", "0") else text
+
+
+def htlc_richtung(rein: Any, raus: Any) -> str:
+    """Wofuer ein HTLC war: weitergeleitet, an uns oder von uns.
+
+    LND sagt es auch in event_type -- die Kanalnummern sagen dasselbe, und
+    sie stehen auch in den Zeilen, die vor 1.4.1 ohne Richtung gemerkt
+    wurden.
+    """
+    rein, raus = htlc_kanal(rein), htlc_kanal(raus)
+    if rein and raus:
+        return "weiter"
+    if raus:
+        return "von_dir"
+    if rein:
+        return "an_dich"
+    return "unbekannt"
+
+
+# Gruende, die eine Probe verraten: jemand schickt eine Zahlung an uns, zu
+# der es keine Rechnung gibt -- um zu sehen, ob der Weg traegt.
+HTLC_PROBEN = ("UNKNOWN_INVOICE", "INCORRECT_OR_UNKNOWN_PAYMENT_DETAILS")
+
+# failure_detail ist die genauere Angabe -- ausser sie sagt "keine". Dann
+# steht der eigentliche Grund in wire_failure.
+_OHNE_EINZELHEIT = ("", "UNKNOWN", "NO_DETAIL")
+
+
+def _htlc_grund(einzelheit: Dict) -> Optional[str]:
+    genau = str(einzelheit.get("failure_detail") or "")
+    if genau not in _OHNE_EINZELHEIT:
+        return genau
+    leitung = str(einzelheit.get("wire_failure") or "")
+    if leitung and leitung != "RESERVED":
+        return leitung
+    return genau or None
+
+
+# So viele begonnene Weiterleitungen werden gemerkt, bis ihr Ausgang kommt.
+# Ein Ausgang ohne Beginn (der Strom hing sich mitten hinein) bleibt eben
+# ohne Betrag.
+HTLC_OFFEN_HOECHSTENS = 1000
+
+
 def htlc_strom(knoten: Knoten):
     """Der laufende Strom. Gibt fertige Zeilen heraus, keine LND-Rohdaten.
 
@@ -2819,6 +2872,10 @@ def htlc_strom(knoten: Knoten):
     an. Ein Strom mit eingebautem Wiederanlauf waere schwerer zu pruefen und
     haette denselben Nutzen.
     """
+    # Betrag und Gebuehr stehen nur beim Beginn (forward_event). Der Ausgang
+    # (settle_event, forward_fail_event) traegt keine -- er bekommt sie ueber
+    # die Nummern der HTLC. Ohne das stand bei "Durchgegangen" nichts.
+    offen: Dict[tuple, tuple] = {}
     for meldung in knoten.strom("/v2/router/htlcevents", macaroon="readonly",
                                 methode="GET", zeitlimit=None):
         e = meldung.get("result") or {}
@@ -2833,21 +2890,28 @@ def htlc_strom(knoten: Knoten):
         if not art:
             continue
         betrag, gebuehr = _htlc_betrag(einzelheit)
-        # Der Grund gibt es nur beim link_fail -- und dort ist er der Punkt.
-        # failure_detail ist die genauere der beiden Angaben; wire_failure
-        # ist das, was die Gegenstelle zu sehen bekam.
-        grund = (einzelheit.get("failure_detail")
-                 or einzelheit.get("wire_failure") or "") or None
+        rein = htlc_kanal(e.get("incoming_channel_id"))
+        raus = htlc_kanal(e.get("outgoing_channel_id"))
+        htlc = (rein, str(e.get("incoming_htlc_id") or ""),
+                raus, str(e.get("outgoing_htlc_id") or ""))
+        if art == "weiterleiten":
+            offen[htlc] = (betrag, gebuehr)
+            while len(offen) > HTLC_OFFEN_HOECHSTENS:
+                offen.pop(next(iter(offen)))
+        elif art in ("erledigt", "fehl") and not betrag:
+            betrag, gebuehr = offen.pop(htlc, (0, 0))
         yield {
             # LND zaehlt in Nanosekunden seit der Epoche.
             "zeit_ms": _zahl(e.get("timestamp_ns")) // 1_000_000
                        or int(time.time() * 1000),
             "art": art,
-            "rein_kanal": str(e.get("incoming_channel_id") or "") or None,
-            "raus_kanal": str(e.get("outgoing_channel_id") or "") or None,
+            "rein_kanal": rein,
+            "raus_kanal": raus,
             "betrag": betrag,
             "gebuehr": gebuehr,
-            "grund": grund,
+            # Einen Grund gibt es nur beim link_fail -- und dort ist er der
+            # Punkt.
+            "grund": _htlc_grund(einzelheit),
         }
 
 

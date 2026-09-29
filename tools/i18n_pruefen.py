@@ -73,7 +73,7 @@ ZUSAMMENGESETZT = {
     # elWege(). Befund vom 28.09.2026.
     "t(titel)": ["el_weg_heimnetz", "el_weg_tor"],
     "t(weg.grund)": ["el_heimnetz_compose_alt", "el_heimnetz_aus",
-                     "el_tor_aus", "el_tor_wartet"],
+                     "el_tor_aus", "el_tor_wartet", "el_heim_host_fehlt"],
     # Die Kopfzeile der Wegwissen-Tafel wird ueber eine Schluesselliste
     # gebaut -- fuenf Spalten, fuenf Texte. Befund vom 22.09.2026.
     "t(k)": ["wg_von", "wg_nach", "wg_trug", "wg_fehl", "wg_wann"],
@@ -143,12 +143,30 @@ ZUSAMMENGESETZT = {
     # statt in der Oberflaeche als leere Zeile.
     't("ht_a_" + e.art)': [
         "ht_a_weiterleiten", "ht_a_erledigt", "ht_a_fehl", "ht_a_link_fehl"],
-    # Die Fehlergruende, die wir uebersetzen. Alles andere zeigt die
-    # Oberflaeche unveraendert -- LNDs Name ist besser als ein leeres Feld.
-    't("ht_g_" + grund.toLowerCase())': [
-        "ht_g_insufficient_balance", "ht_g_htlc_exceeds_max",
-        "ht_g_fee_insufficient", "ht_g_expiry_too_soon",
-        "ht_g_invalid_keysend", "ht_g_channel_disabled"],
+    # Jeder Grund, den LND kennt, als Gruppe aus htlcGrund() -- und der
+    # Handgriff, wo es einen gibt. Ein unbekannter Code bleibt, wie LND ihn
+    # nennt. Befund vom 29.09.2026 ("was soll man mit diesen infos").
+    't(g.text)': [
+        "ht_g_ohne", "ht_g_onion", "ht_g_nicht_bereit", "ht_g_kette",
+        "ht_g_hoechstwert", "ht_g_guthaben", "ht_g_neustart",
+        "ht_g_nicht_hinein", "ht_g_weiter_aus", "ht_g_storniert", "ht_g_betrag",
+        "ht_g_zeitfenster", "ht_g_nicht_offen", "ht_g_teile_zeit", "ht_g_teile",
+        "ht_g_zu_viel", "ht_g_probe", "ht_g_keysend", "ht_g_kreis",
+        "ht_g_extern", "ht_g_mindest", "ht_g_gebuehr", "ht_g_kanal_aus",
+        "ht_g_funktion", "ht_g_naechster", "ht_g_knoten",
+        "ht_g_kanal_dauerhaft", "ht_g_intern"],
+    't(tun)': ["ht_t_guthaben", "ht_t_hoechstwert", "ht_t_partner"],
+    # Wofuer ein HTLC war, und ueber welche Kanaele -- aus htlcWeg().
+    't("ht_r_" + g.richtung)': [
+        "ht_r_weiter", "ht_r_an_dich", "ht_r_von_dir", "ht_r_unbekannt"],
+    't("ht_r_" + e.richtung)': [
+        "ht_r_weiter", "ht_r_an_dich", "ht_r_von_dir", "ht_r_unbekannt"],
+    't(weg, werte)': [
+        "ht_weg_weiter", "ht_weg_an_dich", "ht_weg_von_dir", "ht_weg_unbekannt"],
+    # Die Spaltenkoepfe der beiden Tabellen, aus htlcTabelle().
+    't(spalte)': [
+        "ht_sp_zeit", "ht_sp_richtung", "ht_sp_grund", "ht_sp_weg",
+        "ht_sp_anzahl", "ht_sp_ergebnis", "ht_sp_betrag", "ht_sp_gebuehr"],
     # Was jetzt zu tun ist -- die Faelle aus naechster_schritt() in api.py.
     # Kommt dort einer dazu, faellt es hier auf, statt in der Oberflaeche
     # als leere Zeile zu enden.

@@ -276,6 +276,10 @@ class Ablage:
             "konten": [{k: konto[k] for k in self.KONTOFELDER if k in konto}
                        for konto in wahl.get("konten") or []],
         }
+        # Die Adresse der NAS im Heimnetz, falls jemand sie eingetragen hat
+        # -- nur dann, damit eine Wahl ohne sie gleich bleibt.
+        if wahl.get("heimnetz_host"):
+            e.electrumwahl["heimnetz_host"] = str(wahl["heimnetz_host"])
         self.speichern(e)
 
     def merke_nachrichtenwahl(self, wahl: Dict) -> None:

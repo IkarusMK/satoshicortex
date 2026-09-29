@@ -198,6 +198,15 @@ const I18N = {
     el_wege_titel: "So verbindest du die App",
     el_weg_heimnetz: "Im Heimnetz",
     el_weg_tor: "Über Tor",
+    el_kopieren: "Kopieren",
+    el_wege_fuss: "Trezor Suite: :t ohne Verschlüsselung, :s mit – beides über denselben Port. Die BitBoxApp verschlüsselt, sobald du dort das Zertifikat von unten einfügst. Den Port gibst du im Router nie frei; unterwegs nimmst du Tor.",
+    el_heim_host: "Adresse deiner NAS im Heimnetz",
+    el_heim_host_d: "Die IP-Adresse, unter der die NAS in deinem Heimnetz erreichbar ist – etwa 192.168.1.20. Du findest sie in deinem Router oder in der Oberfläche der NAS.",
+    el_heim_host_warum: "Du hast SatoshiCortex über einen Namen geöffnet, der ins Internet zeigt – etwa über einen Reverse Proxy. Den können die Apps für Electrum nicht nutzen: Sie brauchen die Adresse der NAS in deinem Heimnetz. Trag sie hier ein.",
+    el_heim_host_uebernehmen: "Übernehmen",
+    el_heim_host_gemerkt: "Gemerkt.",
+    el_heim_host_fehlt: "Trag oben die Adresse deiner NAS im Heimnetz ein, dann stehen hier die Zeilen für die Apps.",
+    el_heim_host_ungueltig: "Das nimmt keine App an. Bitte nur die IP-Adresse oder den Namen im Heimnetz – ohne http:// und ohne Port.",
     el_heimnetz_aus: "Aus. Zum Einschalten in der .env ELECTRUM_BIND=0.0.0.0 und ELECTRUM_LAN_PORT=50001 setzen und neu ausrollen.",
     el_heimnetz_compose_alt: "Deine docker-compose.yml ist älter und kennt diesen Weg noch nicht. Übernimm die aktuelle Fassung, dann erscheint er hier.",
     el_tor_aus: "Tor ist in diesem Knoten abgeschaltet.",
@@ -218,7 +227,7 @@ const I18N = {
     el_abmelden_sicher: "Wirklich abmelden?",
     el_abgemeldet: "{name} ist abgemeldet.",
     el_anmelden_titel: "Konto anmelden",
-    el_anmelden_d: "In der App beim Konto die Kontoinformationen öffnen und den erweiterten öffentlichen Schlüssel anzeigen lassen (xpub, ypub oder zpub). Jedes Konto einzeln: Native SegWit und Taproot sind in den Apps getrennte Konten.",
+    el_anmelden_d: "In der App beim Konto den erweiterten öffentlichen Schlüssel anzeigen lassen (xpub, ypub oder zpub) – Trezor Suite: „Details“ → „Public Key anzeigen“; BitBoxApp: „Kontoinformationen“ → „Erweiterter Public Key“. Jeder Schlüssel einzeln: In Trezor Suite sind Native SegWit und Taproot getrennte Konten, in der BitBoxApp hat ein Konto beide – dort wechselst du mit „Taproot anzeigen“ / „Native Segwit anzeigen“.",
     el_nie_privat: "Nur den ÖFFENTLICHEN Schlüssel. Niemals einen privaten Schlüssel (xprv, zprv …) und niemals deine Wörter – die gehören auf Papier und nirgendwo sonst hin. Ein privater Schlüssel wird hier ohnehin abgewiesen.",
     el_name: "Name",
     el_schluessel: "Öffentlicher Kontoschlüssel",
@@ -230,19 +239,19 @@ const I18N = {
     el_art_sh_wpkh: "SegWit in P2SH (3…)",
     el_art_pkh: "Legacy (1…)",
     el_seit: "Benutzt seit (freiwillig)",
-    el_seit_d: "Kürzt die Suche ab. Leer lassen, wenn du es nicht genau weißt – dann durchsucht dein Knoten die ganze Kette; mit seinen Blockfiltern geht das trotzdem zügig.",
+    el_seit_d: "Kürzt die Suche ab. Leer lassen, wenn du es nicht genau weißt – dann durchsucht dein Knoten die ganze Kette; mit seinen Blockfiltern geht das trotzdem zügig. Fehlt später ältere Geschichte, melde dasselbe Konto mit einem früheren Datum noch einmal an: Dann sucht dein Knoten ab dort nach.",
     el_anmelden_knopf: "Anmelden",
     el_angemeldet: "Angemeldet – dein Knoten sucht jetzt die Geschichte des Kontos.",
     el_bitbox_titel: "BitBoxApp verbinden",
-    el_bitbox_1: "In der BitBoxApp in den Einstellungen unter „Erweiterte Einstellungen“ den eigenen Full Node verbinden.",
-    el_bitbox_2: "Als Adresse die Heimnetz-Adresse von oben eintragen – oder die .onion-Adresse, wenn in der BitBoxApp Tor eingeschaltet ist.",
-    el_bitbox_3: "Für eine verschlüsselte Verbindung das Zertifikat von oben einfügen.",
-    el_bitbox_4: "Verbindet die App, erscheinen die angemeldeten Konten mit ihrem Guthaben.",
+    el_bitbox_1: "Einstellungen → „Erweiterte Einstellungen“ → „Eigenen Full Node verbinden“.",
+    el_bitbox_2: "Als Endpunkt die BitBoxApp-Zeile von oben einfügen – ohne :t. Über Tor die .onion-Zeile; dafür vorher „Tor Proxy aktivieren“ einschalten und die BitBoxApp neu starten. Auf dem Rechner muss dazu Tor laufen, etwa der Tor Browser (127.0.0.1:9150).",
+    el_bitbox_3: "Für eine verschlüsselte Verbindung das Zertifikat von oben einfügen – oder „Remote-Zertifikat herunterladen“ und prüfen, dass es genau diesem entspricht. Dann „Überprüfen“ und „Hinzufügen“.",
+    el_bitbox_4: "Die Standardserver aus der Liste entfernen und die BitBoxApp neu starten – solange sie dastehen, ist dein Knoten nur Ersatz, und die App fragt weiter bei BitBox.",
     el_trezor_titel: "Trezor Suite verbinden (Desktop)",
     el_trezor_1: "Einen eigenen Server kann Trezor Suite nur in der Desktop-Fassung nutzen, nicht im Browser und nicht am Telefon.",
-    el_trezor_2: "In den Einstellungen bei Bitcoin das Backend auf einen eigenen Electrum-Server umstellen – dort gehört dieser Dienst hin.",
-    el_trezor_3: "Die Heimnetz-Adresse von oben mit :t anhängen (ohne TLS) oder mit :s (mit TLS), also host:port:t. Über Tor die .onion-Adresse mit :t, wenn Tor in Trezor Suite eingeschaltet ist.",
-    el_trezor_4: "Den öffentlichen Schlüssel zeigt Trezor Suite beim Konto an; das Gerät fragt dafür einmal nach.",
+    el_trezor_2: "Einstellungen → Reiter „Netzwerke“ → bei Bitcoin das Schieberegler-Symbol („Benutzerdefiniertes Backend“) → „Benutzerdefinierter Electrum-Server“ – dort gehört dieser Dienst hin.",
+    el_trezor_3: "Die Trezor-Zeile von oben einfügen, „Neue hinzufügen“, dann „Bestätigen“. Über Tor vorher unter Einstellungen → „Anwendung“ Tor einschalten und die .onion-Zeile nehmen.",
+    el_trezor_4: "Ab dann fragt jedes Bitcoin-Konto in Trezor Suite deinen Knoten. Ein Konto, das du hier nicht angemeldet hast, zeigt 0 – das Geld ist nicht weg. „Trezor (Standard)“ macht es rückgängig.",
     el_grenzen: "Was dieser Dienst kann – und was nicht",
     el_grenzen_d: "Er kennt nur die Konten, die hier angemeldet sind; ein anderes zeigt die App leer an, bis du es anmeldest. Wer den Dienst erreicht, sieht die Geschichte der angemeldeten Konten – deshalb gibt es ihn nur im Heimnetz und über Tor, und den Port leitest du nie im Router weiter. Senden kann er nur, was dein Gerät schon unterschrieben hat.",
     el_kein_schluessel: "Das ist kein gültiger öffentlicher Kontoschlüssel. Erwartet wird ein xpub, ypub oder zpub.",
@@ -329,6 +338,7 @@ const I18N = {
     lv_ein: "eingehend",
     lv_aus: "ausgehend",
     lv_netzkarte: "gleicht die Netzkarte ab",
+    lv_kopieren: "Schlüssel kopieren",
     lv_keine: "Gerade keine Verbindung. Sobald LND läuft, baut er von sich aus welche auf.",
     gegenstelle_abgelehnt: "Diese Adresse hat der Knoten nicht angenommen: {grund}",
     lgw_titel: "Wo du Kanalpartner findest",
@@ -1222,21 +1232,61 @@ const I18N = {
     wt_eigen_ohne: "Dein Turm läuft — aber er hat keine Adresse, unter der ihn jemand von außen erreicht. Damit kann ihn niemand eintragen, und der Beitrag verpufft. Das ändert sich, sobald dein Knoten eine Adresse ankündigt: unter Einstellungen → Sichtbarkeit. Über Tor bekommt der Turm eine eigene .onion, im Clearnet braucht er eine Router-Freigabe auf 9911.",
     wt_eigen_fuss: "Zwei Dinge dazu, damit keine falsche Erwartung entsteht: Der Turm bringt dir KEINE Gebühren ein — LND betreibt ihn ausdrücklich altruistisch, bezahlte Türme sind entworfen, aber nicht scharf. Und du erfährst nie, wen oder wie viel du bewachst: der Turm bekommt verschlüsselte Päckchen, die er erst öffnen kann, wenn die passende Transaktion in der Kette auftaucht. Das ist keine Lücke, sondern der Grund, warum man ihm vertrauen kann.",
     ht_titel: "Was durch deinen Knoten ging",
-    ht_lead: "Nicht nur, was gelungen ist — vor allem, was NICHT gelungen ist und warum. Genau darin steckt der Handgriff: ein Kanal, an dem ständig das Guthaben ausgeht, gehört nachgefüllt oder teurer gemacht.",
-    ht_gruende_titel: "Woran es in den letzten sieben Tagen scheiterte",
-    ht_mal: "{n}× · Kanal {kanal}",
+    ht_lead: "Getrennt nach fremden Zahlungen, die du weiterleitest, Zahlungen an dich und Zahlungen von dir. Die Warnfarbe steht nur dort, wo du etwas tun kannst – etwa bei einem Kanal, dem auf deiner Seite das Guthaben ausgeht.",
+    ht_gruende_titel: "Was in den letzten sieben Tagen abgelehnt wurde",
+    ht_proben: "{n}× in sieben Tagen hat jemand eine Probe an deinen Knoten geschickt: eine Zahlung ohne Rechnung, um zu sehen, ob ein Weg zu dir trägt. Dabei fließt kein Geld. Nichts zu tun – eher ein gutes Zeichen: Dein Knoten wird gefunden.",
     ht_leer: "Noch nichts durchgegangen. Sobald der erste Kanal steht und jemand über dich zahlt, steht es hier.",
-    ht_gebuehr: "{n} sat verdient",
-    ht_a_weiterleiten: "Weiterleitung begonnen",
-    ht_a_erledigt: "Durchgegangen",
-    ht_a_fehl: "Weiter hinten gescheitert",
-    ht_a_link_fehl: "Bei uns gescheitert",
-    ht_g_insufficient_balance: "Guthaben reichte nicht — dieser Kanal ist auf deiner Seite leer",
-    ht_g_htlc_exceeds_max: "Betrag über dem Kanal-Höchstwert",
-    ht_g_fee_insufficient: "Angebotene Gebühr zu niedrig für deine Einstellung",
-    ht_g_expiry_too_soon: "Zeitfenster zu knapp",
-    ht_g_invalid_keysend: "Keysend nicht angenommen",
-    ht_g_channel_disabled: "Kanal war abgeschaltet",
+    ht_sp_zeit: "Zeit",
+    ht_sp_richtung: "Richtung",
+    ht_sp_grund: "Grund",
+    ht_sp_weg: "Weg",
+    ht_sp_anzahl: "Anzahl",
+    ht_sp_ergebnis: "Ergebnis",
+    ht_sp_betrag: "Betrag (sat)",
+    ht_sp_gebuehr: "Gebühr (sat)",
+    ht_r_weiter: "Weitergeleitet",
+    ht_r_an_dich: "An dich",
+    ht_r_von_dir: "Von dir",
+    ht_r_unbekannt: "Unklar",
+    ht_weg_weiter: "{rein} → {raus}",
+    ht_weg_an_dich: "kam über {rein}",
+    ht_weg_von_dir: "ging über {raus}",
+    ht_weg_unbekannt: "ohne Kanal",
+    ht_a_weiterleiten: "begonnen",
+    ht_a_erledigt: "durchgegangen",
+    ht_a_fehl: "weiter hinten gescheitert",
+    ht_a_link_fehl: "abgelehnt: {grund}",
+    ht_g_ohne: "ohne nähere Angabe",
+    ht_g_onion: "Zahlungsanweisung unlesbar – ein Fehler beim Absender",
+    ht_g_nicht_bereit: "Kanal gerade nicht nutzbar – der Partner ist nicht verbunden, oder der Kanal ist noch nicht bereit",
+    ht_g_kette: "Die Zeit lief ab, die Zahlung wurde über die Kette abgewickelt",
+    ht_g_hoechstwert: "Betrag über dem Höchstwert, den du für diesen Kanal erlaubst",
+    ht_g_guthaben: "Guthaben reichte nicht – dieser Kanal ist auf deiner Seite zu leer",
+    ht_g_neustart: "Nach einem Neustart nicht zu Ende gebracht",
+    ht_g_nicht_hinein: "Ließ sich nicht in den Kanal geben",
+    ht_g_weiter_aus: "Weiterleiten ist bei dir abgeschaltet",
+    ht_g_storniert: "Die Rechnung war storniert",
+    ht_g_betrag: "Falscher Betrag – weniger oder anders als verlangt",
+    ht_g_zeitfenster: "Das Zeitfenster passte nicht",
+    ht_g_nicht_offen: "Die Rechnung war nicht mehr offen – schon bezahlt oder abgelaufen",
+    ht_g_teile_zeit: "Eine Zahlung in Teilen kam nicht vollständig an – alles ging an den Absender zurück",
+    ht_g_teile: "Die Teile einer Zahlung passten nicht zusammen",
+    ht_g_zu_viel: "Mehr bezahlt als verlangt – abgelehnt",
+    ht_g_probe: "Probe: eine Zahlung ohne Rechnung, um den Weg zu testen",
+    ht_g_keysend: "Spontanzahlung (Keysend) nicht angenommen",
+    ht_g_kreis: "Kreisweg – hinein und hinaus über denselben Kanal",
+    ht_g_extern: "Von einer externen Prüfung abgelehnt",
+    ht_g_mindest: "Betrag unter dem Mindestbetrag des Kanals",
+    ht_g_gebuehr: "Angebotene Gebühr zu niedrig für deine Einstellung",
+    ht_g_kanal_aus: "Kanal war abgeschaltet",
+    ht_g_funktion: "Eine nötige Funktion fehlte",
+    ht_g_naechster: "Den nächsten Knoten auf dem Weg gibt es nicht",
+    ht_g_knoten: "Ein Knoten auf dem Weg war nicht verfügbar",
+    ht_g_kanal_dauerhaft: "Kanal dauerhaft nicht nutzbar",
+    ht_g_intern: "Interner oder unlesbarer Fehler",
+    ht_t_guthaben: "Was tun: Umschichten füllt den Kanal auf deiner Seite wieder auf. Eine höhere Gebühr auf diesem Kanal lässt weniger darüber laufen.",
+    ht_t_hoechstwert: "Was tun: Soll mehr hindurch, hebe den Höchstwert dieses Kanals an.",
+    ht_t_partner: "Was tun: Prüfe, ob der Kanalpartner erreichbar ist. Bleibt er dauerhaft weg, bindet der Kanal nur Geld.",
     wt_titel: "Wachtürme",
     wt_lead: "Veröffentlicht eine Gegenstelle einen ALTEN Kanalzustand, muss das innerhalb der Zeitsperre bestraft werden — sonst ist das Guthaben weg. Läuft dein Knoten in dem Moment gerade nicht, merkt es niemand. Genau dafür ist ein fremder Wachturm da: er kennt nur den Strafzug und kann damit selbst kein Geld bewegen.",
     wt_keiner: "Kein Wachturm eingetragen. Solange dein Knoten durchläuft, merkt er einen Betrugsversuch selbst — aber bei Stromausfall, Update oder Plattenschaden ist niemand da. Bei einer Wallet auf einem Gerät, das durchlaufen soll, ist das keine Kür.",
@@ -1580,6 +1630,15 @@ const I18N = {
     el_wege_titel: "How to connect the app",
     el_weg_heimnetz: "On your home network",
     el_weg_tor: "Over Tor",
+    el_kopieren: "Copy",
+    el_wege_fuss: "Trezor Suite: :t without encryption, :s with it – both on the same port. The BitBoxApp encrypts once you paste the certificate from below. Never forward the port in your router; away from home, use Tor.",
+    el_heim_host: "Your NAS's address on the home network",
+    el_heim_host_d: "The IP address at which the NAS is reachable on your home network – such as 192.168.1.20. Your router or the NAS's own interface shows it.",
+    el_heim_host_warum: "You opened SatoshiCortex through a name that points to the internet – through a reverse proxy, say. The apps cannot use it for Electrum: they need your NAS's address on the home network. Enter it here.",
+    el_heim_host_uebernehmen: "Apply",
+    el_heim_host_gemerkt: "Saved.",
+    el_heim_host_fehlt: "Enter your NAS's home network address above, and the lines for the apps appear here.",
+    el_heim_host_ungueltig: "No app accepts that. Just the IP address or the name on your home network, please – no http:// and no port.",
     el_heimnetz_aus: "Off. To switch it on, set ELECTRUM_BIND=0.0.0.0 and ELECTRUM_LAN_PORT=50001 in the .env and redeploy.",
     el_heimnetz_compose_alt: "Your docker-compose.yml is older and does not know this route yet. Take the current version and it appears here.",
     el_tor_aus: "Tor is switched off on this node.",
@@ -1600,7 +1659,7 @@ const I18N = {
     el_abmelden_sicher: "Really remove?",
     el_abgemeldet: "{name} has been removed.",
     el_anmelden_titel: "Register an account",
-    el_anmelden_d: "In the app, open the account's information and show its extended public key (xpub, ypub or zpub). One account at a time: Native SegWit and Taproot are separate accounts in the apps.",
+    el_anmelden_d: "In the app, show the account's extended public key (xpub, ypub or zpub) – Trezor Suite: “Details” → “Show public key”; BitBoxApp: “Account information” → “Extended public key”. Each key on its own: in Trezor Suite, Native SegWit and Taproot are separate accounts; in the BitBoxApp one account holds both – switch with “View Taproot” / “View Native Segwit”.",
     el_nie_privat: "Only the PUBLIC key. Never a private key (xprv, zprv …) and never your words – they belong on paper and nowhere else. A private key is refused here anyway.",
     el_name: "Name",
     el_schluessel: "Public account key",
@@ -1612,19 +1671,19 @@ const I18N = {
     el_art_sh_wpkh: "SegWit in P2SH (3…)",
     el_art_pkh: "Legacy (1…)",
     el_seit: "In use since (optional)",
-    el_seit_d: "Shortens the search. Leave it empty if you are not sure – your node then searches the whole chain; with its block filters that is still quick.",
+    el_seit_d: "Shortens the search. Leave it empty if you are not sure – your node then searches the whole chain; with its block filters that is still quick. If older history turns out to be missing, register the same account again with an earlier date: your node then searches from there.",
     el_anmelden_knopf: "Register",
     el_angemeldet: "Registered – your node is now searching the account's history.",
     el_bitbox_titel: "Connect the BitBoxApp",
-    el_bitbox_1: "In the BitBoxApp settings, under “Advanced settings”, connect your own full node.",
-    el_bitbox_2: "Enter the home network address from above – or the .onion address if Tor is switched on in the BitBoxApp.",
-    el_bitbox_3: "For an encrypted connection, paste the certificate from above.",
-    el_bitbox_4: "Once the app connects, the registered accounts appear with their balance.",
+    el_bitbox_1: "Settings → “Advanced settings” → “Connect your own full node”.",
+    el_bitbox_2: "As the endpoint, paste the BitBoxApp line from above – without :t. Over Tor, the .onion line; first switch on “Enable tor proxy” and restart the BitBoxApp. Tor has to run on the computer for that, such as the Tor Browser (127.0.0.1:9150).",
+    el_bitbox_3: "For an encrypted connection, paste the certificate from above – or press “Download remote certificate” and check that it matches this one exactly. Then “Check” and “Add”.",
+    el_bitbox_4: "Remove the default servers from the list and restart the BitBoxApp – as long as they stay, your node is only a fallback and the app keeps asking BitBox.",
     el_trezor_titel: "Connect Trezor Suite (desktop)",
     el_trezor_1: "Trezor Suite can use a server of your own only in its desktop version, not in the browser and not on the phone.",
-    el_trezor_2: "In the settings for Bitcoin, switch the backend to a custom Electrum server – that is where this service goes.",
-    el_trezor_3: "Append :t to the home network address from above (no TLS) or :s (with TLS), i.e. host:port:t. Over Tor, the .onion address with :t, with Tor switched on in Trezor Suite.",
-    el_trezor_4: "Trezor Suite shows the public key with the account; the device asks once to confirm.",
+    el_trezor_2: "Settings → “Networks” tab → the sliders icon next to Bitcoin (“Custom backend”) → “Custom Electrum server” – that is where this service goes.",
+    el_trezor_3: "Paste the Trezor line from above, “Add new”, then “Confirm”. Over Tor, first switch on Tor under Settings → “Application” and use the .onion line.",
+    el_trezor_4: "From then on every Bitcoin account in Trezor Suite asks your node. An account you have not registered here shows 0 – the money is not gone. “Trezor (default)” undoes it.",
     el_grenzen: "What this service can do – and what not",
     el_grenzen_d: "It knows only the accounts registered here; any other account shows as empty in the app until you register it. Anyone who reaches the service sees the history of the registered accounts – which is why it exists only on your home network and over Tor, and you never forward its port in your router. It can only send what your device has already signed.",
     el_kein_schluessel: "That is not a valid public account key. An xpub, ypub or zpub is expected.",
@@ -1711,6 +1770,7 @@ const I18N = {
     lv_ein: "inbound",
     lv_aus: "outbound",
     lv_netzkarte: "syncs the network map",
+    lv_kopieren: "Copy key",
     lv_keine: "No connection right now. Once LND is running it builds some on its own.",
     gegenstelle_abgelehnt: "The node did not accept this address: {grund}",
     lgw_titel: "Where to find channel partners",
@@ -2602,21 +2662,61 @@ const I18N = {
     wt_eigen_ohne: "Your tower is running — but it has no address anyone can reach it at. So nobody can add it, and the contribution goes nowhere. That changes as soon as your node announces an address: under Settings → Visibility. Over Tor the tower gets its own .onion; on the clearnet it needs a router forward on 9911.",
     wt_eigen_fuss: "Two things so no false expectation arises: the tower earns you NO fees — LND runs it explicitly altruistically, and reward towers are designed but not live. And you never learn whom or how much you guard: the tower receives encrypted packets it can only open once the matching transaction appears on chain. That is not a gap, it is the reason it can be trusted.",
     ht_titel: "What went through your node",
-    ht_lead: "Not only what succeeded — above all what did NOT, and why. That is where the actual handle is: a channel that keeps running out of balance wants topping up, or a higher fee.",
-    ht_gruende_titel: "What it failed on over the last seven days",
-    ht_mal: "{n}× · channel {kanal}",
+    ht_lead: "Split into other people's payments you forward, payments to you and payments from you. The warning colour appears only where you can do something – such as a channel running out of balance on your side.",
+    ht_gruende_titel: "What was turned down over the last seven days",
+    ht_proben: "{n}× in seven days someone sent your node a probe: a payment without an invoice, to see whether a route to you holds. No money moves. Nothing to do – if anything a good sign: your node is being found.",
     ht_leer: "Nothing has gone through yet. Once the first channel stands and someone pays through you, it shows up here.",
-    ht_gebuehr: "{n} sat earned",
-    ht_a_weiterleiten: "Forward started",
-    ht_a_erledigt: "Went through",
-    ht_a_fehl: "Failed further along",
-    ht_a_link_fehl: "Failed at our end",
-    ht_g_insufficient_balance: "Not enough balance — this channel is empty on your side",
-    ht_g_htlc_exceeds_max: "Amount above the channel maximum",
-    ht_g_fee_insufficient: "Offered fee too low for your setting",
-    ht_g_expiry_too_soon: "Time window too tight",
-    ht_g_invalid_keysend: "Keysend not accepted",
-    ht_g_channel_disabled: "Channel was disabled",
+    ht_sp_zeit: "Time",
+    ht_sp_richtung: "Direction",
+    ht_sp_grund: "Reason",
+    ht_sp_weg: "Route",
+    ht_sp_anzahl: "Count",
+    ht_sp_ergebnis: "Result",
+    ht_sp_betrag: "Amount (sat)",
+    ht_sp_gebuehr: "Fee (sat)",
+    ht_r_weiter: "Forwarded",
+    ht_r_an_dich: "To you",
+    ht_r_von_dir: "From you",
+    ht_r_unbekannt: "Unclear",
+    ht_weg_weiter: "{rein} → {raus}",
+    ht_weg_an_dich: "came in through {rein}",
+    ht_weg_von_dir: "went out through {raus}",
+    ht_weg_unbekannt: "no channel",
+    ht_a_weiterleiten: "started",
+    ht_a_erledigt: "went through",
+    ht_a_fehl: "failed further along",
+    ht_a_link_fehl: "turned down: {grund}",
+    ht_g_ohne: "no further detail",
+    ht_g_onion: "Payment instructions unreadable – an error on the sender's side",
+    ht_g_nicht_bereit: "Channel not usable right now – the peer is not connected, or the channel is not ready yet",
+    ht_g_kette: "Time ran out, the payment was settled on-chain",
+    ht_g_hoechstwert: "Amount above the maximum you allow for this channel",
+    ht_g_guthaben: "Not enough balance – this channel is too empty on your side",
+    ht_g_neustart: "Not finished after a restart",
+    ht_g_nicht_hinein: "Could not be added to the channel",
+    ht_g_weiter_aus: "Forwarding is switched off on your node",
+    ht_g_storniert: "The invoice was cancelled",
+    ht_g_betrag: "Wrong amount – less than or different from what was asked",
+    ht_g_zeitfenster: "The time window did not fit",
+    ht_g_nicht_offen: "The invoice was no longer open – already paid or expired",
+    ht_g_teile_zeit: "A payment in parts did not arrive in full – everything went back to the sender",
+    ht_g_teile: "The parts of a payment did not match",
+    ht_g_zu_viel: "More paid than asked – turned down",
+    ht_g_probe: "Probe: a payment without an invoice, to test the route",
+    ht_g_keysend: "Spontaneous payment (keysend) not accepted",
+    ht_g_kreis: "Circular route – in and out through the same channel",
+    ht_g_extern: "Turned down by an external check",
+    ht_g_mindest: "Amount below the channel's minimum",
+    ht_g_gebuehr: "Offered fee too low for your setting",
+    ht_g_kanal_aus: "Channel was disabled",
+    ht_g_funktion: "A required feature was missing",
+    ht_g_naechster: "The next node on the route does not exist",
+    ht_g_knoten: "A node on the route was not available",
+    ht_g_kanal_dauerhaft: "Channel permanently unusable",
+    ht_g_intern: "Internal or unreadable error",
+    ht_t_guthaben: "What to do: rebalancing refills the channel on your side. A higher fee on this channel lets less run through it.",
+    ht_t_hoechstwert: "What to do: if more should pass, raise this channel's maximum.",
+    ht_t_partner: "What to do: check whether the peer is reachable. If it stays away for good, the channel only ties up money.",
     wt_titel: "Watchtowers",
     wt_lead: "If a peer publishes an OLD channel state, it has to be punished within the time lock — otherwise the balance is gone. If your node happens to be down at that moment, nobody notices. That is what an outside watchtower is for: it knows only the penalty transaction and cannot move any money with it.",
     wt_keiner: "No watchtower registered. As long as your node keeps running it notices a cheating attempt itself — but during a power cut, an update or a disk failure nobody is there. For a wallet on a machine meant to run continuously, this is not optional.",
@@ -7029,9 +7129,17 @@ function zeichneLnNetz(netz, kanaele, knoten) {
    mit" die Leitungen, unter "Knoten" stand eine Liste der Kanalpartner mit
    der Beschreibung "mit wem du direkt verbunden bist". Wer sich verband,
    fand die Verbindung danach nirgends wieder. */
+// Nur neu bauen, wenn sich etwas geaendert hat: die Liste kommt mit jedem
+// Takt, und ein Neubau nahm die "Kopiert"-Meldung und den aufgedeckten
+// Schluessel gleich wieder weg (Vorschau, 29.09.2026).
+let LV_STAND = "";
+
 function zeichneVerbindungen(verbindungen) {
   const ziel = $("#lv-liste");
   if (!ziel) return;
+  const stand = JSON.stringify([verbindungen, LANG]);
+  if (stand === LV_STAND) return;
+  LV_STAND = stand;
   ziel.textContent = "";
   if (!verbindungen) return;
   if (!verbindungen.length) {
@@ -7046,7 +7154,45 @@ function zeichneVerbindungen(verbindungen) {
                    t(v.eingehend ? "lv_ein" : "lv_aus")];
     if (v.netzkarte) teile.push(t("lv_netzkarte"));
     ziel.append(zeile(v.name || kurz(v.kennung || ""), teile.join(" · ")));
+    if (!v.kennung) continue;
+    // Aus dem Betrieb, 29.09.2026: Knoten ohne Namen standen nur mit dem
+    // gekuerzten Schluessel da -- weder nachschlagbar noch kopierbar.
+    const leiste = document.createElement("div");
+    leiste.className = "lv-leiste";
+    const ansehen = document.createElement("button");
+    ansehen.type = "button";
+    ansehen.className = "btn ghost klein";
+    ansehen.textContent = t("ko_ansehen");
+    ansehen.addEventListener("click", () => verbindungAnsehen(v.kennung));
+    const voll = document.createElement("span");
+    voll.className = "adresse hidden";
+    voll.textContent = v.kennung;
+    const kopieren = document.createElement("button");
+    kopieren.type = "button";
+    kopieren.className = "btn ghost klein";
+    kopieren.textContent = t("lv_kopieren");
+    const meldung = document.createElement("span");
+    meldung.className = "dim small";
+    // Sichtbar, bevor kopiert wird: ueber einfaches HTTP markiert die
+    // zweite Stufe von kopiere() den Text -- das geht nur mit einem, der
+    // dasteht. Und man sieht, was man kopiert hat.
+    kopieren.addEventListener("click", () => {
+      voll.classList.remove("hidden");
+      kopiere(voll, meldung, "lgi_kopiert");
+    });
+    leiste.append(ansehen, kopieren, meldung, voll);
+    ziel.append(leiste);
   }
+}
+
+// Aus der Verbindungsliste nachschlagen: das Feld dafuer steht unter
+// "Kanaele" -- dorthin wechseln, den VOLLEN Schluessel eintragen, das
+// Ergebnis zeigen.
+async function verbindungAnsehen(kennung) {
+  zeigeAnsicht("ln-kanaele");
+  $("#ko-gegenstelle").value = kennung;
+  await gegenstelleAnsehen();
+  $("#ko-befund").scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 /* ── Beitrag ────────────────────────────────────────────────────────────────
@@ -9751,6 +9897,10 @@ function fzErgebnisWeg() {
 
 let EL_DATEN = null;
 let EL_TAKT = null;
+// Wie bei den Verbindungen: die Wege nur neu bauen, wenn sie sich aendern.
+// Solange ein Konto sucht, laedt die Karte alle drei Sekunden -- und ein
+// Neubau nahm die "Kopiert"-Meldung gleich wieder weg (Vorschau, 29.09.2026).
+let EL_WEGE_STAND = "";
 
 // Die Adressarten, als Tabelle mit festen Schluesseln.
 const EL_ARTEN = {
@@ -9768,18 +9918,71 @@ function elArtNoetig(text) {
 
 // Die zwei Wege, jeweils mit Adresse -- oder mit dem Grund, warum es ihn
 // gerade nicht gibt. Nichts wird versteckt, was man einschalten koennte.
-function elWege(d, host) {
+// Woher die Adresse der NAS im Heimnetz kommt.
+//
+// Aus dem Betrieb, 29.09.2026: die Karte nahm den Namen aus der Adresszeile
+// -- geoeffnet ueber eine Domain hinter einem Reverse Proxy war das die
+// Domain, und ueber die geht Electrum nicht. Taugen tut eine IP oder ein
+// Name, der nur im Heimnetz gilt. Die eigene Maschine (127.0.0.1) nie: die
+// App laeuft auf einem anderen Geraet. Wer die Adresse eingetragen hat,
+// dessen Eintrag gilt.
+function elHeimHost(gespeichert, hostname) {
+  if (gespeichert) return { host: gespeichert, quelle: "gespeichert" };
+  const name = String(hostname || "").replace(/^\[|\]$/g, "");
+  const schleife = name === "localhost" || name === "::1" || name.startsWith("127.");
+  const ip = /^\d{1,3}(\.\d{1,3}){3}$/.test(name) || name.includes(":");
+  const heimname = !name.includes(".")
+    || /\.(local|lan|home\.arpa|fritz\.box|internal|localdomain)$/i.test(name);
+  if (name && !schleife && (ip || heimname)) return { host: name, quelle: "seite" };
+  return { host: "", quelle: "fehlt" };
+}
+
+// Je Weg die Zeilen, so wie jede App sie annimmt: Trezor Suite mit :t, die
+// BitBoxApp ohne. Aus dem Betrieb, 29.09.2026: kopiert wurde "host:port",
+// Trezor meldete "Ungueltige URL". Eine IPv6-Adresse in eckigen Klammern --
+// sonst nimmt sie keine der beiden (Trezor: parseElectrumUrl, BitBox:
+// net.SplitHostPort).
+function elZugaenge(d, host) {
   const heim = d.heimnetz || {};
   const tor = d.tor || {};
+  const zeilen = (h, port) => {
+    const adresse = (h.includes(":") ? `[${h}]` : h) + ":" + port;
+    return [["Trezor Suite", adresse + ":t"], ["BitBoxApp", adresse]];
+  };
+  let heimweg;
+  if (heim.stand !== "bereit") {
+    heimweg = { grund: heim.stand === "compose_alt" ? "el_heimnetz_compose_alt"
+                                                    : "el_heimnetz_aus" };
+  } else {
+    heimweg = host ? { zeilen: zeilen(host, heim.port) }
+                   : { grund: "el_heim_host_fehlt" };
+  }
   return [
-    ["el_weg_heimnetz", heim.stand === "bereit"
-      ? { adresse: `${host}:${heim.port}` }
-      : { grund: heim.stand === "compose_alt" ? "el_heimnetz_compose_alt"
-                                              : "el_heimnetz_aus" }],
+    ["el_weg_heimnetz", heimweg],
     ["el_weg_tor", !tor.moeglich ? { grund: "el_tor_aus" }
-      : tor.adresse ? { adresse: `${tor.adresse}:${tor.port}` }
+      : tor.adresse ? { zeilen: zeilen(tor.adresse, tor.port) }
                     : { grund: "el_tor_wartet" }],
   ];
+}
+
+// Eine Zeile zum Kopieren: App, fertige Adresse, Knopf.
+function elKopierzeile(app, text) {
+  const reihe = zeile(app, "");
+  const rechts = document.createElement("span");
+  rechts.className = "v";
+  const feld = document.createElement("span");
+  feld.className = "adresse";
+  feld.textContent = text;
+  const knopf = document.createElement("button");
+  knopf.type = "button";
+  knopf.className = "btn ghost klein";
+  knopf.textContent = t("el_kopieren");
+  const meldung = document.createElement("span");
+  meldung.className = "dim small";
+  knopf.addEventListener("click", () => kopiere(feld, meldung, "lgi_kopiert"));
+  rechts.append(feld, " ", knopf, " ", meldung);
+  reihe.lastChild.replaceWith(rechts);
+  return reihe;
 }
 
 // Was bei einem Konto steht: sucht (mit Fortschritt), gescheitert, bereit.
@@ -9821,20 +10024,30 @@ function zeichneElectrum() {
   $("#el-inhalt").classList.toggle("hidden", !d.an);
   if (!d.an) return;
 
+  const heim = elHeimHost(d.heimnetz_host, location.hostname);
+  const heimBereit = (d.heimnetz || {}).stand === "bereit";
+  $("#el-heim-host-kasten").classList.toggle("hidden", !heimBereit);
+  $("#el-heim-host-warum").classList.toggle("hidden", heim.quelle !== "fehlt");
+  const hostFeld = $("#el-heim-host");
+  if (document.activeElement !== hostFeld) hostFeld.value = heim.host;
+
+  const zugaenge = elZugaenge(d, heim.host);
+  const stand = JSON.stringify([zugaenge, LANG]);
   const wege = $("#el-wege");
-  wege.textContent = "";
-  for (const [titel, weg] of elWege(d, location.hostname)) {
-    if (weg.adresse) {
-      const reihe = zeile(t(titel), "");
-      const feld = document.createElement("span");
-      feld.className = "adresse";
-      feld.textContent = weg.adresse;
-      reihe.lastChild.replaceWith(feld);
-      wege.append(reihe);
-    } else {
-      wege.append(zeile(t(titel), t(weg.grund)));
+  if (stand !== EL_WEGE_STAND) wege.textContent = "";
+  for (const [titel, weg] of stand === EL_WEGE_STAND ? [] : zugaenge) {
+    const kopf = document.createElement("h5");
+    kopf.className = "el-weg";
+    kopf.textContent = t(titel);
+    wege.append(kopf);
+    if (!weg.zeilen) {
+      wege.append(hinweis(t(weg.grund), weg.grund === "el_heim_host_fehlt"
+                                        ? "warn" : ""));
+      continue;
     }
+    for (const [app, text] of weg.zeilen) wege.append(elKopierzeile(app, text));
   }
+  EL_WEGE_STAND = stand;
 
   const tls = d.tls;
   $("#el-tls").classList.toggle("hidden", !tls);
@@ -9861,6 +10074,24 @@ function zeichneElectrum() {
 function elFormularFolgen() {
   $("#el-art-gruppe").classList.toggle(
     "hidden", !elArtNoetig($("#el-schluessel").value));
+}
+
+async function electrumHeimHostSpeichern() {
+  const knopf = $("#el-heim-host-speichern");
+  const meldung = $("#el-heim-host-meldung");
+  knopf.disabled = true;
+  meldung.textContent = "";
+  try {
+    await api("/electrum/heimnetz", "POST", { host: $("#el-heim-host").value });
+    meldung.textContent = t("el_heim_host_gemerkt");
+    await electrumLaden();
+  } catch (e) {
+    if (e && e.abgemeldet) return;
+    const d = e.detail || {};
+    meldung.textContent = t(d.meldung || "e_fehler");
+  } finally {
+    knopf.disabled = false;
+  }
 }
 
 async function electrumSchalten() {
@@ -10462,13 +10693,107 @@ async function gegenstelleAnsehen() {
    Und "INSUFFICIENT_BALANCE" heisst nicht "es ging etwas schief", sondern
    "dieser Kanal ist leer und gehoert nachgefuellt". Das uebersetzen wir,
    statt LNDs Grossbuchstaben auszustellen. */
-const HTLC_GRUENDE_BEKANNT = ["INSUFFICIENT_BALANCE", "HTLC_EXCEEDS_MAX",
-                              "FEE_INSUFFICIENT", "EXPIRY_TOO_SOON",
-                              "INVALID_KEYSEND", "CHANNEL_DISABLED"];
+// Jeder Grund, den LND kennt -- router.proto (FailureDetail) und
+// lightning.proto (Failure.FailureCode), v0.21.3 -- mit seinem Klartext und,
+// wo man etwas tun kann, dem Handgriff. Mehrere Codes teilen sich einen
+// Text, wo sie fuer den Betreiber dasselbe heissen.
+//
+// Aus dem Betrieb, 29.09.2026: "UNKNOWN_INVOICE 2x · Kanal 0 ... was soll man
+// mit diesen infos". Bis dahin waren sechs von 53 Gruenden uebersetzt.
+function htlcGrund(grund, richtung) {
+  const gruppen = {
+    ohne: ["UNKNOWN", "NO_DETAIL"],
+    onion: ["ONION_DECODE", "INVALID_REALM", "INVALID_ONION_VERSION",
+            "INVALID_ONION_HMAC", "INVALID_ONION_KEY", "INVALID_ONION_PAYLOAD",
+            "INVALID_ONION_BLINDING"],
+    nicht_bereit: ["LINK_NOT_ELIGIBLE"],
+    kette: ["ON_CHAIN_TIMEOUT"],
+    hoechstwert: ["HTLC_EXCEEDS_MAX"],
+    guthaben: ["INSUFFICIENT_BALANCE", "TEMPORARY_CHANNEL_FAILURE"],
+    neustart: ["INCOMPLETE_FORWARD"],
+    nicht_hinein: ["HTLC_ADD_FAILED"],
+    weiter_aus: ["FORWARDS_DISABLED"],
+    storniert: ["INVOICE_CANCELED"],
+    betrag: ["INVOICE_UNDERPAID", "SET_TOTAL_TOO_LOW", "INCORRECT_PAYMENT_AMOUNT",
+             "FINAL_INCORRECT_HTLC_AMOUNT"],
+    zeitfenster: ["INVOICE_EXPIRY_TOO_SOON", "FINAL_EXPIRY_TOO_SOON",
+                  "EXPIRY_TOO_SOON", "FINAL_INCORRECT_CLTV_EXPIRY",
+                  "INCORRECT_CLTV_EXPIRY", "EXPIRY_TOO_FAR"],
+    nicht_offen: ["INVOICE_NOT_OPEN", "INVOICE_ALREADY_SETTLED"],
+    teile_zeit: ["MPP_INVOICE_TIMEOUT", "MPP_TIMEOUT"],
+    teile: ["ADDRESS_MISMATCH", "SET_TOTAL_MISMATCH", "MPP_IN_PROGRESS",
+            "AMP_ERROR", "AMP_RECONSTRUCTION", "HTLC_INVOICE_TYPE_MISMATCH"],
+    zu_viel: ["SET_OVERPAID"],
+    probe: ["UNKNOWN_INVOICE", "INCORRECT_OR_UNKNOWN_PAYMENT_DETAILS"],
+    keysend: ["INVALID_KEYSEND"],
+    kreis: ["CIRCULAR_ROUTE"],
+    extern: ["EXTERNAL_VALIDATION_FAILED"],
+    mindest: ["AMOUNT_BELOW_MINIMUM"],
+    gebuehr: ["FEE_INSUFFICIENT"],
+    kanal_aus: ["CHANNEL_DISABLED"],
+    funktion: ["REQUIRED_NODE_FEATURE_MISSING", "REQUIRED_CHANNEL_FEATURE_MISSING"],
+    naechster: ["UNKNOWN_NEXT_PEER"],
+    knoten: ["TEMPORARY_NODE_FAILURE", "PERMANENT_NODE_FAILURE"],
+    kanal_dauerhaft: ["PERMANENT_CHANNEL_FAILURE"],
+    intern: ["INTERNAL_FAILURE", "UNKNOWN_FAILURE", "UNREADABLE_FAILURE"],
+  };
+  // Nur hier gibt es einen Handgriff -- und nur bei dem, was ueber einen
+  // DEINER Kanaele hinausgehen sollte.
+  const handgriff = { guthaben: "ht_t_guthaben", hoechstwert: "ht_t_hoechstwert",
+                      nicht_bereit: "ht_t_partner" };
+  const gruppe = Object.keys(gruppen).find((g) => gruppen[g].includes(grund));
+  if (!gruppe) return { text: grund || "", tun: null, art: "" };
+  if (gruppe === "probe" && richtung === "an_dich") {
+    return { text: "ht_g_probe", tun: null, art: "ok" };
+  }
+  const tun = richtung !== "an_dich" ? handgriff[gruppe] || null : null;
+  return { text: "ht_g_" + gruppe, tun, art: tun ? "warn" : "" };
+}
 
-function htlcGrundText(grund) {
-  return HTLC_GRUENDE_BEKANNT.includes(grund)
-    ? t("ht_g_" + grund.toLowerCase()) : grund;
+// Ueber welche Kanaele -- beim Namen, sonst mit LNDs Nummer. Nie "Kanal 0":
+// das hiess bei LND "kein Kanal" (Senden: kein eingehender, Empfangen: kein
+// ausgehender).
+function htlcWeg(e) {
+  const rein = e.rein_name || e.rein_kanal || "?";
+  const raus = e.raus_name || e.raus_kanal || "?";
+  if (e.richtung === "weiter") return ["ht_weg_weiter", { rein, raus }];
+  if (e.richtung === "an_dich") return ["ht_weg_an_dich", { rein }];
+  if (e.richtung === "von_dir") return ["ht_weg_von_dir", { raus }];
+  return ["ht_weg_unbekannt", {}];
+}
+
+function htlcGrundText(grund, richtung) {
+  const g = htlcGrund(grund, richtung);
+  return g.text.startsWith("ht_g_") ? t(g.text) : g.text;
+}
+
+// Eine Tabelle wie bei den Wegen, die der Knoten gelernt hat: Kopfzeile
+// aus Schluesseln, jede Zelle [Text, Klasse].
+function htlcTabelle(spalten, zeilen) {
+  const rahmen = document.createElement("div");
+  rahmen.className = "ausw-tabelle";
+  const tabelle = document.createElement("table");
+  const kopf = document.createElement("tr");
+  spalten.forEach((spalte, i) => {
+    const th = document.createElement("th");
+    th.textContent = t(spalte);
+    // Wie die Zellen darunter: Zahlenspalten rechtsbuendig.
+    th.className = ((zeilen[0] || [])[i] || [])[1] === "zahl" ? "zahl" : "";
+    kopf.append(th);
+  });
+  tabelle.append(kopf);
+  for (const zeile_ of zeilen) {
+    const tr = document.createElement("tr");
+    for (const [text, klasse] of zeile_) {
+      const td = document.createElement("td");
+      td.className = klasse;
+      td.textContent = text;
+      tr.append(td);
+    }
+    tabelle.append(tr);
+  }
+  rahmen.append(tabelle);
+  return rahmen;
 }
 
 async function durchgangLaden() {
@@ -10486,13 +10811,30 @@ async function durchgangLaden() {
 
   const oben = $("#ht-gruende");
   oben.textContent = "";
-  if (gruende.length) {
-    oben.append(hinweis(t("ht_gruende_titel"), "warn"));
-    for (const g of gruende) {
-      const kanal = g.raus_kanal || g.rein_kanal || "—";
-      oben.append(zeile(htlcGrundText(g.grund),
-                        t("ht_mal", { n: g.anzahl, kanal })));
-    }
+  // Proben zuerst und fuer sich: kein Fehler, eher ein gutes Zeichen.
+  if (d.proben) oben.append(hinweis(t("ht_proben", { n: zahl(d.proben) }), "ok"));
+  // Was abgelehnt wurde -- als Tabelle, nach Richtung geordnet (aus dem
+  // Betrieb, 29.09.2026: "sonst haette man da ne art tabelle draus machen muessen").
+  const reihenfolge = ["weiter", "von_dir", "an_dich", "unbekannt"];
+  const echte = gruende
+    .filter((g) => htlcGrund(g.grund, g.richtung).text !== "ht_g_probe")
+    .sort((a, b) => reihenfolge.indexOf(a.richtung) - reihenfolge.indexOf(b.richtung)
+                    || b.anzahl - a.anzahl);
+  if (echte.length) {
+    const handgriffe = [...new Set(echte.map((g) => htlcGrund(g.grund, g.richtung).tun)
+                                         .filter(Boolean))];
+    oben.append(hinweis(t("ht_gruende_titel"), handgriffe.length ? "warn" : ""));
+    oben.append(htlcTabelle(["ht_sp_richtung", "ht_sp_grund", "ht_sp_weg", "ht_sp_anzahl"],
+      echte.map((g) => {
+        const [weg, werte] = htlcWeg(g);
+        const warn = htlcGrund(g.grund, g.richtung).art === "warn";
+        return [[t("ht_r_" + g.richtung), ""],
+                [htlcGrundText(g.grund, g.richtung), "text" + (warn ? " bad" : "")],
+                [t(weg, werte), "text"],
+                [zahl(g.anzahl), "zahl"]];
+      })));
+    // Jeder Handgriff einmal -- welcher Kanal gemeint ist, steht rot darueber.
+    for (const tun of handgriffe) oben.append(hinweis(t(tun), "warn"));
   }
 
   const liste = $("#ht-liste");
@@ -10501,15 +10843,23 @@ async function durchgangLaden() {
     liste.append(hinweis(t("ht_leer"), ""));
     return;
   }
-  for (const e of ereignisse.slice(0, 25)) {
-    const wert = e.art === "link_fehl"
-      ? htlcGrundText(e.grund)
-      : sats(e.betrag) + (e.gebuehr ? " · " + t("ht_gebuehr",
-                                                { n: zahl(e.gebuehr) }) : "");
-    liste.append(zeile(t("ht_a_" + e.art), wert,
-                       e.art === "erledigt" ? "ok"
-                       : e.art === "link_fehl" ? "bad" : ""));
-  }
+  liste.append(htlcTabelle(["ht_sp_zeit", "ht_sp_richtung", "ht_sp_ergebnis",
+                            "ht_sp_betrag", "ht_sp_gebuehr", "ht_sp_weg"],
+    ereignisse.slice(0, 25).map((e) => {
+      const [weg, werte] = htlcWeg(e);
+      const probe = htlcGrund(e.grund, e.richtung).art === "ok";
+      const ergebnis = e.art === "link_fehl"
+        ? t("ht_a_link_fehl", { grund: htlcGrundText(e.grund, e.richtung) })
+        : t("ht_a_" + e.art);
+      const farbe = e.art === "erledigt" || probe ? " ok"
+        : e.art === "link_fehl" ? " bad" : "";
+      return [[datumZeit(e.zeit_ms), ""],
+              [t("ht_r_" + e.richtung), ""],
+              [ergebnis, "text" + farbe],
+              [e.betrag ? zahl(e.betrag) : "—", "zahl"],
+              [e.gebuehr && e.richtung === "weiter" ? zahl(e.gebuehr) : "—", "zahl"],
+              [t(weg, werte), "text"]];
+    })));
 }
 
 async function wachtuermeLaden() {
@@ -11837,9 +12187,17 @@ async function kopiere(feld, meldung, schluessel) {
   // Und warum es nie auffiel: beim Entwickeln läuft man auf localhost, und
   // das IST ein sicherer Kontext. Der Knopf funktionierte überall außer
   // dort, wo er benutzt wird.
+  //
+  // Und nicht ewig warten: in der Vorschau fragte die Zwischenablage am
+  // 29.09.2026 still um Erlaubnis und antwortete nie -- writeText hing, und
+  // jeder Kopierknopf der Seite blieb stumm. Nach anderthalb Sekunden geht
+  // es mit der zweiten Stufe weiter.
   if (navigator.clipboard && window.isSecureContext) {
     try {
-      await navigator.clipboard.writeText(feld.textContent);
+      await Promise.race([
+        navigator.clipboard.writeText(feld.textContent),
+        new Promise((_, nein) => setTimeout(() => nein(new Error("keine Antwort")), 1500)),
+      ]);
       meldung.textContent = t(schluessel);
       return;
     } catch (e) { /* weiter zur zweiten Stufe */ }
@@ -12825,6 +13183,7 @@ async function start() {
   $("#el-an").addEventListener("change", electrumSchalten);
   $("#el-anmelden").addEventListener("click", electrumKontoAnmelden);
   $("#el-schluessel").addEventListener("input", elFormularFolgen);
+  $("#el-heim-host-speichern").addEventListener("click", electrumHeimHostSpeichern);
   $("#el-pem-kopieren").addEventListener("click", () => kopiere(
     $("#el-pem"), $("#el-pem-meldung"), "lgi_kopiert"));
   $("#fz-fertig").addEventListener("click", fzErgebnisWeg);

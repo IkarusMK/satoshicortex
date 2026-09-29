@@ -3729,24 +3729,82 @@ def test_die_art_wird_nur_gefragt_wenn_der_schluessel_sie_offenlaesst(js):
         True, True, False, False, False, True, False, False]
 
 
-def test_die_wege_nennen_adresse_oder_grund(js):
+def test_die_wege_nennen_fuer_jede_app_die_fertige_zeile(js):
+    """Aus dem Betrieb, 29.09.2026: kopiert wurde "host:port", Trezor Suite
+    wollte "host:port:t" und meldete "Ungueltige URL". Jede App bekommt ihre
+    eigene Zeile, so wie sie sie annimmt: Trezor mit :t, die BitBoxApp ohne.
+    Eine IPv6-Adresse in eckigen Klammern -- sonst nimmt sie keine der
+    beiden (Trezor: parseElectrumUrl, BitBox: net.SplitHostPort)."""
     import json
     faelle = [
-        {"heimnetz": {"stand": "bereit", "port": 50001},
-         "tor": {"moeglich": True, "adresse": "abc.onion", "port": 50001}},
-        {"heimnetz": {"stand": "aus"}, "tor": {"moeglich": True, "adresse": ""}},
-        {"heimnetz": {"stand": "compose_alt"}, "tor": {"moeglich": False}},
+        ({"heimnetz": {"stand": "bereit", "port": 50001},
+          "tor": {"moeglich": True, "adresse": "abc.onion", "port": 50001}},
+         "192.0.2.20"),
+        ({"heimnetz": {"stand": "bereit", "port": 50011},
+          "tor": {"moeglich": False}}, "fd00::12"),
+        ({"heimnetz": {"stand": "bereit", "port": 50001},
+          "tor": {"moeglich": True, "adresse": ""}}, ""),
+        ({"heimnetz": {"stand": "aus"}, "tor": {"moeglich": True, "adresse": ""}},
+         "192.0.2.20"),
+        ({"heimnetz": {"stand": "compose_alt"}, "tor": {"moeglich": False}},
+         "192.0.2.20"),
     ]
     ergebnis = _funktionen_ausfuehren(
-        js, ["elWege"], f"{json.dumps(faelle)}.map(d => elWege(d, 'nas.lan'))")
+        js, ["elZugaenge"],
+        f"{json.dumps(faelle)}.map(([d, h]) => elZugaenge(d, h))")
+    trezor, bitbox = "Trezor Suite", "BitBoxApp"
     assert ergebnis == [
-        [["el_weg_heimnetz", {"adresse": "nas.lan:50001"}],
-         ["el_weg_tor", {"adresse": "abc.onion:50001"}]],
+        [["el_weg_heimnetz", {"zeilen": [[trezor, "192.0.2.20:50001:t"],
+                                         [bitbox, "192.0.2.20:50001"]]}],
+         ["el_weg_tor", {"zeilen": [[trezor, "abc.onion:50001:t"],
+                                    [bitbox, "abc.onion:50001"]]}]],
+        [["el_weg_heimnetz", {"zeilen": [[trezor, "[fd00::12]:50011:t"],
+                                         [bitbox, "[fd00::12]:50011"]]}],
+         ["el_weg_tor", {"grund": "el_tor_aus"}]],
+        [["el_weg_heimnetz", {"grund": "el_heim_host_fehlt"}],
+         ["el_weg_tor", {"grund": "el_tor_wartet"}]],
         [["el_weg_heimnetz", {"grund": "el_heimnetz_aus"}],
          ["el_weg_tor", {"grund": "el_tor_wartet"}]],
         [["el_weg_heimnetz", {"grund": "el_heimnetz_compose_alt"}],
          ["el_weg_tor", {"grund": "el_tor_aus"}]],
     ]
+
+
+def test_die_heimnetz_adresse_kommt_nur_aus_der_adresszeile_wenn_sie_passt(js):
+    """Eine IP oder ein Name, der nur im Heimnetz gilt, taugt. Eine Domain
+    -- etwa hinter einem Reverse Proxy -- zeigt ins Internet, und dorthin
+    gehoert Electrum nie. Ebenso wenig die eigene Maschine (127.0.0.1): die
+    App laeuft auf einem anderen Geraet. Gemerkt geht vor."""
+    import json
+    faelle = [
+        ["", "192.168.1.20"], ["", "nas.local"], ["", "nas"],
+        ["", "nas.fritz.box"], ["", "nas.home.arpa"], ["", "nas.lan"],
+        ["", "satoshicortex.example.de"], ["", "127.0.0.1"], ["", "localhost"],
+        ["", "[fd00::12]"], ["192.0.2.20", "satoshicortex.example.de"],
+    ]
+    ergebnis = _funktionen_ausfuehren(
+        js, ["elHeimHost"], f"{json.dumps(faelle)}.map(([g, h]) => elHeimHost(g, h))")
+    assert ergebnis == [
+        {"host": "192.168.1.20", "quelle": "seite"},
+        {"host": "nas.local", "quelle": "seite"},
+        {"host": "nas", "quelle": "seite"},
+        {"host": "nas.fritz.box", "quelle": "seite"},
+        {"host": "nas.home.arpa", "quelle": "seite"},
+        {"host": "nas.lan", "quelle": "seite"},
+        {"host": "", "quelle": "fehlt"},
+        {"host": "", "quelle": "fehlt"},
+        {"host": "", "quelle": "fehlt"},
+        {"host": "fd00::12", "quelle": "seite"},
+        {"host": "192.0.2.20", "quelle": "gespeichert"},
+    ]
+
+
+def test_jede_zeile_der_wege_hat_einen_kopierknopf(js):
+    zeichnen = _ohne_js_kommentare(_block(js, "function zeichneElectrum("))
+    assert "elZugaenge(" in zeichnen and "elHeimHost(" in zeichnen
+    assert "elKopierzeile(app, text)" in zeichnen
+    zeile_ = _ohne_js_kommentare(_block(js, "function elKopierzeile("))
+    assert "kopiere(feld, meldung" in zeile_
 
 
 def test_ein_konto_sagt_ob_es_sucht_scheiterte_oder_bereit_ist(js):
@@ -3768,3 +3826,213 @@ def test_ein_konto_sagt_ob_es_sucht_scheiterte_oder_bereit_ist(js):
 def test_der_schluessel_bleibt_nach_dem_anmelden_nicht_stehen(js):
     anmelden = _ohne_js_kommentare(_block(js, "async function electrumKontoAnmelden("))
     assert '$("#el-schluessel").value = "";' in anmelden
+
+
+# ── Deine Verbindungen: ansehen und kopieren (29.09.2026) ──────────────────
+#
+# Aus dem Betrieb: drei Knoten ohne Namen, nur der gekuerzte Schluessel --
+# weder nachschlagbar noch kopierbar.
+
+def _ausfuehren_async(js, namen, vorspann, ablauf):
+    """Funktionen aus app.js mit Attrappen fuer das DOM ausfuehren und das
+    Ergebnis eines async-Ablaufs zurueckgeben."""
+    import json
+    import shutil
+    import subprocess
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node nicht vorhanden -- die CI prueft es trotzdem")
+    quelle = vorspann
+    for name in namen:
+        for kopf in (f"async function {name}(", f"function {name}("):
+            if kopf in js:
+                stelle = js.index(kopf)
+                quelle += js[stelle:js.index("\n}\n", stelle) + 2]
+                break
+    lauf = subprocess.run(
+        [node, "-e", quelle + "\n(async () => { const r = await (" + ablauf
+         + "); console.log(JSON.stringify(r)); })().catch((f) => {"
+         " console.log(JSON.stringify({fehler: String(f)})); });"],
+        capture_output=True, text=True)
+    assert lauf.returncode == 0, lauf.stderr
+    return json.loads(lauf.stdout)
+
+
+_DOM = """
+const ELEMENTE = {};
+function $(sel) {
+  if (!ELEMENTE[sel]) ELEMENTE[sel] = {
+    value: "", textContent: "", disabled: false, href: "",
+    classList: { add() {}, remove() {}, toggle() {} },
+    append() {}, scrollIntoView() { this.gescrollt = true; } };
+  return ELEMENTE[sel];
+}
+const t = (k, w) => k;
+const hinweis = (x) => x;
+const zeile = (a, b) => [a, b];
+const zahl = (x) => x;
+const sats = (x) => x;
+const zeichneQr = () => {};
+let ANSICHT = "";
+function zeigeAnsicht(name) { ANSICHT = name; }
+"""
+
+
+def test_scheitert_knoten_ansehen_steht_der_grund_da(js):
+    """Seit "Knoten ansehen" auch aus der Verbindungsliste kommt, landet man
+    dort mit einem Schluessel, den man nicht selbst getippt hat. Scheitert
+    das Nachschlagen, muss der Grund dastehen -- ausgefuehrt, nicht nur
+    gelesen."""
+    ergebnis = _ausfuehren_async(js, ["gegenstelleAnsehen"], _DOM + """
+async function api() { throw { detail: { meldung: "ko_ungueltig" } }; }
+""", """(async () => { await gegenstelleAnsehen();
+       return $("#ko-meldung").textContent; })()""")
+    assert ergebnis == "ko_ungueltig"
+
+
+def test_knoten_ansehen_aus_der_verbindungsliste(js):
+    """Wechselt in den Reiter, in dem das Nachschlagen steht, traegt den
+    VOLLEN Schluessel ein, schlaegt nach und zeigt das Ergebnis."""
+    kennung = "02" + "ab" * 32
+    ergebnis = _ausfuehren_async(
+        js, ["verbindungAnsehen", "gegenstelleAnsehen"], _DOM + """
+let GEFRAGT = null;
+async function api(pfad, art, rumpf) { GEFRAGT = rumpf; return { bekannt: false }; }
+""", f"""(async () => {{ await verbindungAnsehen("{kennung}");
+       return [ANSICHT, $("#ko-gegenstelle").value, GEFRAGT,
+               !!$("#ko-befund").gescrollt]; }})()""")
+    assert ergebnis == ["ln-kanaele", kennung, {"gegenstelle": kennung}, True]
+
+
+def test_jede_verbindung_hat_ansehen_und_kopieren(js):
+    zeichnen = _ohne_js_kommentare(_block(js, "function zeichneVerbindungen("))
+    assert "verbindungAnsehen(v.kennung)" in zeichnen
+    assert "kopiere(" in zeichnen and "v.kennung" in zeichnen
+
+
+# ── Was durch deinen Knoten ging (29.09.2026) ──────────────────────────────
+#
+# Aus dem Betrieb: "UNKNOWN_INVOICE 2x · Kanal 0 ... was soll man mit diesen
+# infos". Jeder Grund, den LND kennt, bekommt einen Klartext; Warnfarbe nur,
+# wo man etwas tun kann; eine Probe ist kein Fehler.
+
+# Aus router.proto (FailureDetail) und lightning.proto (Failure.FailureCode),
+# LND v0.21.3-beta -- ohne die Platzhalter UNKNOWN/RESERVED.
+LND_GRUENDE = """NO_DETAIL ONION_DECODE LINK_NOT_ELIGIBLE ON_CHAIN_TIMEOUT
+HTLC_EXCEEDS_MAX INSUFFICIENT_BALANCE INCOMPLETE_FORWARD HTLC_ADD_FAILED
+FORWARDS_DISABLED INVOICE_CANCELED INVOICE_UNDERPAID INVOICE_EXPIRY_TOO_SOON
+INVOICE_NOT_OPEN MPP_INVOICE_TIMEOUT ADDRESS_MISMATCH SET_TOTAL_MISMATCH
+SET_TOTAL_TOO_LOW SET_OVERPAID UNKNOWN_INVOICE INVALID_KEYSEND MPP_IN_PROGRESS
+CIRCULAR_ROUTE INVOICE_ALREADY_SETTLED HTLC_INVOICE_TYPE_MISMATCH AMP_ERROR
+AMP_RECONSTRUCTION EXTERNAL_VALIDATION_FAILED
+INCORRECT_OR_UNKNOWN_PAYMENT_DETAILS INCORRECT_PAYMENT_AMOUNT
+FINAL_INCORRECT_CLTV_EXPIRY FINAL_INCORRECT_HTLC_AMOUNT FINAL_EXPIRY_TOO_SOON
+INVALID_REALM EXPIRY_TOO_SOON INVALID_ONION_VERSION INVALID_ONION_HMAC
+INVALID_ONION_KEY AMOUNT_BELOW_MINIMUM FEE_INSUFFICIENT INCORRECT_CLTV_EXPIRY
+CHANNEL_DISABLED TEMPORARY_CHANNEL_FAILURE REQUIRED_NODE_FEATURE_MISSING
+REQUIRED_CHANNEL_FEATURE_MISSING UNKNOWN_NEXT_PEER TEMPORARY_NODE_FAILURE
+PERMANENT_NODE_FAILURE PERMANENT_CHANNEL_FAILURE EXPIRY_TOO_FAR MPP_TIMEOUT
+INVALID_ONION_PAYLOAD INVALID_ONION_BLINDING INTERNAL_FAILURE UNKNOWN_FAILURE
+UNREADABLE_FAILURE""".split()
+
+
+def test_jeder_grund_von_lnd_hat_einen_klartext_in_beiden_sprachen(js):
+    import json
+    ergebnis = _funktionen_ausfuehren(
+        js, ["htlcGrund"],
+        f"{json.dumps(LND_GRUENDE)}.map(g => htlcGrund(g, 'weiter'))")
+    for grund, e in zip(LND_GRUENDE, ergebnis):
+        assert e["text"].startswith("ht_g_"), grund
+        for schluessel in [e["text"]] + ([e["tun"]] if e["tun"] else []):
+            assert js.count(f"    {schluessel}: ") == 2, (grund, schluessel)
+
+
+def test_warnfarbe_nur_wo_man_etwas_tun_kann(js):
+    import json
+    faelle = [["INSUFFICIENT_BALANCE", "weiter"], ["INSUFFICIENT_BALANCE", "von_dir"],
+              ["UNKNOWN_INVOICE", "an_dich"],
+              ["INCORRECT_OR_UNKNOWN_PAYMENT_DETAILS", "an_dich"],
+              ["MPP_INVOICE_TIMEOUT", "an_dich"], ["NO_DETAIL", "weiter"],
+              ["GANZ_NEU", "weiter"]]
+    assert _funktionen_ausfuehren(
+        js, ["htlcGrund"],
+        f"{json.dumps(faelle)}.map(([g, r]) => htlcGrund(g, r))") == [
+        {"text": "ht_g_guthaben", "tun": "ht_t_guthaben", "art": "warn"},
+        {"text": "ht_g_guthaben", "tun": "ht_t_guthaben", "art": "warn"},
+        {"text": "ht_g_probe", "tun": None, "art": "ok"},
+        {"text": "ht_g_probe", "tun": None, "art": "ok"},
+        {"text": "ht_g_teile_zeit", "tun": None, "art": ""},
+        {"text": "ht_g_ohne", "tun": None, "art": ""},
+        {"text": "GANZ_NEU", "tun": None, "art": ""}]
+
+
+def test_der_weg_nennt_kanaele_beim_namen_und_nie_kanal_null(js):
+    import json
+    faelle = [
+        {"richtung": "weiter", "rein_kanal": "1", "raus_kanal": "2",
+         "rein_name": "Alpha", "raus_name": "Beta"},
+        {"richtung": "an_dich", "rein_kanal": "1", "raus_kanal": None,
+         "rein_name": "Alpha", "raus_name": ""},
+        {"richtung": "von_dir", "rein_kanal": None, "raus_kanal": "77",
+         "rein_name": "", "raus_name": ""},
+    ]
+    assert _funktionen_ausfuehren(
+        js, ["htlcWeg"], f"{json.dumps(faelle)}.map(htlcWeg)") == [
+        ["ht_weg_weiter", {"rein": "Alpha", "raus": "Beta"}],
+        ["ht_weg_an_dich", {"rein": "Alpha"}],
+        ["ht_weg_von_dir", {"raus": "77"}]]
+
+
+def test_die_karte_trennt_richtungen_und_zeigt_proben(js):
+    laden = _ohne_js_kommentare(_block(js, "async function durchgangLaden("))
+    assert "htlcGrund(" in laden and "htlcWeg(" in laden
+    assert "d.proben" in laden and '"ht_r_"' in laden
+    assert "Kanal {kanal}" not in js and "channel {kanal}" not in js
+
+
+def test_ablehnungen_und_ereignisse_stehen_in_tabellen(js):
+    """Aus dem Betrieb, 29.09.2026: "ich hoffe das wird nicht zu unuebersichtlich
+    sonst haette man da ne art tabelle draus machen muessen". Zeit, Richtung,
+    Ergebnis, Betrag, Gebuehr und Weg hintereinander in einer Zeile lasen
+    sich schwer -- also Spalten, wie bei den Wegen, die der Knoten gelernt
+    hat."""
+    import re
+    laden = re.sub(r"\s+", " ", _ohne_js_kommentare(
+        _block(js, "async function durchgangLaden(")))
+    for spalten in (
+            '["ht_sp_richtung", "ht_sp_grund", "ht_sp_weg", "ht_sp_anzahl"]',
+            '["ht_sp_zeit", "ht_sp_richtung", "ht_sp_ergebnis", '
+            '"ht_sp_betrag", "ht_sp_gebuehr", "ht_sp_weg"]'):
+        assert f"htlcTabelle({spalten}" in laden
+    tabelle = _ohne_js_kommentare(_block(js, "function htlcTabelle("))
+    assert "ausw-tabelle" in tabelle and "t(spalte)" in tabelle
+
+
+def test_ein_kopierknopf_bleibt_nie_stumm(js):
+    """Gefunden in der Vorschau, 29.09.2026: die Zwischenablage fragte um
+    Erlaubnis und antwortete nie -- writeText blieb haengen, und JEDER
+    Kopierknopf der Seite blieb stumm. Jetzt wird hoechstens kurz gewartet,
+    dann markiert und gesagt, was zu tun ist."""
+    ergebnis = _ausfuehren_async(js, ["kopiere"], """
+const t = (k) => k;
+Object.defineProperty(globalThis, "navigator", { configurable: true,
+  value: { clipboard: { writeText: () => new Promise(() => {}) } } });
+Object.defineProperty(globalThis, "window", { configurable: true, value: {
+  isSecureContext: true,
+  getSelection: () => ({ removeAllRanges() {}, addRange() {} }) } });
+Object.defineProperty(globalThis, "document", { configurable: true, value: {
+  createRange: () => ({ selectNodeContents() {} }), execCommand: () => false } });
+""", """(async () => { const m = { textContent: "" };
+       await kopiere({ textContent: "x" }, m, "lgi_kopiert");
+       return m.textContent; })()""")
+    assert ergebnis == "kopieren_von_hand"
+
+
+def test_listen_mit_kopierknoepfen_werden_nur_bei_aenderung_neu_gebaut(js):
+    """Gefunden in der Vorschau, 29.09.2026: beide Listen kommen im Takt,
+    und jeder Neubau nahm die "Kopiert"-Meldung gleich wieder weg."""
+    verbindungen = _ohne_js_kommentare(_block(js, "function zeichneVerbindungen("))
+    assert "if (stand === LV_STAND) return;" in verbindungen
+    electrum = _ohne_js_kommentare(_block(js, "function zeichneElectrum("))
+    assert "stand !== EL_WEGE_STAND" in electrum
+    assert "EL_WEGE_STAND = stand;" in electrum

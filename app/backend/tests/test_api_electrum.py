@@ -209,3 +209,24 @@ def test_ueberlange_eingaben_werden_abgewiesen(client, core):
     antwort = client.post("/api/electrum/konto", json={
         "schluessel": "x" * 5000, "name": "BitBox"})
     assert antwort.status_code == 422
+
+
+def test_die_heimnetz_adresse_setzen_und_lesen(client):
+    assert client.get("/api/electrum").json()["heimnetz_host"] == ""
+    antwort = client.post("/api/electrum/heimnetz", json={"host": "192.0.2.20"})
+    assert antwort.status_code == 200
+    assert client.get("/api/electrum").json()["heimnetz_host"] == "192.0.2.20"
+
+
+def test_eine_unbrauchbare_heimnetz_adresse_kommt_mit_grund_zurueck(client):
+    antwort = client.post("/api/electrum/heimnetz",
+                          json={"host": "http://192.0.2.20"})
+    assert antwort.status_code == 400
+    assert antwort.json()["detail"]["meldung"] == "el_heim_host_ungueltig"
+
+
+def test_die_heimnetz_adresse_nur_angemeldet(tmp_path, monkeypatch, ohne_netz):
+    _platz(monkeypatch, 4000)
+    c = _client(tmp_path, anmelden=False)
+    assert c.post("/api/electrum/heimnetz",
+                  json={"host": "192.0.2.20"}).status_code == 401

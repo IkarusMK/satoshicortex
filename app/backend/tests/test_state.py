@@ -188,3 +188,14 @@ def test_der_kontoschluessel_steht_nie_in_der_einstellungsdatei(tmp_path):
         "art": "wpkh", "schluessel": "zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9x"}]})
     assert "zpub" not in ablage.datei.read_text()
     assert ablage.laden().electrumwahl["an"] is True
+
+
+def test_die_heimnetz_adresse_fuer_electrum_bleibt_stehen(tmp_path):
+    """Die Adresse der NAS im Heimnetz -- gemerkt, weil die Seite sie nicht
+    kennen kann, wenn sie ueber einen Namen geoeffnet wird (29.09.2026)."""
+    ablage = Ablage(str(tmp_path))
+    ablage.merke_electrumwahl({"an": True, "konten": [],
+                               "heimnetz_host": "192.0.2.20"})
+    assert ablage.laden().electrumwahl["heimnetz_host"] == "192.0.2.20"
+    ablage.merke_electrumwahl({"an": True, "konten": []})
+    assert "heimnetz_host" not in ablage.laden().electrumwahl

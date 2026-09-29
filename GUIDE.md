@@ -873,12 +873,107 @@ wallets**. There is no electrs and no address index over the whole chain:
 | **Home network** | In the `.env` set `ELECTRUM_BIND=0.0.0.0` and `ELECTRUM_LAN_PORT=50001` (any free port), and redeploy with the current compose file. | Fast. Only at home, or over your router's VPN. |
 | **Tor** | Nothing beyond switching on Tor in the app. The node creates an onion address of its own while the service is on; give Tor a minute or two. | Slower. |
 
-**TLS or not, on the same port.** Both apps can connect either way; the service
-tells them apart by the first byte. The tab shows the service's certificate and
-its fingerprint: the BitBoxApp takes the certificate for an encrypted
-connection. In Trezor Suite — **desktop only**; the browser and phone versions
-cannot use a server of your own — enter `host:port:s` for TLS or `host:port:t`
-without it. Over Tor the connection is encrypted anyway.
+**TLS or not, on the same port.** Both apps can connect either way; the
+service tells them apart by the first byte. Over Tor the connection is
+encrypted anyway.
+
+#### Connecting the apps, step by step
+
+Everything the apps need is on the Electrum service card under *External
+wallets*: for each route and each app **the finished line to copy** — for
+Trezor Suite with `:t` at the end, for the BitBoxApp without — and the
+certificate. Below, `NAS` stands for your server's **IP address in the home
+network** and `50001` for the port you set as `ELECTRUM_LAN_PORT`. **One port
+for both**, with and without TLS — the `50002` in Trezor Suite's example is
+only an example.
+
+**Opened SatoshiCortex through a domain name** (a reverse proxy)? Then the
+page cannot know your server's address in the home network, and that domain
+is no use for Electrum: it points to the internet, and the proxy does not
+carry Electrum. The card asks for the address instead — enter the server's
+IP address there once; it is kept.
+
+The menu names are the apps' own, in English; checked against Trezor Suite
+26.9.2 and the BitBoxApp's source.
+
+**Once, before either app:**
+
+1. **Home network only:** in the `.env`, set `ELECTRUM_BIND=0.0.0.0` and
+   `ELECTRUM_LAN_PORT=50001` (any port that is free on the server) and
+   redeploy with the current `docker-compose.yml`. For Tor alone, skip this.
+2. *External wallets* → switch on the Electrum service. With Tor on, the
+   onion address appears after a minute or two; Tor restarts once for it.
+3. **Register the account** with its public key and wait until it says
+   *ready*. Several accounts are searched one after another. If older history
+   turns out to be missing, register the same account again with an earlier
+   "in use since" date — the node then searches from there. Where the apps
+   show the key:
+   - **BitBoxApp:** open the account → *Account information* → *Extended
+     public key*. One BitBoxApp account can hold **several** keys — Native
+     SegWit and Taproot; switch with *View Taproot* / *View Native Segwit*.
+     Register each one you use as an account of its own; a key you leave out
+     shows as empty. For a Taproot key starting with `xpub`, choose *Taproot*
+     as the type.
+   - **Trezor Suite:** open the account → *Details* → *Show public key*; the
+     device asks you to confirm. Every Bitcoin account in Trezor Suite has a
+     key of its own — register each one you want to see.
+
+**BitBoxApp**
+
+1. *Settings → Advanced settings → Connect your own full node.*
+2. **Step 1, endpoint:** the BitBoxApp line from the card, `NAS:50001` — over
+   Tor, the .onion line (see below).
+3. **Step 2, certificate:** for an encrypted connection, paste the
+   certificate from the card. Or press *Download remote certificate* and
+   compare it with the card — they must match exactly. Leave the field empty
+   to connect without TLS.
+4. **Step 3:** *Check*, then *Add*.
+5. **Remove the default servers** from the list and restart the BitBoxApp.
+   The app itself says why: as long as they stay, your node is only a
+   fallback, and the app keeps asking BitBox's servers about your addresses.
+
+**Over Tor:** the BitBoxApp needs a Tor running on the same computer — the
+Tor Browser (port `9150`) or a Tor service (`9050`). *Advanced settings →
+Enable tor proxy → Set proxy address* `127.0.0.1:9150` (or `9050`), close the
+BitBoxApp completely and open it again, then use the .onion address as the
+endpoint.
+
+**Trezor Suite (the desktop program)**
+
+Checked against Trezor Suite 26.9.2 for macOS; the German names in brackets.
+
+1. *Settings* (*Einstellungen*) → tab *Networks* (*Netzwerke*).
+2. On the **Bitcoin** card, click the small sliders icon — its tooltip reads
+   *Custom backend* (*Benutzerdefiniertes Backend*).
+3. Under *Backend*, switch *Trezor (default)* to *Custom Electrum server*
+   (*Benutzerdefinierter Electrum-Server*).
+4. Paste the Trezor Suite line from the card — `NAS:50001:t` without TLS,
+   or change the `t` to `s` for TLS — click *Add new* (*Neue hinzufügen*), then
+   *Confirm* (*Bestätigen*).
+5. **Over Tor:** first *Settings → Application → Tor* (*Einstellungen →
+   Anwendung → Tor*) on, wait until Tor is connected, then enter the .onion
+   address as `….onion:50001:t` in step 4.
+
+From then on, **every** Bitcoin account in Trezor Suite asks your node — an
+account you have not registered shows 0 until you do. Switching back to
+*Trezor (default)* undoes it. The browser and phone versions of Trezor Suite
+cannot use a server of your own.
+
+**If the app does not connect:**
+
+- **The card says the home network route is closed:** `ELECTRUM_BIND` or
+  `ELECTRUM_LAN_PORT` is missing in the `.env`, or the project was not
+  redeployed with the new `docker-compose.yml`.
+- **The web interface itself no longer starts after the redeploy:** the port
+  is taken on the server. Pick another one for `ELECTRUM_LAN_PORT`, redeploy,
+  and enter that number in the app.
+- **It connects but shows 0:** the account is still searching, or it is not
+  registered — in the BitBoxApp, check that every key of the account is.
+- **Trezor Suite says *Invalid URL* (*Ungültige URL*):** it takes exactly
+  `host:port:t` or `host:port:s` — no `http://`, nothing missing at the end,
+  and no space before or after, which easily comes along when copying.
+- **Trezor Suite refuses `:s`:** use `:t`. At home the difference is small,
+  and over Tor the connection is encrypted anyway.
 
 **Never paste a private key** (xprv, zprv …) and never your seed words. A
 private key is refused before it goes anywhere — treat it as exposed if a copy

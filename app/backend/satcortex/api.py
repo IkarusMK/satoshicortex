@@ -557,6 +557,11 @@ class Electrumschalter(BaseModel):
     an: bool
 
 
+class Electrumheimnetz(BaseModel):
+    """Die Adresse der NAS im Heimnetz, fuer die Zeilen zum Kopieren."""
+    host: str = Field("", max_length=300)
+
+
 class Electrumkonto(BaseModel):
     """Ein Konto fuer Electrum anmelden -- mit dem OEFFENTLICHEN Schluessel.
 
@@ -3529,6 +3534,14 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         }
         return lage
 
+    @api.post("/electrum/heimnetz", dependencies=geschuetzt)
+    def electrum_heimnetz(wunsch: Electrumheimnetz) -> Dict:
+        try:
+            electrum_betrieb.heimnetz_host_setzen(wunsch.host)
+        except lesewallet.SchluesselFehler as fehler:
+            raise HTTPException(400, {"meldung": fehler.schluessel})
+        return {"ok": True}
+
     @api.post("/electrum/schalter", dependencies=geschuetzt)
     async def electrum_schalten(wunsch: Electrumschalter) -> Dict:
         try:
@@ -4184,9 +4197,41 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         Frage nicht, die man hier hat: welcher Kanal macht Aerger?
         """
         seit = int((time.time() - 7 * 86400) * 1000)
+        # Kanalnamen statt Nummern. Ist LND gerade nicht da, eben ohne.
+        try:
+            namen = {k.get("nummer"): k.get("gegenstelle") or ""
+                     for k in lnd.kanaele(lndverbindung())}
+        except (lnd.NichtErreichbar, lnd.LndFehler, lnd.Beschaeftigt,
+                OSError, ValueError):
+            namen = {}
+
+        def aufbereiten(z: Dict) -> Dict:
+            rein = lnd.htlc_kanal(z.get("rein_kanal"))
+            raus = lnd.htlc_kanal(z.get("raus_kanal"))
+            return {**z, "rein_kanal": rein, "raus_kanal": raus,
+                    "richtung": lnd.htlc_richtung(rein, raus),
+                    "rein_name": namen.get(rein, ""),
+                    "raus_name": namen.get(raus, "")}
+
+        # Zeilen von vor 1.4.1 tragen "0" statt "kein Kanal" -- sie zaehlen
+        # mit den neuen zusammen, sonst stuende derselbe Grund zweimal da.
+        gruende: Dict[tuple, Dict] = {}
+        for g in map(aufbereiten, auswertung.htlc_gruende(seit)):
+            schluessel = (g["grund"], g["rein_kanal"], g["raus_kanal"])
+            if schluessel in gruende:
+                gruende[schluessel]["anzahl"] += g["anzahl"]
+            else:
+                gruende[schluessel] = g
+        liste = sorted(gruende.values(), key=lambda g: -g["anzahl"])
         return {
-            "ereignisse": auswertung.htlc_lesen(min(max(int(grenze), 1), 500)),
-            "gruende": auswertung.htlc_gruende(seit),
+            "ereignisse": [aufbereiten(z) for z in auswertung.htlc_lesen(
+                min(max(int(grenze), 1), 500))],
+            "gruende": liste,
+            # Proben an den eigenen Knoten: kein Fehler, eher ein gutes
+            # Zeichen -- jemand prueft, ob ein Weg zu dir traegt.
+            "proben": sum(g["anzahl"] for g in liste
+                          if g["richtung"] == "an_dich"
+                          and g["grund"] in lnd.HTLC_PROBEN),
             "speicher": auswertung.verfuegbar,
         }
 

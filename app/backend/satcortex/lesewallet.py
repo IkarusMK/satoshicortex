@@ -240,17 +240,27 @@ def anmelden(knoten, schluessel: Schluessel, art: str, seit: int = 0,
         if fehler.code != _WALLET_GIBT_ES_SCHON:
             raise
         laden(knoten, name)
-    # Sind die Deskriptoren schon da, ist das Konto schon angemeldet. Ein
-    # zweiter Import wuerde abgelehnt, sobald der Vorrat gewachsen ist ("new
-    # range must include current range = [0,1003]" -- an der Regtest-Kette
-    # gefunden, 28.09.2026), und er wuerde ohnehin nur neu suchen.
-    vorhanden = {d.get("desc", "").split("#")[0] for d in (
+    # Sind die Deskriptoren schon da, ist das Konto schon angemeldet -- und
+    # durchsucht ab dem Zeitpunkt, den Core sich dazu gemerkt hat. Ein
+    # spaeteres oder gleiches Datum fuegt nichts hinzu. Ein FRUEHERES schon:
+    # aus dem Betrieb, 29.09.2026, fehlte sonst die aeltere Geschichte, und
+    # ein zweites Anmelden half nicht.
+    vorhanden = {d.get("desc", "").split("#")[0]: d for d in (
         knoten.ruf("listdescriptors", wallet=name) or {}).get("descriptors", [])}
-    if {empfang, wechsel} <= vorhanden:
-        return name
+    if empfang in vorhanden and wechsel in vorhanden:
+        bisher = min(int(vorhanden[d].get("timestamp") or 0)
+                     for d in (empfang, wechsel))
+        if int(seit) >= bisher:
+            return name
+    # Der Bereich muss den bisherigen einschliessen: Core lehnt sonst ab,
+    # sobald der Vorrat gewachsen ist ("new range must include current
+    # range = [0,1003]" -- an der Regtest-Kette gefunden, 28.09.2026).
+    def bis(d: str) -> int:
+        bereich = (vorhanden.get(d) or {}).get("range") or [0, 0]
+        return max(VORRAT - 1, int(bereich[1]))
     anfragen = [
         {"desc": knoten.ruf("getdescriptorinfo", d)["descriptor"],
-         "active": True, "internal": intern, "range": [0, VORRAT - 1],
+         "active": True, "internal": intern, "range": [0, bis(d)],
          "timestamp": int(seit)}
         for d, intern in ((empfang, False), (wechsel, True))
     ]

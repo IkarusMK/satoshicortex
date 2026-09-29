@@ -1084,8 +1084,9 @@
         <div class="panel hidden" id="ln-durchgang">
           <h3 data-i18n="ht_titel"></h3>
           <p class="dim small" data-i18n="ht_lead"></p>
-          <!-- Die Fehlschlaege ZUERST. Eine Liste, in der Gelungenes und
-               Gescheitertes durcheinanderlaufen, beantwortet die Frage
+          <!-- Die Fehlschlaege ZUERST -- getrennt nach weitergeleitet, an
+               dich, von dir, und Proben fuer sich (29.09.2026). Eine Liste,
+               in der alles durcheinanderlaeuft, beantwortet die Frage
                nicht, die man hier hat. -->
           <div id="ht-gruende"></div>
           <div id="ht-liste"></div>
@@ -1900,7 +1901,26 @@
 
           <div id="el-inhalt" class="hidden">
             <h4 style="margin-top:18px" data-i18n="el_wege_titel"></h4>
+            <!-- Die Adresse der NAS im Heimnetz. Die Seite kennt sie nicht,
+                 wenn sie ueber einen Namen geoeffnet wurde (29.09.2026). -->
+            <div id="el-heim-host-kasten" class="hidden">
+              <div class="note warn hidden" id="el-heim-host-warum"
+                   data-i18n="el_heim_host_warum"></div>
+              <label class="feld">
+                <b data-i18n="el_heim_host"></b>
+                <span class="dim small" data-i18n="el_heim_host_d"></span>
+                <input type="text" id="el-heim-host" maxlength="253"
+                       autocomplete="off" spellcheck="false"
+                       placeholder="192.168.1.20">
+              </label>
+              <div style="display:flex;gap:12px;align-items:center;margin-top:8px">
+                <button type="button" class="btn ghost" id="el-heim-host-speichern"
+                        data-i18n="el_heim_host_uebernehmen"></button>
+                <span class="dim small" id="el-heim-host-meldung"></span>
+              </div>
+            </div>
             <div id="el-wege"></div>
+            <p class="dim small" data-i18n="el_wege_fuss"></p>
             <details class="erklaerung" id="el-tls">
               <summary data-i18n="el_tls_titel"></summary>
               <p class="dim small" data-i18n="el_tls_d"></p>

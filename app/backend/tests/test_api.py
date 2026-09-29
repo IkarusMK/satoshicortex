@@ -6848,6 +6848,56 @@ def test_der_htlc_strom_zaehlt_die_fehlschlaege_je_kanal(client):
     assert nach_grund["INSUFFICIENT_BALANCE"] == 3, d["gruende"]
 
 
+def test_der_htlc_strom_trennt_richtungen_zaehlt_proben_und_nennt_kanaele(
+        client, monkeypatch):
+    """Aus dem Betrieb, 29.09.2026: "UNKNOWN_INVOICE 2x · Kanal 0". Das war
+    eine Probe an den eigenen Knoten, keine gescheiterte Weiterleitung --
+    und "Kanal 0" gibt es nicht. Zeilen von vor 1.4.1 tragen noch die "0";
+    sie zaehlen mit den neuen zusammen."""
+    import time as zeitmodul
+
+    from satcortex import api as api_modul, store as st
+    monkeypatch.setattr(api_modul.lnd, "kanaele", lambda k: [
+        {"nummer": "1", "gegenstelle": "Alpha"},
+        {"nummer": "2", "gegenstelle": "Beta"}])
+    ablage = st.Ablage(str(client.tmp / "fast" / "app" / "auswertung.db"))
+    jetzt = int(zeitmodul.time() * 1000)
+
+    def merke(rein, raus, grund, art="link_fehl"):
+        ablage.htlc_merken({"zeit_ms": jetzt, "art": art, "rein_kanal": rein,
+                            "raus_kanal": raus, "betrag": 0, "gebuehr": 0,
+                            "grund": grund})
+    merke("1", "2", "INSUFFICIENT_BALANCE")
+    merke("1", "0", "UNKNOWN_INVOICE")          # von vor 1.4.1
+    merke("1", "0", "UNKNOWN_INVOICE")
+    merke("1", None, "UNKNOWN_INVOICE")         # ab 1.4.1
+    merke("1", None, "MPP_INVOICE_TIMEOUT")
+    merke("0", "2", "INSUFFICIENT_BALANCE")
+
+    d = client.get("/api/lightning/htlc").json()
+    assert d["proben"] == 3
+    gruende = {(g["richtung"], g["grund"]): g for g in d["gruende"]}
+    assert gruende[("an_dich", "UNKNOWN_INVOICE")]["anzahl"] == 3
+    assert gruende[("an_dich", "UNKNOWN_INVOICE")]["raus_kanal"] is None
+    assert gruende[("an_dich", "UNKNOWN_INVOICE")]["rein_name"] == "Alpha"
+    assert gruende[("weiter", "INSUFFICIENT_BALANCE")]["raus_name"] == "Beta"
+    assert gruende[("von_dir", "INSUFFICIENT_BALANCE")]["rein_kanal"] is None
+    assert {e["richtung"] for e in d["ereignisse"]} == {
+        "weiter", "an_dich", "von_dir"}
+    assert all(e["raus_kanal"] != "0" and e["rein_kanal"] != "0"
+               for e in d["ereignisse"])
+
+
+def test_ohne_lnd_kommt_der_strom_trotzdem_nur_ohne_namen(client, monkeypatch):
+    from satcortex import api as api_modul, lnd as lnd_modul
+
+    def weg(_k):
+        raise lnd_modul.NichtErreichbar("weg")
+    monkeypatch.setattr(api_modul.lnd, "kanaele", weg)
+    d = client.get("/api/lightning/htlc").json()
+    assert d["ereignisse"] == [] and d["proben"] == 0
+
+
 def test_die_grenze_des_htlc_stroms_wird_eingehalten(client):
     import time as zeitmodul
 
