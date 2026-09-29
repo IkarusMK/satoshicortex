@@ -4,6 +4,42 @@ All notable changes to SatoshiCortex. Format loosely after
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning after
 [SemVer](https://semver.org/).
 
+## [1.4.2] — 2026-09-29
+
+### Changed: the wallet keeps on-chain and Lightning apart
+
+- The balance comes in two blocks, *On-chain* and *Lightning · in your
+  channels*, each with the two buttons that belong to it — *Deposit* and
+  *Send*, *Create invoice* and *Pay invoice*. They jump to the matching panel
+  further down.
+- Your transactions stay right under the balance. Below them the panels sit
+  in two sections, *On-chain* (`bc1…`) and *Lightning* (`lnbc…`), each with a
+  sentence on what belongs there.
+- *Receive* is now called *Create a Lightning invoice*. Next to *Pay a
+  Lightning invoice* it did not say which of the two ways it meant.
+- The note on the channel reserve sits under both blocks instead of as a
+  narrow column beside the numbers.
+
+### Changed: "What went through your node", second pass
+
+Found on a running node after 1.4.1.
+
+- Your own rebalancing is shown as *Rebalancing* — out via one channel, back
+  via the other — instead of as a payment from you and one to you. It is
+  recognised from LND's own payment list: a payment that comes back over one
+  of your own channels. A failed attempt no longer reads like someone else's
+  payment gone wrong, and it gets no warning colour — nothing was lost.
+- The list of events has its own heading. After a single refusal it ran
+  straight on below the table of reasons and read like a second header row.
+- A payment stands once, not as *started* and again as *went through*. The
+  amount moves into the line with the outcome — also for lines recorded
+  before this version.
+
+### Upgrading
+
+Only the application image is new; Bitcoin Core, LND and Tor keep running.
+Nothing to change in `docker-compose.yml` or `.env`.
+
 ## [1.4.1] — 2026-09-29
 
 ### Fixed: the Electrum card gives each app the line it accepts

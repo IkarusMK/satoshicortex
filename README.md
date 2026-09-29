@@ -291,6 +291,16 @@ peer's on the right.
        alt="Channels: capacity, local and remote balance per channel, and the dialog to open one">
 </p>
 
+**What went through your node.** Forwards, your own rebalancing, payments to
+you and from you — kept apart, every reason LND gives in plain language, the
+warning colour only where there is something to do. Probes are counted on
+their own: someone checking that a route to you holds.
+
+<p align="center">
+  <img src="assets/screenshots/23-forwarding.png" width="90%"
+       alt="What went through your node: what was turned down by direction and reason, and the latest events with amount, fee and route">
+</p>
+
 **Fees, measured against the network.** What the network charges today, from
 your own graph, next to what each of your channels charges — and the rate you
 set stays in the field after a reload. **Receiving** is an invoice with a QR
@@ -300,15 +310,17 @@ code that tells you by itself when it is paid.
   <img src="assets/screenshots/18-fees.png" width="49%"
        alt="Fees: what the network charges, its distribution and four-week band, and the current fee of your channels">
   <img src="assets/screenshots/22-receive.png" width="49%"
-       alt="Receive: a Lightning invoice with QR code, waiting for the payment">
+       alt="Create a Lightning invoice: the invoice with its QR code, waiting for the payment">
 </p>
 
-**The wallet.** On-chain and in channels kept apart, the channel reserve named,
-every transaction with its full id.
+**The wallet.** On-chain and in channels kept apart, each with the two buttons
+that belong to it — deposit and send on-chain, create and pay an invoice over
+Lightning. The channel reserve named, every transaction with its full id,
+right under the balance.
 
 <p align="center">
   <img src="assets/screenshots/14-wallet.png" width="90%"
-       alt="Wallet: balance split into on-chain, in channels, spendable and inbound room, and the list of transactions">
+       alt="Wallet: the balance in two blocks, on-chain and in channels, each with its own buttons, and the transactions right below">
 </p>
 
 **External wallets.** Zeus on your phone, over Tor or over your router's VPN.

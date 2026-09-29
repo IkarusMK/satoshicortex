@@ -158,11 +158,14 @@ ZUSAMMENGESETZT = {
     't(tun)': ["ht_t_guthaben", "ht_t_hoechstwert", "ht_t_partner"],
     # Wofuer ein HTLC war, und ueber welche Kanaele -- aus htlcWeg().
     't("ht_r_" + g.richtung)': [
-        "ht_r_weiter", "ht_r_an_dich", "ht_r_von_dir", "ht_r_unbekannt"],
+        "ht_r_weiter", "ht_r_an_dich", "ht_r_von_dir", "ht_r_unbekannt",
+        "ht_r_umschichten"],
     't("ht_r_" + e.richtung)': [
-        "ht_r_weiter", "ht_r_an_dich", "ht_r_von_dir", "ht_r_unbekannt"],
+        "ht_r_weiter", "ht_r_an_dich", "ht_r_von_dir", "ht_r_unbekannt",
+        "ht_r_umschichten"],
     't(weg, werte)': [
-        "ht_weg_weiter", "ht_weg_an_dich", "ht_weg_von_dir", "ht_weg_unbekannt"],
+        "ht_weg_weiter", "ht_weg_an_dich", "ht_weg_von_dir", "ht_weg_unbekannt",
+        "ht_weg_raus", "ht_weg_zurueck"],
     # Die Spaltenkoepfe der beiden Tabellen, aus htlcTabelle().
     't(spalte)': [
         "ht_sp_zeit", "ht_sp_richtung", "ht_sp_grund", "ht_sp_weg",

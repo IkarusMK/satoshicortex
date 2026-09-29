@@ -6888,6 +6888,74 @@ def test_der_htlc_strom_trennt_richtungen_zaehlt_proben_und_nennt_kanaele(
                for e in d["ereignisse"])
 
 
+def test_eigenes_umschichten_steht_als_umschichten_da(client, monkeypatch):
+    """Aus dem Betrieb, 29.09.2026: "An dich -- eine Zahlung in Teilen kam
+    nicht vollstaendig an". Das war ein eigener Umschicht-Versuch: hinaus
+    ueber Beta, zurueck ueber Alpha, und der zweite Teil kam nie los. Dazu
+    stand jede Zahlung zweimal da, "begonnen" und "durchgegangen"."""
+    import time as zeitmodul
+
+    from satcortex import api as api_modul, store as st
+    jetzt = int(zeitmodul.time() * 1000)
+    monkeypatch.setattr(api_modul.lnd, "kanaele", lambda k: [
+        {"nummer": "1", "gegenstelle": "Alpha"},
+        {"nummer": "2", "gegenstelle": "Beta"}])
+    gefragt = []
+
+    def versuche(knoten, seit_s, eigene):
+        gefragt.append((seit_s, eigene))
+        return [{"raus_kanal": "2", "rein_kanal": "1", "von_ms": jetzt - 70_000,
+                 "bis_ms": jetzt - 5_000, "betrag": 25_000}]
+    monkeypatch.setattr(api_modul.lnd, "umschicht_versuche", versuche)
+    ablage = st.Ablage(str(client.tmp / "fast" / "app" / "auswertung.db"))
+
+    def merke(zeit, art, rein, raus, grund=None, betrag=0):
+        ablage.htlc_merken({"zeit_ms": zeit, "art": art, "rein_kanal": rein,
+                            "raus_kanal": raus, "betrag": betrag,
+                            "gebuehr": 0, "grund": grund})
+    merke(jetzt - 69_000, "weiterleiten", None, "2", betrag=25_010)
+    merke(jetzt - 6_000, "link_fehl", "1", None, "MPP_INVOICE_TIMEOUT")
+    merke(jetzt - 5_500, "fehl", None, "2", betrag=25_010)
+    merke(jetzt - 30_000, "link_fehl", "1", None, "UNKNOWN_INVOICE")  # Probe
+    merke(jetzt - 900_000, "link_fehl", "1", None, "MPP_INVOICE_TIMEOUT")
+
+    d = client.get("/api/lightning/htlc").json()
+    gruende = {(g["richtung"], g["grund"]): g["anzahl"] for g in d["gruende"]}
+    assert gruende == {("umschichten", "MPP_INVOICE_TIMEOUT"): 1,
+                       ("an_dich", "MPP_INVOICE_TIMEOUT"): 1,
+                       ("an_dich", "UNKNOWN_INVOICE"): 1}
+    assert d["proben"] == 1, "eine Probe von aussen bleibt eine Probe"
+
+    zeilen = [(e["richtung"], e["art"], e["betrag"]) for e in d["ereignisse"]]
+    # Der Beginn (vor 69 s) steht nicht mehr neben seinem Ausgang; was
+    # ankommen sollte, steht beim Zurueck-Teil, der keinen Betrag traegt.
+    assert zeilen == [("umschichten", "fehl", 25_010),
+                      ("umschichten", "link_fehl", 25_000),
+                      ("an_dich", "link_fehl", 0),
+                      ("an_dich", "link_fehl", 0)]
+    [(seit_s, eigene)] = gefragt
+    assert eigene == {"1", "2"}
+    assert seit_s <= (jetzt - 900_000) // 1000, "auch die aelteste Zeile zaehlt"
+
+
+def test_ohne_zahlungsliste_bleibt_alles_wie_es_war(client, monkeypatch):
+    from satcortex import api as api_modul, lnd as lnd_modul, store as st
+    import time as zeitmodul
+    monkeypatch.setattr(api_modul.lnd, "kanaele", lambda k: [
+        {"nummer": "1", "gegenstelle": "Alpha"}])
+
+    def weg(*_a):
+        raise lnd_modul.NichtErreichbar("weg")
+    monkeypatch.setattr(api_modul.lnd, "umschicht_versuche", weg)
+    ablage = st.Ablage(str(client.tmp / "fast" / "app" / "auswertung.db"))
+    ablage.htlc_merken({"zeit_ms": int(zeitmodul.time() * 1000),
+                        "art": "link_fehl", "rein_kanal": "1",
+                        "raus_kanal": None, "betrag": 0, "gebuehr": 0,
+                        "grund": "MPP_INVOICE_TIMEOUT"})
+    d = client.get("/api/lightning/htlc").json()
+    assert [g["richtung"] for g in d["gruende"]] == ["an_dich"]
+
+
 def test_ohne_lnd_kommt_der_strom_trotzdem_nur_ohne_namen(client, monkeypatch):
     from satcortex import api as api_modul, lnd as lnd_modul
 

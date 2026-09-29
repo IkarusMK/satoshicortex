@@ -4196,11 +4196,14 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         Gelungenes und Gescheitertes durcheinanderlaufen, beantwortet die
         Frage nicht, die man hier hat: welcher Kanal macht Aerger?
         """
-        seit = int((time.time() - 7 * 86400) * 1000)
+        jetzt = int(time.time() * 1000)
+        seit = jetzt - 7 * 86_400_000
         # Kanalnamen statt Nummern. Ist LND gerade nicht da, eben ohne.
+        knoten = None
         try:
+            knoten = lndverbindung()
             namen = {k.get("nummer"): k.get("gegenstelle") or ""
-                     for k in lnd.kanaele(lndverbindung())}
+                     for k in lnd.kanaele(knoten)}
         except (lnd.NichtErreichbar, lnd.LndFehler, lnd.Beschaeftigt,
                 OSError, ValueError):
             namen = {}
@@ -4213,19 +4216,65 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
                     "rein_name": namen.get(rein, ""),
                     "raus_name": namen.get(raus, "")}
 
+        ereignisse = [aufbereiten(z) for z in auswertung.htlc_lesen(
+            min(max(int(grenze), 1), 500))]
+        eigene = [aufbereiten(z)
+                  for z in auswertung.htlc_eigene_fehlschlaege(seit)]
+
+        # Eigenes Umschichten (aus dem Betrieb, 29.09.2026): beide Enden bist
+        # du. Ohne die Zahlungsliste bleibt es bei "von dir" und "an dich".
+        versuche: List[Dict] = []
+        if namen:
+            aelteste = min([z["zeit_ms"] for z in ereignisse + eigene],
+                           default=seit)
+            try:
+                # Eine Stunde Vorlauf: der Versuch kann vor seiner Zeile
+                # angelegt worden sein.
+                versuche = lnd.umschicht_versuche(
+                    knoten, aelteste // 1000 - 3600, set(namen))
+            except (lnd.NichtErreichbar, lnd.LndFehler, lnd.Beschaeftigt,
+                    OSError, ValueError):
+                versuche = []
+
+        def einordnen(z: Dict) -> Dict:
+            versuch = lnd.htlc_umschichten(z, versuche, jetzt)
+            if not versuch:
+                return z
+            # Der Zurueck-Teil traegt keinen Betrag (LND meldet beim
+            # Empfangen keinen) -- was ankommen sollte, sagt der Versuch.
+            betrag = z.get("betrag") or (versuch["betrag"] if z["rein_kanal"]
+                                         else 0)
+            return {**z, "richtung": "umschichten", "betrag": betrag}
+
         # Zeilen von vor 1.4.1 tragen "0" statt "kein Kanal" -- sie zaehlen
         # mit den neuen zusammen, sonst stuende derselbe Grund zweimal da.
         gruende: Dict[tuple, Dict] = {}
+
+        def zaehle(g: Dict, anzahl: int) -> None:
+            felder = ("grund", "richtung", "rein_kanal", "raus_kanal",
+                      "rein_name", "raus_name")
+            schluessel = (g["grund"], g["richtung"], g["rein_kanal"],
+                          g["raus_kanal"])
+            bisher = gruende.get(schluessel) or {
+                **{f: g.get(f) for f in felder}, "anzahl": 0}
+            gruende[schluessel] = {**bisher,
+                                   "anzahl": bisher["anzahl"] + anzahl}
+
         for g in map(aufbereiten, auswertung.htlc_gruende(seit)):
-            schluessel = (g["grund"], g["rein_kanal"], g["raus_kanal"])
-            if schluessel in gruende:
-                gruende[schluessel]["anzahl"] += g["anzahl"]
-            else:
-                gruende[schluessel] = g
-        liste = sorted(gruende.values(), key=lambda g: -g["anzahl"])
+            zaehle(g, g["anzahl"])
+        # Was davon ein eigener Versuch war, wandert aus "von dir"/"an dich"
+        # hinueber. Die gezaehlten Gruende haben keine Zeit; die eigenen
+        # Fehlschlaege kommen dafuer einzeln.
+        for z in eigene:
+            umgeschichtet = einordnen(z)
+            if umgeschichtet is not z:
+                zaehle(z, -1)
+                zaehle(umgeschichtet, 1)
+        liste = sorted((g for g in gruende.values() if g["anzahl"] > 0),
+                       key=lambda g: -g["anzahl"])
         return {
-            "ereignisse": [aufbereiten(z) for z in auswertung.htlc_lesen(
-                min(max(int(grenze), 1), 500))],
+            "ereignisse": lnd.htlc_zusammenfassen(
+                [einordnen(z) for z in ereignisse]),
             "gruende": liste,
             # Proben an den eigenen Knoten: kein Fehler, eher ein gutes
             # Zeichen -- jemand prueft, ob ein Weg zu dir traegt.

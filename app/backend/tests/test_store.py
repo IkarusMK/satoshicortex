@@ -388,6 +388,31 @@ def test_alte_ereignisse_zaehlen_nicht_mehr_mit(tmp_path):
     assert a.htlc_gruende(seit_ms=0)[0]["anzahl"] == 1
 
 
+def test_eigene_fehlschlaege_kommen_einzeln_mit_zeit(tmp_path):
+    """Fuers Umschichten (29.09.2026): ob ein Fehlschlag zu einem eigenen
+    Versuch gehoert, entscheidet seine ZEIT -- die gezaehlten Gruende haben
+    keine. Einzeln kommen nur die, bei denen ein Kanal fehlt, also Zahlungen
+    von dir oder an dich. Weiterleitungen gehoeren nie zu einem eigenen
+    Versuch, und von ihnen kann es sehr viele geben."""
+    a = store.Ablage(str(tmp_path / "p.db"))
+
+    def merke(zeit, rein, raus, grund="MPP_INVOICE_TIMEOUT", art="link_fehl"):
+        a.htlc_merken({"zeit_ms": zeit, "art": art, "rein_kanal": rein,
+                       "raus_kanal": raus, "betrag": 0, "gebuehr": 0,
+                       "grund": grund})
+    merke(1_000, "111", None)
+    merke(2_000, "111", "0")                    # von vor 1.4.1
+    merke(3_000, None, "222", "INSUFFICIENT_BALANCE")
+    merke(4_000, "111", "222", "INSUFFICIENT_BALANCE")   # Weiterleitung
+    merke(5_000, "111", None, None, art="erledigt")      # kein Fehlschlag
+    merke(500, "111", None)                              # zu alt
+
+    zeilen = a.htlc_eigene_fehlschlaege(seit_ms=900)
+    assert [z["zeit_ms"] for z in zeilen] == [3_000, 2_000, 1_000]
+    assert zeilen[0] == {"zeit_ms": 3_000, "grund": "INSUFFICIENT_BALANCE",
+                         "rein_kanal": None, "raus_kanal": "222"}
+
+
 def test_die_neuesten_ereignisse_stehen_vorne(tmp_path):
     a = store.Ablage(str(tmp_path / "p.db"))
     _htlc(a, "erledigt", zeit=1_000)

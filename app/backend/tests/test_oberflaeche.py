@@ -2150,7 +2150,10 @@ def test_kein_sichtbarer_text_ohne_uebersetzung(html):
     Die Ausnahmen stehen namentlich da, damit eine NEUE Stelle auffaellt
     statt in der Liste unterzugehen."""
     import re
-    EIGENNAMEN = {"Satoshi", "Cortex", "SatoshiCortex", "Bitcoin", "Lightning"}
+    EIGENNAMEN = {"Satoshi", "Cortex", "SatoshiCortex", "Bitcoin", "Lightning",
+                  # Die Kennzeichen der Adressen in der Wallet: Formate,
+                  # keine Woerter.
+                  "lnbc…"}
     ohne = re.sub(r"<!--.*?-->", "", html, flags=re.S)
     ohne = re.sub(r"<(script|style)\b.*?</\1>", "", ohne, flags=re.S | re.I)
     uebrig = []
@@ -2722,8 +2725,9 @@ def test_ausgebbar_ist_nur_das_bestaetigte_guthaben(js):
     eine frische Einzahlung ausgebbar aussehen."""
     anfang = js.index("function zeichneLnGuthaben")
     teil = js[anfang:anfang + 2000]
-    assert '[t("lk_onchain"), g.kette_bestaetigt]' in teil
-    assert '[t("lk_onchain"), g.kette_gesamt]' not in teil
+    # Seit 29.09.2026 im On-Chain-Block unter "Ausgebbar".
+    assert '[t("gh_kette_frei"), g.kette_bestaetigt]' in teil
+    assert "g.kette_gesamt]" not in teil
 
 
 def test_die_adressabfrage_kuerzt_die_txid_nicht(js):
@@ -3953,7 +3957,10 @@ def test_warnfarbe_nur_wo_man_etwas_tun_kann(js):
               ["UNKNOWN_INVOICE", "an_dich"],
               ["INCORRECT_OR_UNKNOWN_PAYMENT_DETAILS", "an_dich"],
               ["MPP_INVOICE_TIMEOUT", "an_dich"], ["NO_DETAIL", "weiter"],
-              ["GANZ_NEU", "weiter"]]
+              ["GANZ_NEU", "weiter"],
+              # Beim eigenen Umschichten ist nichts zu reparieren.
+              ["INSUFFICIENT_BALANCE", "umschichten"],
+              ["MPP_INVOICE_TIMEOUT", "umschichten"]]
     assert _funktionen_ausfuehren(
         js, ["htlcGrund"],
         f"{json.dumps(faelle)}.map(([g, r]) => htlcGrund(g, r))") == [
@@ -3963,7 +3970,9 @@ def test_warnfarbe_nur_wo_man_etwas_tun_kann(js):
         {"text": "ht_g_probe", "tun": None, "art": "ok"},
         {"text": "ht_g_teile_zeit", "tun": None, "art": ""},
         {"text": "ht_g_ohne", "tun": None, "art": ""},
-        {"text": "GANZ_NEU", "tun": None, "art": ""}]
+        {"text": "GANZ_NEU", "tun": None, "art": ""},
+        {"text": "ht_g_guthaben", "tun": None, "art": ""},
+        {"text": "ht_g_teile_zeit", "tun": None, "art": ""}]
 
 
 def test_der_weg_nennt_kanaele_beim_namen_und_nie_kanal_null(js):
@@ -3975,12 +3984,19 @@ def test_der_weg_nennt_kanaele_beim_namen_und_nie_kanal_null(js):
          "rein_name": "Alpha", "raus_name": ""},
         {"richtung": "von_dir", "rein_kanal": None, "raus_kanal": "77",
          "rein_name": "", "raus_name": ""},
+        # Umschichten: hinaus ueber den einen, zurueck ueber den anderen.
+        {"richtung": "umschichten", "rein_kanal": None, "raus_kanal": "2",
+         "rein_name": "", "raus_name": "Beta"},
+        {"richtung": "umschichten", "rein_kanal": "1", "raus_kanal": None,
+         "rein_name": "Alpha", "raus_name": ""},
     ]
     assert _funktionen_ausfuehren(
         js, ["htlcWeg"], f"{json.dumps(faelle)}.map(htlcWeg)") == [
         ["ht_weg_weiter", {"rein": "Alpha", "raus": "Beta"}],
         ["ht_weg_an_dich", {"rein": "Alpha"}],
-        ["ht_weg_von_dir", {"raus": "77"}]]
+        ["ht_weg_von_dir", {"raus": "77"}],
+        ["ht_weg_raus", {"raus": "Beta"}],
+        ["ht_weg_zurueck", {"rein": "Alpha"}]]
 
 
 def test_die_karte_trennt_richtungen_und_zeigt_proben(js):
@@ -4006,6 +4022,158 @@ def test_ablehnungen_und_ereignisse_stehen_in_tabellen(js):
         assert f"htlcTabelle({spalten}" in laden
     tabelle = _ohne_js_kommentare(_block(js, "function htlcTabelle("))
     assert "ausw-tabelle" in tabelle and "t(spalte)" in tabelle
+
+
+def test_die_ereignisliste_hat_eine_eigene_ueberschrift(js):
+    """Aus dem Betrieb, 29.09.2026: "die erste zeile sieht komisch aus".
+    Nach einer einzigen Ablehnung lief die Ereignisliste direkt weiter und
+    las sich wie eine zweite Kopfzeile derselben Tabelle."""
+    import re
+    laden = re.sub(r"\s+", " ", _ohne_js_kommentare(
+        _block(js, "async function durchgangLaden(")))
+    ueberschrift = laden.index('hinweis(t("ht_liste_titel")')
+    assert ueberschrift < laden.index('htlcTabelle(["ht_sp_zeit"')
+    assert '"umschichten"' in laden, "Umschichten hat einen Platz in der Reihenfolge"
+
+
+# ── Die Wallet: on-chain und Lightning auseinander (29.09.2026) ────────────
+#
+# Aus dem Betrieb: "das mann das mal auseinander halten kann vernuenftig was
+# ist on chain was ist LND rechnung" -- und "hier in dem grossen feld ..
+# koennte man ja direkt einzahl auszahlen machen".
+
+_GUTHABEN_DOM = """
+const t = (k, w) => k;
+const sats = (x) => String(x);
+const zahl = (x) => x;
+const hinweis = (x) => ({ hinweis: x });
+let LETZTES_GUTHABEN = null;
+const ZIEL = { kinder: [], set textContent(v) { this.kinder = []; },
+               append(...k) { this.kinder.push(...k); } };
+const HINWEIS = { textContent: "" };
+function $(sel) { return sel === "#ln-guthaben-inhalt" ? ZIEL : HINWEIS; }
+const document = { createElement: (tag) => ({
+  tag, className: "", textContent: "", dataset: {}, kinder: [],
+  append(...k) { this.kinder.push(...k); } }) };
+const text = (e) => [e.textContent || "", ...(e.kinder || []).map(text)]
+  .join(" ").trim();
+"""
+
+
+def test_das_guthaben_steht_in_zwei_bloecken_mit_ihren_knoepfen(js):
+    ergebnis = _ausfuehren_async(
+        js, ["zeichneLnGuthaben", "guthabenBlock"], _GUTHABEN_DOM, """(async () => {
+  zeichneLnGuthaben({ kette_gesamt: 1300, kette_bestaetigt: 1000,
+                      kanal_hier: 500, kanal_frei: 490, kanal_reserve: 10,
+                      kanal_drueben: 700 });
+  const [bloecke, reserve] = ZIEL.kinder;
+  return { klasse: bloecke.className, reserve, unterwegs: HINWEIS.textContent,
+           bloecke: bloecke.kinder.map((b) => ({
+             titel: text(b.kinder[0].kinder[0]),
+             knoepfe: b.kinder[0].kinder[1].kinder.map(
+               (k) => [k.textContent, k.dataset.sprung, k.type]),
+             zahlen: b.kinder[1].kinder.map(
+               (k) => k.kinder.map((x) => x.textContent)) })) };
+})()""")
+    assert ergebnis == {
+        "klasse": "gh-bloecke",
+        "reserve": {"hinweis": "lk_reserve"},
+        "unterwegs": "lk_unterwegs_d",
+        "bloecke": [
+            {"titel": "gh_kette bc1…",
+             "knoepfe": [["gh_einzahlen", "#w-einzahlen", "button"],
+                         ["gh_senden", "#w-senden", "button"]],
+             "zahlen": [["1000", "gh_kette_frei"], ["300", "lk_unterwegs"]]},
+            {"titel": "gh_blitz lnbc…",
+             "knoepfe": [["gh_rechnung", "#w-empfangen", "button"],
+                         ["gh_bezahlen", "#w-zahlen", "button"]],
+             "zahlen": [["500", "gh_blitz_hier"], ["490", "lk_kanal_frei"],
+                        ["700", "lk_kanal_drueben"]]}]}
+
+
+def test_ohne_reserve_und_unbestaetigtes_bleibt_es_bei_den_zahlen_die_es_gibt(js):
+    ergebnis = _ausfuehren_async(
+        js, ["zeichneLnGuthaben", "guthabenBlock"], _GUTHABEN_DOM, """(async () => {
+  zeichneLnGuthaben({ kette_gesamt: 1000, kette_bestaetigt: 1000,
+                      kanal_hier: 0, kanal_frei: 0, kanal_reserve: 0,
+                      kanal_drueben: 0 });
+  return [ZIEL.kinder.length, HINWEIS.textContent,
+          ZIEL.kinder[0].kinder.map((b) => b.kinder[1].kinder.length)];
+})()""")
+    assert ergebnis == [1, "", [1, 2]]
+
+
+def test_ein_sprung_landet_im_kasten_und_nicht_in_der_tastatur(js):
+    """Der Fokus geht auf die Ueberschrift des Kastens -- im ersten Feld
+    oeffnete auf dem Handy sofort die Tastatur. Wer Bewegung abbestellt hat,
+    springt ohne Gleiten."""
+    ergebnis = _ausfuehren_async(js, ["springeZu"], """
+const SPRUNG_MARKE_MS = 1;
+const TITEL = { tabIndex: 0, fokus: null, focus(o) { this.fokus = o; } };
+const KLASSEN = new Set();
+const KASTEN = { classList: { contains: (k) => KLASSEN.has(k),
+                              add: (k) => KLASSEN.add(k),
+                              remove: (k) => KLASSEN.delete(k) },
+                 scrollIntoView(o) { this.sprung = o; },
+                 querySelector: (s) => (s === "h3" ? TITEL : null) };
+const VERSTECKT = { classList: { contains: (k) => k === "hidden" },
+                    scrollIntoView() { throw new Error("gesprungen"); } };
+function $(sel) { return { "#w-senden": KASTEN, "#w-zahlen": VERSTECKT }[sel] || null; }
+Object.defineProperty(globalThis, "window", { configurable: true,
+  value: { matchMedia: () => ({ matches: true }) } });
+""", """(async () => {
+  springeZu("#w-zahlen");            // versteckt: kein Sprung
+  springeZu("#gibt-es-nicht");
+  springeZu("#w-senden");
+  const markiert = KLASSEN.has("angesprungen");
+  await new Promise((r) => setTimeout(r, 10));
+  return { sprung: KASTEN.sprung, tab: TITEL.tabIndex, fokus: TITEL.fokus,
+           markiert, danach: KLASSEN.has("angesprungen") };
+})()""")
+    assert ergebnis == {"sprung": {"behavior": "auto", "block": "start"},
+                        "tab": -1, "fokus": {"preventScroll": True},
+                        "markiert": True, "danach": False}
+
+
+def test_die_knoepfe_im_guthaben_springen_zu_kaesten_der_wallet(js, html):
+    """Jedes Sprungziel steht in der Wallet-Ansicht -- ein Knopf, der ins
+    Leere springt, waere schlimmer als keiner."""
+    import re
+    wallet = html[html.index('<section data-ansicht="ln-wallet"'):]
+    wallet = wallet[:wallet.index("</section>")]
+    ziele = re.findall(r'\[t\("gh_[a-z]+"\), "(#[a-z-]+)"\]',
+                       _ohne_js_kommentare(_block(js, "function zeichneLnGuthaben(")))
+    assert ziele == ["#w-einzahlen", "#w-senden", "#w-empfangen", "#w-zahlen"]
+    for ziel in ziele:
+        assert f'id="{ziel[1:]}"' in wallet, ziel
+    start = _ohne_js_kommentare(_block(js, "async function start("))
+    assert '$("#ln-guthaben-inhalt").addEventListener("click"' in start
+    assert "springeZu(knopf.dataset.sprung)" in start
+
+
+def test_die_bewegungen_stehen_direkt_unter_dem_guthaben(html):
+    """Aus dem Betrieb, 29.09.2026: "unsere transaktions historie bleibt
+    trotzdem oben unter guthaben". Darunter die beiden Bereiche, jeder mit
+    seinen Kaesten."""
+    reihenfolge = ["ln-guthaben", "w-bewegungen", "w-bereich-kette",
+                   "w-einzahlen", "w-senden", "w-bereich-blitz",
+                   "w-empfangen", "w-zahlen"]
+    stellen = [html.index(f'id="{name}"') for name in reihenfolge]
+    assert stellen == sorted(stellen)
+
+
+def test_die_bereiche_erscheinen_nur_mit_laufendem_lnd(js):
+    laden = _ohne_js_kommentare(_block(js, "async function ladeLightningKanaele("))
+    for name in ("#w-bereich-kette", "#w-bereich-blitz"):
+        assert f'"{name}"' in laden
+
+
+def test_empfangen_heisst_jetzt_was_es_ist(js):
+    """"Empfangen" sagte nicht, dass es um eine Lightning-Rechnung geht --
+    daneben stand "Eine Lightning-Rechnung bezahlen"."""
+    assert '    rq_titel: "Lightning-Rechnung erstellen",' in js
+    assert '    rq_titel: "Create a Lightning invoice",' in js
+    assert "sondern unter Zahlen." not in js and "use Pay instead" not in js
 
 
 def test_ein_kopierknopf_bleibt_nie_stumm(js):

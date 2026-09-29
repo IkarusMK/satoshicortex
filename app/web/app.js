@@ -94,6 +94,18 @@ const I18N = {
     lk_kanal_hier: "In Kanälen, auf deiner Seite",
     lk_kanal_frei: "Davon wirklich ausgebbar",
     lk_kanal_drueben: "Auf der Gegenseite (= dein Empfangsraum)",
+    gh_kette: "On-Chain",
+    gh_kette_frei: "Ausgebbar",
+    gh_blitz: "Lightning · in deinen Kanälen",
+    gh_blitz_hier: "Auf deiner Seite",
+    gh_einzahlen: "Einzahlen",
+    gh_senden: "Senden",
+    gh_rechnung: "Rechnung erstellen",
+    gh_bezahlen: "Rechnung bezahlen",
+    wb_kette_titel: "On-Chain",
+    wb_kette_d: "Gewöhnliche Bitcoin-Adressen (bc1…, 3…, 1…). Jede Bewegung kommt in einen Block: Sie braucht Minuten bis Stunden und kostet Netzgebühr. Zahlst du von einer Börse ein, wähle dort Bitcoin, nicht Lightning.",
+    wb_blitz_titel: "Lightning",
+    wb_blitz_d: "Rechnungen (lnbc…) über deine Kanäle. Sie gehen in Sekunden durch und kosten einen Bruchteil. Empfangen kannst du, was auf der Gegenseite deiner Kanäle Platz hat – zahlen, was auf deiner Seite liegt.",
     lk_reserve: "{n} sat davon sind Kanalreserve und lassen sich nicht ausgeben. Jeder Kanal hält auf beiden Seiten ein Prozent seiner Kapazität zurück — das ist das Pfand, das einen Betrugsversuch teuer macht. Bei kleinen Kanälen fällt es ins Gewicht.",
     lk_kanaele_titel: "Kanäle",
     lk_kanaele_d: "Der Balken ist die eigentliche Aussage: liegt alles auf einer Seite, leitet der Kanal in eine Richtung nichts mehr weiter. Links dein Anteil, rechts der der Gegenstelle.",
@@ -903,7 +915,7 @@ const I18N = {
     bw_gebuehr: "Gebühr: {n} sat",
     bw_an: "An: {adresse}",
     b_budget_rest: "Vom Upload-Budget sind noch {bytes} übrig, das Fenster läuft noch {rest}. Bitcoin Core rechnet in 24 Stunden, nicht im Monat — der Regler in der Einrichtung fragt eine Monatszahl und teilt sie auf.",
-    rq_titel: "Empfangen",
+    rq_titel: "Lightning-Rechnung erstellen",
     rq_lead: "Stell eine Rechnung aus, damit dir jemand über Lightning Geld schickt. Sie gilt eine Stunde. Wer sie bezahlt, sieht den Betrag und den Zweck.",
     rq_betrag: "Betrag in Satoshi",
     rq_betrag_d: "Leer oder 0 lässt den Betrag offen — dann bestimmt ihn der Zahlende. Praktisch für eine Spende.",
@@ -1152,7 +1164,7 @@ const I18N = {
     pin_entfernt: "Abgeschafft. Es fragt jetzt nichts mehr danach.",
     tg_pin: "Deine PIN",
     tg_pin_d: "Das Löschen ist der Handgriff, den die PIN bewacht.",
-    zl_titel: "Eine Lightning-Rechnung bezahlen",
+    zl_titel: "Lightning-Rechnung bezahlen",
     zl_lead: "Über Lightning statt über die Kette: in Sekunden statt in Blöcken, und für einen Bruchteil der Gebühr. Voraussetzung ist ein Kanal mit Guthaben auf deiner Seite.",
     zl_rechnung: "Die Rechnung",
     zl_rechnung_d: "Die lange Zeichenkette, die mit lnbc beginnt. Ein „lightning:“ davor stört nicht, das schneide ich weg.",
@@ -1232,8 +1244,9 @@ const I18N = {
     wt_eigen_ohne: "Dein Turm läuft — aber er hat keine Adresse, unter der ihn jemand von außen erreicht. Damit kann ihn niemand eintragen, und der Beitrag verpufft. Das ändert sich, sobald dein Knoten eine Adresse ankündigt: unter Einstellungen → Sichtbarkeit. Über Tor bekommt der Turm eine eigene .onion, im Clearnet braucht er eine Router-Freigabe auf 9911.",
     wt_eigen_fuss: "Zwei Dinge dazu, damit keine falsche Erwartung entsteht: Der Turm bringt dir KEINE Gebühren ein — LND betreibt ihn ausdrücklich altruistisch, bezahlte Türme sind entworfen, aber nicht scharf. Und du erfährst nie, wen oder wie viel du bewachst: der Turm bekommt verschlüsselte Päckchen, die er erst öffnen kann, wenn die passende Transaktion in der Kette auftaucht. Das ist keine Lücke, sondern der Grund, warum man ihm vertrauen kann.",
     ht_titel: "Was durch deinen Knoten ging",
-    ht_lead: "Getrennt nach fremden Zahlungen, die du weiterleitest, Zahlungen an dich und Zahlungen von dir. Die Warnfarbe steht nur dort, wo du etwas tun kannst – etwa bei einem Kanal, dem auf deiner Seite das Guthaben ausgeht.",
+    ht_lead: "Getrennt nach fremden Zahlungen, die du weiterleitest, deinem eigenen Umschichten, Zahlungen an dich und Zahlungen von dir. Die Warnfarbe steht nur dort, wo du etwas tun kannst – etwa bei einem Kanal, dem auf deiner Seite das Guthaben ausgeht.",
     ht_gruende_titel: "Was in den letzten sieben Tagen abgelehnt wurde",
+    ht_liste_titel: "Die letzten Ereignisse – das jüngste oben",
     ht_proben: "{n}× in sieben Tagen hat jemand eine Probe an deinen Knoten geschickt: eine Zahlung ohne Rechnung, um zu sehen, ob ein Weg zu dir trägt. Dabei fließt kein Geld. Nichts zu tun – eher ein gutes Zeichen: Dein Knoten wird gefunden.",
     ht_leer: "Noch nichts durchgegangen. Sobald der erste Kanal steht und jemand über dich zahlt, steht es hier.",
     ht_sp_zeit: "Zeit",
@@ -1248,10 +1261,13 @@ const I18N = {
     ht_r_an_dich: "An dich",
     ht_r_von_dir: "Von dir",
     ht_r_unbekannt: "Unklar",
+    ht_r_umschichten: "Umschichten",
     ht_weg_weiter: "{rein} → {raus}",
     ht_weg_an_dich: "kam über {rein}",
     ht_weg_von_dir: "ging über {raus}",
     ht_weg_unbekannt: "ohne Kanal",
+    ht_weg_raus: "hinaus über {raus}",
+    ht_weg_zurueck: "zurück über {rein}",
     ht_a_weiterleiten: "begonnen",
     ht_a_erledigt: "durchgegangen",
     ht_a_fehl: "weiter hinten gescheitert",
@@ -1353,7 +1369,7 @@ const I18N = {
     kanal_unklar: "Keine Antwort innerhalb der Wartezeit. Der Vorgang kann trotzdem laufen — NICHT wiederholen, sondern erst in der Kanalliste nachsehen.",
     betrag_fehlt: "Diese Rechnung nennt keinen Betrag. Trag einen ein.",
     sd_titel: "Senden",
-    sd_lead: "On-Chain aus der Wallet deines Knotens heraus, an eine gewöhnliche Bitcoin-Adresse. Was in Kanälen liegt, geht so nicht — das kommt erst zurück auf die Kette, wenn ein Kanal schließt. Eine Lightning-Rechnung (lnbc…) gehört nicht hierher, sondern unter Zahlen.",
+    sd_lead: "On-Chain aus der Wallet deines Knotens heraus, an eine gewöhnliche Bitcoin-Adresse. Was in Kanälen liegt, geht so nicht — das kommt erst zurück auf die Kette, wenn ein Kanal schließt. Eine Lightning-Rechnung (lnbc…) gehört nicht hierher, sondern unter „Lightning-Rechnung bezahlen“.",
     wg_titel: "Was dein Knoten über Wege gelernt hat",
     wg_lead: "LND merkt sich je Gegenstellenpaar, bis zu welchem Betrag eine Weiterleitung getragen hat und ab welchem sie versagte — und wählt später danach aus. Liegt „versagte ab“ knapp über „trug bis“, ist der Weg nicht kaputt, sondern leer. Das ist eine Frage der Liquidität und behebbar.",
     wg_zahlen: "{paare} Paare im Gedächtnis · {fehl} mit Fehlschlag · {erfolg} mit Erfolg",
@@ -1526,6 +1542,18 @@ const I18N = {
     lk_kanal_hier: "In channels, your side",
     lk_kanal_frei: "Of that, actually spendable",
     lk_kanal_drueben: "On the far side (= your inbound room)",
+    gh_kette: "On-chain",
+    gh_kette_frei: "Spendable",
+    gh_blitz: "Lightning · in your channels",
+    gh_blitz_hier: "Your side",
+    gh_einzahlen: "Deposit",
+    gh_senden: "Send",
+    gh_rechnung: "Create invoice",
+    gh_bezahlen: "Pay invoice",
+    wb_kette_titel: "On-chain",
+    wb_kette_d: "Ordinary Bitcoin addresses (bc1…, 3…, 1…). Every movement goes into a block: it takes minutes to hours and costs a network fee. When you deposit from an exchange, choose Bitcoin there, not Lightning.",
+    wb_blitz_titel: "Lightning",
+    wb_blitz_d: "Invoices (lnbc…) over your channels. They go through in seconds and cost a fraction. You can receive what fits on the far side of your channels – and pay with what sits on your side.",
     lk_reserve: "{n} sat of that is channel reserve and cannot be spent. Every channel holds back one percent of its capacity on both sides — that is the stake that makes cheating expensive. On small channels it matters.",
     lk_kanaele_titel: "Channels",
     lk_kanaele_d: "The bar is the real statement: with everything on one side, the channel forwards nothing in one direction. Your share on the left, the peer's on the right.",
@@ -2333,7 +2361,7 @@ const I18N = {
     bw_gebuehr: "Fee: {n} sat",
     bw_an: "To: {adresse}",
     b_budget_rest: "{bytes} of the upload budget are left, and the window runs for another {rest}. Bitcoin Core counts per 24 hours, not per month — the slider in setup asks for a monthly figure and divides it up.",
-    rq_titel: "Receive",
+    rq_titel: "Create a Lightning invoice",
     rq_lead: "Create an invoice so someone can send you money over Lightning. It is valid for one hour. Whoever pays it sees the amount and the memo.",
     rq_betrag: "Amount in satoshi",
     rq_betrag_d: "Empty or 0 leaves the amount open — then the payer decides. Handy for a donation.",
@@ -2662,8 +2690,9 @@ const I18N = {
     wt_eigen_ohne: "Your tower is running — but it has no address anyone can reach it at. So nobody can add it, and the contribution goes nowhere. That changes as soon as your node announces an address: under Settings → Visibility. Over Tor the tower gets its own .onion; on the clearnet it needs a router forward on 9911.",
     wt_eigen_fuss: "Two things so no false expectation arises: the tower earns you NO fees — LND runs it explicitly altruistically, and reward towers are designed but not live. And you never learn whom or how much you guard: the tower receives encrypted packets it can only open once the matching transaction appears on chain. That is not a gap, it is the reason it can be trusted.",
     ht_titel: "What went through your node",
-    ht_lead: "Split into other people's payments you forward, payments to you and payments from you. The warning colour appears only where you can do something – such as a channel running out of balance on your side.",
+    ht_lead: "Split into other people's payments you forward, your own rebalancing, payments to you and payments from you. The warning colour appears only where you can do something – such as a channel running out of balance on your side.",
     ht_gruende_titel: "What was turned down over the last seven days",
+    ht_liste_titel: "The latest events – newest on top",
     ht_proben: "{n}× in seven days someone sent your node a probe: a payment without an invoice, to see whether a route to you holds. No money moves. Nothing to do – if anything a good sign: your node is being found.",
     ht_leer: "Nothing has gone through yet. Once the first channel stands and someone pays through you, it shows up here.",
     ht_sp_zeit: "Time",
@@ -2678,10 +2707,13 @@ const I18N = {
     ht_r_an_dich: "To you",
     ht_r_von_dir: "From you",
     ht_r_unbekannt: "Unclear",
+    ht_r_umschichten: "Rebalancing",
     ht_weg_weiter: "{rein} → {raus}",
     ht_weg_an_dich: "came in through {rein}",
     ht_weg_von_dir: "went out through {raus}",
     ht_weg_unbekannt: "no channel",
+    ht_weg_raus: "out via {raus}",
+    ht_weg_zurueck: "back via {rein}",
     ht_a_weiterleiten: "started",
     ht_a_erledigt: "went through",
     ht_a_fehl: "failed further along",
@@ -2783,7 +2815,7 @@ const I18N = {
     kanal_unklar: "No answer within the waiting time. The operation may still be running — do NOT repeat it, check the channel list first.",
     betrag_fehlt: "This invoice names no amount. Enter one.",
     sd_titel: "Send",
-    sd_lead: "On-chain, out of your node's wallet, to an ordinary Bitcoin address. What sits in channels cannot go this way — it returns to the chain only when a channel closes. A Lightning invoice (lnbc…) does not belong here; use Pay instead.",
+    sd_lead: "On-chain, out of your node's wallet, to an ordinary Bitcoin address. What sits in channels cannot go this way — it returns to the chain only when a channel closes. A Lightning invoice (lnbc…) does not belong here; use “Pay a Lightning invoice” instead.",
     wg_titel: "What your node has learned about routes",
     wg_lead: "For each pair of peers LND remembers up to which amount a forward carried and from which amount it failed — and picks routes accordingly later. If “failed from” sits just above “carried up to”, the route is not broken but empty. That is a liquidity question, and it can be fixed.",
     wg_zahlen: "{paare} pairs remembered · {fehl} with a failure · {erfolg} with a success",
@@ -6147,9 +6179,9 @@ async function ladeLightningKanaele() {
   }
   // Einzahlen steht unter "Wallet", Gebuehren unter "Kanaele" -- beide
   // haengen an denselben Daten, deshalb hier mit.
-  for (const id of ["#w-bewegungen", "#w-einzahlen", "#w-senden",
-                    "#w-empfangen", "#w-gebuehren",
-                    "#w-zahlen", "#ln-oeffnen"]) {
+  for (const id of ["#w-bereich-kette", "#w-bewegungen", "#w-einzahlen",
+                    "#w-senden", "#w-bereich-blitz", "#w-empfangen",
+                    "#w-gebuehren", "#w-zahlen", "#ln-oeffnen"]) {
     const feld = $(id);
     if (feld) feld.classList.toggle("hidden", !bereit);
   }
@@ -6506,18 +6538,52 @@ function zeichneLnGuthaben(g) {
   // Senden scheiterte. Das Unbestaetigte steht jetzt daneben.
   LETZTES_GUTHABEN = g;
   const unterwegs = Math.max(0, (g.kette_gesamt || 0) - (g.kette_bestaetigt || 0));
-  const werte = [
-    [t("lk_onchain"), g.kette_bestaetigt],
-    [t("lk_kanal_hier"), g.kanal_hier],
-  ];
-  if (unterwegs) werte.splice(1, 0, [t("lk_unterwegs"), unterwegs]);
   // Der Satz dazu steht UNTER den Kennzahlen: im Raster wurde er zur
   // schmalen Spalte. Leer blendet .note:empty ihn aus.
   const erklaerung = $("#ln-guthaben-hinweis");
   if (erklaerung) erklaerung.textContent = unterwegs ? t("lk_unterwegs_d") : "";
-  if (g.kanal_reserve) werte.push([t("lk_kanal_frei"), g.kanal_frei]);
-  werte.push([t("lk_kanal_drueben"), g.kanal_drueben]);
-  for (const [name, betrag] of werte) {
+  // Zwei Bloecke statt einer Reihe gleich grosser Zahlen: was on-chain liegt,
+  // und was in den Kanaelen. Jeder mit den zwei Knoepfen, die zu ihm gehoeren
+  // -- aus dem Betrieb, 29.09.2026: "hier in dem grossen feld .. koennte man
+  // ja direkt einzahl auszahlen machen".
+  const kette = [[t("gh_kette_frei"), g.kette_bestaetigt]];
+  if (unterwegs) kette.push([t("lk_unterwegs"), unterwegs]);
+  const blitz = [[t("gh_blitz_hier"), g.kanal_hier]];
+  if (g.kanal_reserve) blitz.push([t("lk_kanal_frei"), g.kanal_frei]);
+  blitz.push([t("lk_kanal_drueben"), g.kanal_drueben]);
+  const bloecke = document.createElement("div");
+  bloecke.className = "gh-bloecke";
+  bloecke.append(
+    guthabenBlock(t("gh_kette"), "bc1…", kette, [
+      [t("gh_einzahlen"), "#w-einzahlen"], [t("gh_senden"), "#w-senden"]]),
+    guthabenBlock(t("gh_blitz"), "lnbc…", blitz, [
+      [t("gh_rechnung"), "#w-empfangen"], [t("gh_bezahlen"), "#w-zahlen"]]));
+  ziel.append(bloecke);
+  // Unter beiden Bloecken, nicht als Kachel dazwischen: dort stand der Satz
+  // als schmale, hohe Spalte und schob ein leeres Feld unter die Zahlen.
+  if (g.kanal_reserve) {
+    ziel.append(hinweis(t("lk_reserve", { n: zahl(g.kanal_reserve) }), ""));
+  }
+}
+
+// Ein Block im Guthaben: in der Kopfzeile die Ueberschrift mit dem
+// Kennzeichen der Adressen und rechts die Knoepfe, die zum passenden Kasten
+// weiter unten springen; darunter die Zahlen ueber die volle Breite.
+function guthabenBlock(titel, kennzeichen, werte, knoepfe) {
+  const block = document.createElement("div");
+  block.className = "gh-block";
+  const kopf = document.createElement("div");
+  kopf.className = "gh-kopf";
+  const ueberschrift = document.createElement("h4");
+  const name = document.createElement("span");
+  name.textContent = titel;
+  const zeichen = document.createElement("span");
+  zeichen.className = "kennzeichen";
+  zeichen.textContent = kennzeichen;
+  ueberschrift.append(name, zeichen);
+  const zahlen = document.createElement("div");
+  zahlen.className = "gh-zahlen";
+  for (const [bezeichnung, betrag] of werte) {
     const kasten = document.createElement("div");
     kasten.className = "kennzahl-gross";
     const wert = document.createElement("div");
@@ -6525,13 +6591,44 @@ function zeichneLnGuthaben(g) {
     wert.textContent = sats(betrag);
     const bez = document.createElement("div");
     bez.className = "bez";
-    bez.textContent = name;
+    bez.textContent = bezeichnung;
     kasten.append(wert, bez);
-    ziel.append(kasten);
+    zahlen.append(kasten);
   }
-  if (g.kanal_reserve) {
-    ziel.append(hinweis(t("lk_reserve", { n: zahl(g.kanal_reserve) }), ""));
+  const leiste = document.createElement("div");
+  leiste.className = "gh-knoepfe";
+  for (const [text, ziel] of knoepfe) {
+    const knopf = document.createElement("button");
+    knopf.type = "button";
+    knopf.className = "btn ghost";
+    knopf.textContent = text;
+    knopf.dataset.sprung = ziel;
+    leiste.append(knopf);
   }
+  kopf.append(ueberschrift, leiste);
+  block.append(kopf, zahlen);
+  return block;
+}
+
+// So lange leuchtet der Rand des Kastens, in den gesprungen wurde.
+const SPRUNG_MARKE_MS = 1600;
+
+// Aus dem Guthaben in den passenden Kasten darunter. Der Fokus geht auf die
+// Ueberschrift, nicht ins erste Feld: auf dem Handy oeffnete sonst sofort die
+// Tastatur, bevor man gesehen hat, wo man gelandet ist.
+function springeZu(ziel) {
+  const kasten = $(ziel);
+  if (!kasten || kasten.classList.contains("hidden")) return;
+  const ruhig = !!(window.matchMedia
+                   && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  kasten.scrollIntoView({ behavior: ruhig ? "auto" : "smooth", block: "start" });
+  const titel = kasten.querySelector("h3");
+  if (titel) {
+    titel.tabIndex = -1;
+    titel.focus({ preventScroll: true });
+  }
+  kasten.classList.add("angesprungen");
+  setTimeout(() => kasten.classList.remove("angesprungen"), SPRUNG_MARKE_MS);
 }
 
 // Anteil der Zeit, in der die Gegenstelle diesen Knoten erreichen konnte.
@@ -10746,7 +10843,10 @@ function htlcGrund(grund, richtung) {
   if (gruppe === "probe" && richtung === "an_dich") {
     return { text: "ht_g_probe", tun: null, art: "ok" };
   }
-  const tun = richtung !== "an_dich" ? handgriff[gruppe] || null : null;
+  // Beim eigenen Umschichten ist nichts zu reparieren -- der Versuch war
+  // deiner, und nichts ist verloren.
+  const tun = !["an_dich", "umschichten"].includes(richtung)
+    ? handgriff[gruppe] || null : null;
   return { text: "ht_g_" + gruppe, tun, art: tun ? "warn" : "" };
 }
 
@@ -10759,6 +10859,11 @@ function htlcWeg(e) {
   if (e.richtung === "weiter") return ["ht_weg_weiter", { rein, raus }];
   if (e.richtung === "an_dich") return ["ht_weg_an_dich", { rein }];
   if (e.richtung === "von_dir") return ["ht_weg_von_dir", { raus }];
+  // Umschichten: jede Zeile ist einer der beiden Teile -- hinaus ueber den
+  // einen Kanal oder zurueck ueber den anderen.
+  if (e.richtung === "umschichten") {
+    return e.raus_kanal ? ["ht_weg_raus", { raus }] : ["ht_weg_zurueck", { rein }];
+  }
   return ["ht_weg_unbekannt", {}];
 }
 
@@ -10815,7 +10920,7 @@ async function durchgangLaden() {
   if (d.proben) oben.append(hinweis(t("ht_proben", { n: zahl(d.proben) }), "ok"));
   // Was abgelehnt wurde -- als Tabelle, nach Richtung geordnet (aus dem
   // Betrieb, 29.09.2026: "sonst haette man da ne art tabelle draus machen muessen").
-  const reihenfolge = ["weiter", "von_dir", "an_dich", "unbekannt"];
+  const reihenfolge = ["weiter", "umschichten", "von_dir", "an_dich", "unbekannt"];
   const echte = gruende
     .filter((g) => htlcGrund(g.grund, g.richtung).text !== "ht_g_probe")
     .sort((a, b) => reihenfolge.indexOf(a.richtung) - reihenfolge.indexOf(b.richtung)
@@ -10843,6 +10948,10 @@ async function durchgangLaden() {
     liste.append(hinweis(t("ht_leer"), ""));
     return;
   }
+  // Eine eigene Ueberschrift: ohne sie lief die Ereignisliste direkt unter
+  // der Tabelle der Gruende weiter und las sich wie deren zweite Kopfzeile
+  // (aus dem Betrieb, 29.09.2026).
+  liste.append(hinweis(t("ht_liste_titel"), ""));
   liste.append(htlcTabelle(["ht_sp_zeit", "ht_sp_richtung", "ht_sp_ergebnis",
                             "ht_sp_betrag", "ht_sp_gebuehr", "ht_sp_weg"],
     ereignisse.slice(0, 25).map((e) => {
@@ -13070,6 +13179,12 @@ async function start() {
   // sperren druecke". Genau das.
   $("#tg-sperren").addEventListener("click", () => walletSperren());
   $("#tg-loeschen").addEventListener("click", walletTilgen);
+  // Die Knoepfe im Guthaben entstehen bei jedem Zeichnen neu -- deshalb
+  // haengt der Klick am Kasten, nicht am einzelnen Knopf.
+  $("#ln-guthaben-inhalt").addEventListener("click", (ereignis) => {
+    const knopf = ereignis.target.closest("[data-sprung]");
+    if (knopf) springeZu(knopf.dataset.sprung);
+  });
   $("#ez-holen").addEventListener("click", () => einzahladresseHolen(false));
   $("#ez-neue").addEventListener("click", () => einzahladresseHolen(true));
   // Eine andere Adressform heisst eine andere Adresse -- sofort, nicht erst

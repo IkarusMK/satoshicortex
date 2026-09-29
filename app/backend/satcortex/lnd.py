@@ -31,7 +31,7 @@ import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 from . import fernzugang
 
@@ -2857,6 +2857,122 @@ def _htlc_grund(einzelheit: Dict) -> Optional[str]:
     if leitung and leitung != "RESERVED":
         return leitung
     return genau or None
+
+
+# Beginn und Ausgang einer Zahlung standen als ZWEI Zeilen da: "begonnen" mit
+# Betrag, darunter "durchgegangen" ohne (aus dem Betrieb, 29.09.2026). Seit
+# 1.4.1 traegt der Ausgang den Betrag selbst -- der Beginn ist dann nur noch
+# dieselbe Zahlung ein zweites Mal. Er faellt weg, sobald sein Ausgang
+# dasteht. Was noch unterwegs ist, bleibt als "begonnen" stehen.
+#
+# Die gemerkten Zeilen tragen keine HTLC-Nummern. Zusammen gehoeren deshalb
+# der aelteste offene Beginn und der naechste Ausgang auf denselben Kanaelen
+# mit demselben Betrag -- oder, bei Zeilen von vor 1.4.1, ohne Betrag.
+HTLC_AUSGAENGE = ("erledigt", "fehl")
+
+
+def htlc_zusammenfassen(zeilen: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Die Zeilen ohne die Beginne, deren Ausgang dasteht. Juengste zuerst,
+    wie sie hereinkommen; die Eingabe bleibt unberuehrt."""
+    offen: List[int] = []            # Beginne ohne Ausgang, aelteste zuerst
+    erledigt = set()
+    aelteste_zuerst = [dict(z) for z in reversed(zeilen)]
+    for i, zeile in enumerate(aelteste_zuerst):
+        if zeile.get("art") == "weiterleiten":
+            offen.append(i)
+            continue
+        if zeile.get("art") not in HTLC_AUSGAENGE:
+            continue
+        for j in offen:
+            beginn = aelteste_zuerst[j]
+            if ((beginn.get("rein_kanal"), beginn.get("raus_kanal"))
+                    != (zeile.get("rein_kanal"), zeile.get("raus_kanal"))):
+                continue
+            if zeile.get("betrag") and zeile["betrag"] != beginn.get("betrag"):
+                continue
+            offen.remove(j)
+            erledigt.add(j)
+            if not zeile.get("betrag"):
+                zeile["betrag"] = beginn.get("betrag")
+                zeile["gebuehr"] = beginn.get("gebuehr")
+            break
+    return [z for i, z in reversed(list(enumerate(aelteste_zuerst)))
+            if i not in erledigt]
+
+
+# ── Umschichten erkennen ───────────────────────────────────────────────────
+#
+# Aus dem Betrieb, 29.09.2026: In der Karte stand "An dich -- eine Zahlung in
+# Teilen kam nicht vollstaendig an, alles ging an den Absender zurueck". Der
+# Absender war der Betreiber selbst, bei einem Umschicht-Versuch. Beim
+# Umschichten ist man beide Enden, und die Karte zeigte es wie die Zahlung
+# eines Fremden.
+#
+# Erkannt wird es an LNDs eigener Zahlungsliste (ListPayments, offchain:read
+# -- steckt im readonly.macaroon), nicht an einer eigenen Buchfuehrung: dort
+# steht jeder Versuch mit seinem Weg und seinem Zeitfenster, auch die
+# gescheiterten und auch die von vor diesem Tag. Eine Zahlung an sich selbst
+# kommt ueber einen EIGENEN Kanal zurueck. Bei einer Zahlung an jemand
+# anderen kann der letzte Kanal nur dann einer von uns sein, wenn der Weg aus
+# genau diesem einen Schritt besteht -- die direkte Zahlung an einen
+# Kanalpartner. Die zaehlt deshalb nicht mit.
+#
+# Zugeordnet wird ueber Kanal und Zeitfenster des Versuchs; HTLC-Nummern hat
+# die Ablage nicht. Eine Probe von aussen gehoert nie dazu: zu ihr gibt es
+# keine Rechnung, zum Umschichten schon.
+UMSCHICHT_ZAHLUNGEN_HOECHSTENS = 500
+UMSCHICHT_SPIELRAUM_MS = 5_000
+
+
+def umschicht_versuche(knoten: Knoten, seit_s: int,
+                       eigene_kanaele: Set[str]) -> List[Dict[str, Any]]:
+    """Jeder Versuch einer Zahlung an sich selbst seit seit_s: hinaus ueber
+    welchen Kanal, zurueck ueber welchen, wann, und was ankommen sollte."""
+    frage = urllib.parse.urlencode({
+        "include_incomplete": "true",
+        "reversed": "true",
+        "max_payments": str(UMSCHICHT_ZAHLUNGEN_HOECHSTENS),
+        "creation_date_start": str(max(0, int(seit_s))),
+    })
+    d = knoten.ruf("/v1/payments?" + frage) or {}
+    versuche = []
+    for zahlung in d.get("payments") or []:
+        for versuch in zahlung.get("htlcs") or []:
+            schritte = (versuch.get("route") or {}).get("hops") or []
+            if len(schritte) < 2:
+                continue
+            zurueck = htlc_kanal(schritte[-1].get("chan_id"))
+            if zurueck not in eigene_kanaele:
+                continue
+            versuche.append({
+                "raus_kanal": htlc_kanal(schritte[0].get("chan_id")),
+                "rein_kanal": zurueck,
+                "von_ms": _zahl(versuch.get("attempt_time_ns")) // 1_000_000,
+                "bis_ms": _zahl(versuch.get("resolve_time_ns")) // 1_000_000,
+                "betrag": _zahl(schritte[-1].get("amt_to_forward_msat")) // 1000,
+            })
+    return versuche
+
+
+def htlc_umschichten(zeile: Dict[str, Any], versuche: List[Dict[str, Any]],
+                     jetzt_ms: int) -> Optional[Dict[str, Any]]:
+    """Der Umschicht-Versuch, zu dem diese HTLC-Zeile gehoert -- oder None."""
+    richtung = zeile.get("richtung")
+    if richtung not in ("von_dir", "an_dich") or zeile.get("grund") in HTLC_PROBEN:
+        return None
+    zeit = _zahl(zeile.get("zeit_ms"))
+    for versuch in versuche:
+        # Ein Versuch, der noch unterwegs ist, hat kein Ende -- LND laesst
+        # resolve_time_ns dann leer.
+        bis = versuch["bis_ms"] or jetzt_ms
+        if not (versuch["von_ms"] - UMSCHICHT_SPIELRAUM_MS <= zeit
+                <= bis + UMSCHICHT_SPIELRAUM_MS):
+            continue
+        if richtung == "von_dir" and zeile.get("raus_kanal") == versuch["raus_kanal"]:
+            return versuch
+        if richtung == "an_dich" and zeile.get("rein_kanal") == versuch["rein_kanal"]:
+            return versuch
+    return None
 
 
 # So viele begonnene Weiterleitungen werden gemerkt, bis ihr Ausgang kommt.

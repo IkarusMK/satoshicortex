@@ -538,12 +538,18 @@ anything.
 
 Two ways, and they are different:
 
+The wallet page keeps both apart. The balance on top comes in two blocks —
+*On-chain* and *Lightning · in your channels* — each with the two buttons that
+belong to it, and those jump to the matching panel further down. Directly
+under the balance stand your transactions; below them the panels sit in two
+sections, *On-chain* (`bc1…`) and *Lightning* (`lnbc…`).
+
 **Depositing on-chain.** Under *Wallet → Deposit* the node generates an address
 together with a QR image. The money then sits in the node's on-chain wallet and
 is the basis for channels. It needs confirmations: only what is confirmed can
 be spent.
 
-**Receiving over Lightning.** Under *Wallet → Receive* you issue an invoice:
+**Receiving over Lightning.** Under *Wallet → Create a Lightning invoice* you issue an invoice:
 amount, purpose, validity. Out comes a BOLT11 invoice with a QR image that you
 pass on. Below it are the most recently issued invoices with their state —
 open, paid, cancelled.

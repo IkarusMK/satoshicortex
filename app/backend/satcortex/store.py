@@ -54,6 +54,11 @@ NACHRICHTEN_TAGE = 60
 # sechzig Meldungen -- der Rest fiel sofort unter die Grenze.
 NACHRICHTEN_FENSTER = 60
 
+# Wie viele eigene Fehlschlaege (von dir, an dich) einer Woche einzeln
+# hereinkommen, um sie Umschicht-Versuchen zuzuordnen. Eigene Zahlungen sind
+# wenige; die Grenze haelt nur einen Ausreisser aus dem Speicher.
+HTLC_EIGENE_HOECHSTENS = 5000
+
 # Wie lange ein Schreibender auf die Sperre wartet, bevor er aufgibt.
 #
 # Die Zahl allein schuetzt vor nichts. DER BEFUND VOM 26.09.2026, aus dem
@@ -749,6 +754,25 @@ class Ablage:
             "AND zeit_ms >= ? GROUP BY grund, rein_kanal, raus_kanal "
             "ORDER BY anzahl DESC LIMIT 50", (int(seit_ms),)).fetchall()]
 
+    def htlc_eigene_fehlschlaege(self, seit_ms: int = 0,
+                                 grenze: int = HTLC_EIGENE_HOECHSTENS
+                                 ) -> List[Dict]:
+        """Die Fehlschlaege von dir oder an dich, einzeln und mit Zeit.
+
+        Ob einer davon zu einem eigenen Umschicht-Versuch gehoerte, sagt nur
+        seine Zeit -- die gezaehlten Gruende haben keine. Weiterleitungen
+        bleiben draussen: sie gehoeren nie zu einem eigenen Versuch, und von
+        ihnen kann es auf einem vielbefahrenen Knoten sehr viele geben.
+        "0" ist der Kanal "keiner" aus Zeilen von vor 1.4.1.
+        """
+        return [dict(r) for r in self.v.execute(
+            "SELECT zeit_ms, grund, rein_kanal, raus_kanal FROM htlc "
+            "WHERE art='link_fehl' AND grund IS NOT NULL AND zeit_ms >= ? "
+            "AND (COALESCE(rein_kanal, '') IN ('', '0') "
+            "     OR COALESCE(raus_kanal, '') IN ('', '0')) "
+            "ORDER BY zeit_ms DESC LIMIT ?",
+            (int(seit_ms), int(grenze))).fetchall()]
+
     def netzgebuehren_merken(self, tag: str, zeit_s: int,
                              werte: Dict) -> None:
         """Die Tagesmessung festhalten -- oder die des Tages ersetzen."""
@@ -928,6 +952,11 @@ class LeereAblage:
         return []
 
     def htlc_gruende(self, seit_ms: int = 0) -> List[Dict]:
+        return []
+
+    def htlc_eigene_fehlschlaege(self, seit_ms: int = 0,
+                                 grenze: int = HTLC_EIGENE_HOECHSTENS
+                                 ) -> List[Dict]:
         return []
 
     def htlc_aufraeumen(self, tage: int = NACHRICHTEN_TAGE) -> int:

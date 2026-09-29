@@ -1305,11 +1305,66 @@ body.ansicht-welt section[data-ansicht="welt"] { flex: 1 1 auto; }
 /* Die Guthaben sind die Zahl, wegen der man diese Seite oeffnet. Also
    gross, nebeneinander, mit Ziffern gleicher Breite -- damit sich beim
    Nachladen nichts verschiebt. */
-#ln-guthaben-inhalt,
 #rn-kurse {
   display: grid; gap: 14px;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
 }
+
+/* Zwei Bloecke untereinander: on-chain und in den Kanaelen, jeder mit
+   seinen zwei Knoepfen rechts in der Kopfzeile (29.09.2026). Nebeneinander
+   passten die drei Lightning-Zahlen nicht in ihre Spalten -- untereinander
+   hat jede Zahl die volle Breite, und hoeher wird es kaum. */
+.gh-bloecke { display: grid; gap: 12px; margin-top: 16px; }
+.gh-block {
+  padding: 14px 16px 16px; border-radius: 12px;
+  background: var(--surface-2); border: 1px solid var(--border);
+}
+.gh-kopf {
+  display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: space-between; gap: 10px 16px; margin-bottom: 12px;
+}
+.gh-kopf h4 {
+  display: flex; align-items: center; gap: 10px; margin: 0;
+  font-size: 11px; font-weight: 700; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--text);
+}
+.gh-zahlen {
+  display: grid; gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+/* Nie umbrochen: "3.120.000" und "sat" auf zwei Zeilen las sich wie zwei
+   Zahlen. Reicht der Platz nicht, rueckt die ganze Zahl in die naechste
+   Zeile. */
+.gh-zahlen .wert { white-space: nowrap; }
+.gh-knoepfe { display: flex; flex-wrap: wrap; gap: 8px; }
+.gh-knoepfe .btn { padding: 7px 14px; font-size: 13px; }
+
+/* Das Kennzeichen der Adressen: bc1... fuer on-chain, lnbc... fuer
+   Lightning. Daran erkennt man, was wohin gehoert, bevor man liest.
+   Nicht ".marke" -- die gibt es schon, bei den Nachrichtenquellen. */
+.kennzeichen {
+  font-family: var(--mono); font-size: 11px; font-weight: 500;
+  letter-spacing: 0; text-transform: none; color: var(--btc-2);
+  padding: 1px 7px; border-radius: 6px; border: 1px solid var(--border-hi);
+}
+
+/* Die beiden Bereiche der Wallet. Groesser als die Ueberschrift eines
+   Kastens: sie ordnen Kaesten, sie sind keiner. */
+.w-bereich {
+  margin-top: 18px; padding: 18px 2px 0;
+  border-top: 1px solid var(--border);
+}
+.w-bereich h2 {
+  display: flex; align-items: center; gap: 12px; margin: 0 0 6px;
+  font-size: 20px; font-weight: 700; color: var(--text);
+}
+.w-bereich p { max-width: 78ch; }
+
+/* Wohin ein Knopf im Guthaben gesprungen ist: der Rand leuchtet kurz auf.
+   Die Kopfleiste steht oben fest -- ohne den Abstand laege die
+   Ueberschrift des Kastens darunter. */
+.inhalt .panel { scroll-margin-top: 84px; }
+.panel.angesprungen { border-color: var(--border-hi); }
 .kennzahl-gross .wert {
   font-family: var(--mono); font-size: 24px; font-weight: 600;
   line-height: 1.15; color: var(--text); font-variant-numeric: tabular-nums;

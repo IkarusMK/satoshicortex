@@ -2209,6 +2209,122 @@ def test_ein_gelungener_ausgang_bekommt_betrag_und_gebuehr_der_weiterleitung():
     assert (zeilen[1]["betrag"], zeilen[1]["gebuehr"]) == (1000, 5)
 
 
+def _zeile(zeit, art, rein, raus, betrag=0, gebuehr=0, grund=None):
+    return {"zeit_ms": zeit, "art": art, "rein_kanal": rein,
+            "raus_kanal": raus, "betrag": betrag, "gebuehr": gebuehr,
+            "grund": grund, "richtung": lnd.htlc_richtung(rein, raus)}
+
+
+def test_beginn_und_ausgang_werden_eine_zeile():
+    """Aus dem Betrieb, 29.09.2026: jede Zahlung stand zweimal da --
+    "begonnen" mit Betrag, "durchgegangen" ohne. Der Beginn faellt weg,
+    sobald sein Ausgang dasteht; was noch unterwegs ist, bleibt stehen."""
+    zeilen = [                                   # die juengste zuerst
+        _zeile(5, "erledigt", None, "111"),      # von vor 1.4.1: ohne Betrag
+        _zeile(4, "weiterleiten", None, "111", 20_005),
+        _zeile(3, "erledigt", "222", "111", 900, 1),
+        _zeile(2, "weiterleiten", "222", "111", 900, 1),
+        _zeile(1, "weiterleiten", "222", "333", 700, 1),
+    ]
+    aus = lnd.htlc_zusammenfassen(zeilen)
+    assert [(z["zeit_ms"], z["art"], z["betrag"]) for z in aus] == [
+        (5, "erledigt", 20_005), (3, "erledigt", 900), (1, "weiterleiten", 700)]
+    assert zeilen[0]["betrag"] == 0, "die gemerkten Zeilen bleiben, wie sie sind"
+
+
+def test_gleichzeitige_zahlungen_finden_ihren_eigenen_beginn():
+    """Zwei HTLC auf demselben Kanal: der Ausgang gehoert zu dem Beginn mit
+    SEINEM Betrag, nicht einfach zum aelteren."""
+    aus = lnd.htlc_zusammenfassen([
+        _zeile(4, "fehl", "222", "111", 200),
+        _zeile(3, "erledigt", "222", "111", 100),
+        _zeile(2, "weiterleiten", "222", "111", 200),
+        _zeile(1, "weiterleiten", "222", "111", 100),
+    ])
+    assert [(z["art"], z["betrag"]) for z in aus] == [("fehl", 200),
+                                                      ("erledigt", 100)]
+
+
+# ── Umschichten erkennen (29.09.2026) ──────────────────────────────────────
+#
+# Aus dem Betrieb: "An dich -- eine Zahlung in Teilen kam nicht vollstaendig
+# an, alles ging an den Absender zurueck". Der Absender war der Betreiber
+# selbst, bei einem Umschicht-Versuch. Beide Enden sind er.
+
+class Zahlungsattrappe:
+    def __init__(self, zahlungen):
+        self.zahlungen = zahlungen
+        self.aufrufe = []
+
+    def ruf(self, pfad, macaroon="readonly", daten=None, zeitlimit=None):
+        self.aufrufe.append((pfad, macaroon, daten))
+        return {"payments": self.zahlungen}
+
+
+def _versuch(*kanaele, von_ms=1_000_000, bis_ms=1_060_000, msat="40000000"):
+    return {"attempt_time_ns": str(von_ms * 1_000_000),
+            "resolve_time_ns": str(bis_ms * 1_000_000),
+            "route": {"hops": [{"chan_id": k, "pub_key": "02" + "ab" * 32,
+                                "amt_to_forward_msat": msat}
+                               for k in kanaele]}}
+
+
+def test_umschichten_ist_eine_zahlung_die_ueber_einen_eigenen_kanal_zurueckkommt():
+    a = Zahlungsattrappe([
+        {"htlcs": [_versuch("111", "555", "222"),     # Teil 1: zurueck ueber 222
+                   _versuch("333", "555", "222",      # Teil 2 kam nie los
+                            von_ms=1_000_050, bis_ms=1_000_900)]},
+        {"htlcs": [_versuch("111", "555", "666")]},   # an jemand anderen
+        {"htlcs": [_versuch("222")]},                 # direkt an den Partner
+    ])
+    versuche = lnd.umschicht_versuche(a, 900, {"111", "222", "333"})
+    assert versuche == [
+        {"raus_kanal": "111", "rein_kanal": "222", "von_ms": 1_000_000,
+         "bis_ms": 1_060_000, "betrag": 40_000},
+        {"raus_kanal": "333", "rein_kanal": "222", "von_ms": 1_000_050,
+         "bis_ms": 1_000_900, "betrag": 40_000}]
+    [(pfad, macaroon, daten)] = a.aufrufe
+    assert pfad.startswith("/v1/payments?") and daten is None
+    assert "include_incomplete=true" in pfad
+    assert "creation_date_start=900" in pfad
+    assert macaroon == "readonly", "offchain:read steckt im readonly.macaroon"
+
+
+def test_ohne_eigene_kanaele_gibt_es_kein_umschichten():
+    a = Zahlungsattrappe([{"htlcs": [_versuch("111", "555", "222")]}])
+    assert lnd.umschicht_versuche(a, 0, set()) == []
+
+
+UMSCHICHTEN = {"raus_kanal": "111", "rein_kanal": "222", "von_ms": 1_000_000,
+               "bis_ms": 1_060_000, "betrag": 40_000}
+
+
+@pytest.mark.parametrize("zeile, gehoert_dazu", [
+    (_zeile(1_060_500, "link_fehl", "222", None,
+            grund="MPP_INVOICE_TIMEOUT"), True),     # der Rest kam nie an
+    (_zeile(1_000_100, "weiterleiten", None, "111"), True),
+    (_zeile(1_030_000, "erledigt", "333", None), False),   # anderer Kanal
+    (_zeile(1_200_000, "erledigt", "222", None), False),   # spaeter
+    (_zeile(990_000, "weiterleiten", None, "111"), False),  # frueher
+    (_zeile(1_030_000, "erledigt", "222", "111"), False),  # Weiterleitung
+    (_zeile(1_030_000, "link_fehl", "222", None,
+            grund="UNKNOWN_INVOICE"), False),         # eine Probe von aussen
+])
+def test_eine_zeile_gehoert_ueber_kanal_und_zeitfenster_zum_umschichten(
+        zeile, gehoert_dazu):
+    assert (lnd.htlc_umschichten(zeile, [UMSCHICHTEN], 0)
+            is UMSCHICHTEN) is gehoert_dazu
+
+
+def test_ein_laufender_versuch_reicht_bis_jetzt():
+    """Solange ein Versuch unterwegs ist, hat er kein Ende -- LND laesst
+    resolve_time_ns dann leer."""
+    laeuft = {**UMSCHICHTEN, "bis_ms": 0}
+    zeile = _zeile(2_000_000, "weiterleiten", None, "111")
+    assert lnd.htlc_umschichten(zeile, [laeuft], 2_000_500) is laeuft
+    assert lnd.htlc_umschichten(zeile, [laeuft], 1_500_000) is None
+
+
 # ── Verbindungen: Leitungen, nicht Kanaele (14.09.2026) ────────────────────
 
 class Peerattrappe:
@@ -2362,6 +2478,7 @@ AUFRUFE = [
     ("umschichten", lambda k: lnd.umschichten(
         k, "123456789", KENNUNG_TEST, 1000, 10)),
     ("htlc_strom", lambda k: next(iter(lnd.htlc_strom(k)))),
+    ("umschicht_versuche", lambda k: lnd.umschicht_versuche(k, 0, {"1"})),
     ("kanal_schliessen", lambda k: lnd.kanal_schliessen(k, KANALPUNKT_TEST, 5)),
     ("setze_gebuehren", lambda k: lnd.setze_gebuehren(k, 1000, 100)),
     ("gebuehrenbericht", lambda k: lnd.gebuehrenbericht(k)),

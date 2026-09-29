@@ -587,11 +587,25 @@
         </div>
 
         <!-- Befund vom 15.09.2026: nach der ersten Einzahlung stand nur eine
-             Zahl da. Hier stehen die Bewegungen mit voller txid. -->
+             Zahl da. Hier stehen die Bewegungen mit voller txid -- direkt
+             unter dem Guthaben, VOR den beiden Bereichen (aus dem Betrieb,
+             29.09.2026: "unsere transaktions historie bleibt trotzdem oben
+             unter guthaben"). -->
         <div class="panel hidden" id="w-bewegungen">
           <h3 data-i18n="bw_titel"></h3>
           <p class="dim small" data-i18n="bw_lead"></p>
           <div id="bw-liste"></div>
+        </div>
+
+        <!-- Zwei Bereiche, jeder mit Ueberschrift. Aus dem Betrieb, 29.09.2026:
+             "das mann das mal auseinander halten kann vernuenftig was ist on
+             chain was ist LND rechnung". Die Kaesten standen bis dahin in
+             einer Reihe, und "Empfangen" sagte nicht, dass es um Lightning
+             geht. Das Guthaben oben springt mit seinen Knoepfen hinein. -->
+        <div class="w-bereich hidden" id="w-bereich-kette">
+          <h2><span data-i18n="wb_kette_titel"></span>
+            <span class="kennzeichen">bc1…</span></h2>
+          <p class="dim small" data-i18n="wb_kette_d"></p>
         </div>
 
         <div class="panel hidden" id="w-einzahlen">
@@ -734,10 +748,12 @@
           </div>
         </div>
 
-        <!-- Ueber Lightning zahlen. Steht direkt neben dem On-Chain-Senden,
-             weil beides dasselbe tut -- Geld aus der Hand geben -- und sich
-             nur im Weg unterscheidet. Dieselbe PIN, dieselbe Reihenfolge:
-             erst ansehen, dann freigeben. -->
+        <div class="w-bereich hidden" id="w-bereich-blitz">
+          <h2><span data-i18n="wb_blitz_titel"></span>
+            <span class="kennzeichen">lnbc…</span></h2>
+          <p class="dim small" data-i18n="wb_blitz_d"></p>
+        </div>
+
         <!-- Empfangen ueber Lightning. Gebaut am 16.09.2026: bis dahin
              konnte die Anwendung zahlen, aber nichts hereinbekommen. -->
         <div class="panel hidden" id="w-empfangen">
@@ -786,6 +802,8 @@
           <div id="rq-liste"></div>
         </div>
 
+        <!-- Ueber Lightning zahlen. Dieselbe PIN und dieselbe Reihenfolge wie
+             beim On-Chain-Senden: erst ansehen, dann freigeben. -->
         <div class="panel hidden" id="w-zahlen">
           <h3 data-i18n="zl_titel"></h3>
           <p class="dim small" data-i18n="zl_lead"></p>
