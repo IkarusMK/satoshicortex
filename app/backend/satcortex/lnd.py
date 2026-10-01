@@ -23,6 +23,7 @@ import shutil
 import json
 import os
 import logging
+import re
 import socket
 import ssl
 import time
@@ -379,8 +380,8 @@ def zustand(knoten: Knoten) -> Dict[str, Any]:
 # Der heikelste Ablauf im ganzen Projekt, und zwar aus zwei Gruenden.
 #
 # 1. DER SEED. Vierundzwanzig Woerter, aus denen sich alles wiederherstellen
-#    laesst. Die Vorgabe des Betreibers ist eindeutig: "eine wallet seed gehoert immer
-#    auf ein blatt papier nie auf platte irgendwo". Er wird deshalb hier
+#    laesst. Die Vorgabe aus dem Betrieb ist eindeutig: ein Seed gehoert auf
+#    Papier, nie auf eine Platte. Er wird deshalb hier
 #    erzeugt, EINMAL angezeigt und nie geschrieben -- nicht in eine Datei,
 #    nicht ins Protokoll, nicht in den Zustand. Wer ihn nicht abschreibt, hat
 #    ihn verloren, und genau so soll es sein.
@@ -755,9 +756,9 @@ def _mit_vorzeichen(wert: Any) -> int:
 
 # Wieviel On-Chain liegenbleiben MUSS, wenn ein Kanal dazukommt.
 #
-# Aus dem Betrieb, 11.09.2026: "wenn ich einen Kanal erstellen will, dass er mir
-# direkt sagt: ok, dein Knoten soll die Menge an Sat haben, dann musst du aber
-# das plus Exit und Gebuehren an Sat einzahlen".
+# Aus dem Betrieb, 11.09.2026: wer einen Kanal anlegen will, soll gleich lesen,
+# was er dafuer einzahlen muss -- den Betrag plus Reserve fuer den Ausstieg und
+# die Gebuehren.
 #
 # Sein Gefuehl stimmt -- der Mechanismus ist nur ein anderer, als er klingt:
 #
@@ -857,6 +858,9 @@ def kanaele(knoten: Knoten) -> List[Dict[str, Any]]:
             "empfangen": _zahl(k.get("total_satoshis_received")),
             "laufzeit_s": _zahl(k.get("lifetime")),
             "erreichbar_s": _zahl(k.get("uptime")),
+            # Wer ihn eroeffnet hat -- nur dann hat deine Wallet die
+            # Eroeffnung bezahlt (Ertrag, 30.09.2026).
+            "eroeffnet_von_dir": bool(k.get("initiator")),
         })
     # Die stillen zuerst: ein Kanal, der nicht aktiv ist, ist das, was
     # Aufmerksamkeit braucht. Danach nach Kapazitaet.
@@ -1114,58 +1118,126 @@ WEITERLEITUNG_SEITE = 10_000
 # Und eine Notbremse: liefert ein Knoten immer wieder dieselbe volle Seite,
 # darf uns das nicht in eine Endlosschleife ziehen.
 WEITERLEITUNG_SEITEN_HOECHSTENS = 20
-# So viele Weiterleitungen zeigt die Oberflaeche einzeln.
-WEITERLEITUNG_ZEIGEN = 20
 
 
-def weiterleitungen(knoten: Knoten) -> Dict[str, Any]:
-    """Was FREMDE durch diesen Knoten geschickt haben.
+def _weiterleitungs_seiten(knoten: Knoten, seit_s: int = 0):
+    """ForwardingHistory Seite fuer Seite -- geblaettert, bis nichts mehr kommt.
 
-    Der Moment, in dem der Knoten wirklich Teil des Netzes ist -- nicht die
-    erste eigene Zahlung, sondern die erste fremde, die hindurchgeht.
+    Ohne start_time liest LND ab dem Anfang der Zeit (rpcserver.go, v0.21.3:
+    "startTime defaults to the Unix epoch").
     """
-    anzahl = menge = gebuehr = 0
-    letzte_roh: List[Dict[str, Any]] = []
     offset = 0
     for _ in range(WEITERLEITUNG_SEITEN_HOECHSTENS):
-        d = knoten.ruf("/v1/switch", macaroon="readonly", daten={
+        daten: Dict[str, Any] = {
             "index_offset": offset,
             "num_max_events": WEITERLEITUNG_SEITE,
             "peer_alias_lookup": True,
-        }) or {}
+        }
+        if seit_s:
+            daten["start_time"] = str(int(seit_s))
+        d = knoten.ruf("/v1/switch", macaroon="readonly", daten=daten) or {}
         seite = d.get("forwarding_events") or []
         if not seite:
-            break
-        anzahl += len(seite)
-        gebuehr += sum(_zahl(e.get("fee_msat")) for e in seite)
-        menge += sum(_zahl(e.get("amt_out")) for e in seite)
-        # Nur das Ende mitschleppen -- der Rest waere Ballast im Speicher.
-        letzte_roh = (letzte_roh + seite)[-WEITERLEITUNG_ZEIGEN:]
+            return
+        yield seite
         if len(seite) < WEITERLEITUNG_SEITE:
-            break
+            return
         # Ohne Fortschritt im Offset waere die naechste Seite dieselbe.
         weiter = _zahl(d.get("last_offset_index"))
         offset = weiter if weiter > offset else offset + len(seite)
-    letzte = [{
-        # "timestamp" ist in LNDs eigener Beschreibung als veraltet markiert
-        # ("Deprecated by timestamp_ns"), am 03.09.2026 nachgeschlagen. Es
-        # steht heute noch drin -- aber veraltete Felder verschwinden
-        # irgendwann, und dann staende hier bei jeder Weiterleitung 1970.
-        # Nanosekunden, also durch eine Milliarde; der Rueckfall bleibt fuer
-        # den Fall, dass eine aeltere Fassung nur das alte Feld kennt.
-        "zeitpunkt": (_zahl(e.get("timestamp_ns")) // 1_000_000_000
-                      or _zahl(e.get("timestamp"))),
-        "von": e.get("peer_alias_in") or "",
-        "nach": e.get("peer_alias_out") or "",
-        "menge": _zahl(e.get("amt_out")),
-        "gebuehr_msat": _zahl(e.get("fee_msat")),
-    } for e in letzte_roh]
-    letzte.reverse()
+
+
+def weiterleitungen_seit(knoten: Knoten, seit_s: int = 0) -> List[Dict[str, Any]]:
+    """Jede Weiterleitung seit seit_s, knapp: wann, ueber welche Kanaele, wie
+    viel, welche Gebuehr. Grundlage des Ertrags je Kanal (30.09.2026)."""
+    liste = []
+    for seite in _weiterleitungs_seiten(knoten, seit_s):
+        for e in seite:
+            liste.append({
+                "zeit_s": (_zahl(e.get("timestamp_ns")) // 1_000_000_000
+                           or _zahl(e.get("timestamp"))),
+                "rein": str(e.get("chan_id_in") or ""),
+                "raus": str(e.get("chan_id_out") or ""),
+                "rein_sat": _zahl(e.get("amt_in")),
+                "raus_sat": _zahl(e.get("amt_out")),
+                "gebuehr_msat": _zahl(e.get("fee_msat")),
+                "rein_name": str(e.get("peer_alias_in") or ""),
+                "raus_name": str(e.get("peer_alias_out") or ""),
+            })
+    return liste
+
+
+# LNDs Etiketten auf eigenen Transaktionen: "0:openchannel:shortchanid-<id>"
+# (labels/labels.go, v0.21.3-beta, MakeLabel). Ohne Kanalnummer --
+# "0:openchannel" allein -- laesst sich nichts zuordnen.
+_KANAL_ETIKETT = re.compile(r"^0:(openchannel|closechannel):shortchanid-(\d+)$")
+
+
+def kanal_kosten(knoten: Knoten) -> Tuple[Dict[str, Dict[str, int]],
+                                           Dict[str, Dict[str, int]]]:
+    """Was das Oeffnen und das Schliessen je Kanal gekostet hat.
+
+    Nur, was deine Wallet bezahlt hat: eine Eroeffnung durch die Gegenseite
+    steht mit Gebuehr 0 in der Liste oder gar nicht. Beim Schliessen ordnet
+    LND die Gebuehr nur zu, soweit sie aus deiner Wallet kam.
+    """
+    d = knoten.ruf("/v1/transactions") or {}
+    oeffnen: Dict[str, Dict[str, int]] = {}
+    schliessen: Dict[str, Dict[str, int]] = {}
+    for tx in d.get("transactions") or []:
+        treffer = _KANAL_ETIKETT.match(str(tx.get("label") or ""))
+        gebuehr = max(0, _mit_vorzeichen(tx.get("total_fees")))
+        if not treffer or not gebuehr:
+            continue
+        ziel = oeffnen if treffer.group(1) == "openchannel" else schliessen
+        ziel[treffer.group(2)] = {"sat": gebuehr,
+                                  "zeit_s": max(0, _mit_vorzeichen(tx.get("time_stamp")))}
+    return oeffnen, schliessen
+
+
+def geschlossene_kanaele(knoten: Knoten) -> List[Dict[str, Any]]:
+    """Die geschlossenen Kanaele -- fuer ihre Schlussbilanz im Ertrag.
+
+    ClosedChannels kennt keinen Namen der Gegenstelle; der kommt, wenn es
+    einen gab, aus den Weiterleitungen (ertrag.py).
+    """
+    d = knoten.ruf("/v1/channels/closed") or {}
+    return [{
+        "nummer": str(k.get("chan_id") or ""),
+        "name": "",
+        "kennung": str(k.get("remote_pubkey") or ""),
+        "kapazitaet": _zahl(k.get("capacity")),
+        "art": str(k.get("close_type") or ""),
+        "eroeffnet_von_dir": k.get("open_initiator") == "INITIATOR_LOCAL",
+        "geschlossen_hoehe": _zahl(k.get("close_height")),
+    } for k in d.get("channels") or [] if k.get("chan_id")]
+
+
+def kanal_linie(knoten: Knoten, nummer: str,
+                gegenstelle: str) -> Optional[Dict[str, Any]]:
+    """Was UNSERE Seite eines Kanals gerade ankuendigt.
+
+    GetChanInfo liefert beide Richtungen einer Kante; unsere ist die, die
+    nicht der Gegenstelle gehoert. Gebraucht fuer den geltenden
+    Hoechstbetrag (max_htlc) und die Zeitsperre -- FeeReport kennt beides
+    nicht, UpdateChannelPolicy verlangt die Zeitsperre aber bei jedem Setzen.
+    """
+    d = knoten.ruf("/v1/graph/edge/" + urllib.parse.quote(str(nummer), safe="")) or {}
+    if d.get("node1_pub") == gegenstelle:
+        linie = d.get("node2_policy")
+    elif d.get("node2_pub") == gegenstelle:
+        linie = d.get("node1_policy")
+    else:
+        linie = None
+    if not isinstance(linie, dict):
+        return None
     return {
-        "anzahl": anzahl,
-        "menge": menge,
-        "gebuehr_msat": gebuehr,
-        "letzte": letzte,
+        "zeitsperre": _zahl(linie.get("time_lock_delta")),
+        "min_htlc_msat": _zahl(linie.get("min_htlc")),
+        "hoechstbetrag_sat": _zahl(linie.get("max_htlc_msat")) // 1000,
+        "satz_ppm": _zahl(linie.get("fee_rate_milli_msat")),
+        "basis_msat": _zahl(linie.get("fee_base_msat")),
+        "aus": bool(linie.get("disabled")),
     }
 
 
@@ -1245,10 +1317,9 @@ EIGENE_RECHTE = (
     # Eine Nachricht mit dem Knotenschluessel unterschreiben. Bewegt kein
     # Geld -- es beweist nur, dass dieser Knoten einem gehoert.
     #
-    # Aus dem Betrieb, 04.09.2026: "was ich auch gesehen habe, dass man im
-    # LightningNetwork+ sich signieren muss ... ich hoffe, dass unser Knoten
-    # dann auch alle notwendigen Funktionen beherrscht, die wir brauchen, um
-    # uns groesseren Netzwerken anzuschliessen."
+    # Aus dem Betrieb, 04.09.2026: bei LightningNetwork+ muss man signieren --
+    # der Knoten soll alles koennen, was es braucht, um sich groesseren Netzen
+    # anzuschliessen.
     #
     # Er hat richtig hingesehen: genau dieses Recht fehlte. Ohne
     # message:write scheitert SignMessage -- nachgeschlagen in LNDs
@@ -1263,8 +1334,8 @@ EIGENE_RECHTE = (
     # Geld und gibt keinen Schluessel preis; es liest nur nach.
     ("message", "read"),
     # SENDEN. Das schwerste Recht in dieser Liste, und es kam erst am
-    # 10.09.2026 dazu -- nach der Bedingung des Betreibers vom 30.08.2026: "ich werde
-    # nix dahin ueberweisen solange ich es nicht zurueck schicken kann".
+    # 10.09.2026 dazu -- nach der Bedingung aus dem Betrieb vom 30.08.2026:
+    # eingezahlt wird erst, wenn man das Geld auch wieder zurueckschicken kann.
     # Eine Wallet, aus der man nicht wieder herauskommt, ist keine Wallet,
     # sondern ein Einbahnstrassenschild.
     #
@@ -1678,9 +1749,9 @@ def gebuehr_erhoehen(knoten: Knoten, txid: str, ausgang: int,
 def loesche_wallet(verzeichnis: Path) -> None:
     """Alles unterhalb des Wallet-Verzeichnisses entfernen.
 
-    Aus dem Betrieb, 09.09.2026: "mach es dann moeglich ein wallet zu loeschen mit
-    dem wallet passwort zum entsperren ... dann kann ich die ganze
-    initialisierung nochmal machen und testen."
+    Aus dem Betrieb, 09.09.2026: eine Wallet soll sich mit ihrem Passwort
+    loeschen lassen, damit man die ganze Einrichtung noch einmal durchlaufen
+    und pruefen kann.
 
     Weg sind damit: die Wallet selbst, die Kanal-Datenbank, die Macaroons,
     das TLS-Zertifikat und der Schluessel des Onion-Dienstes. LND faengt
@@ -1770,8 +1841,8 @@ def verbinde_gegenstelle(knoten: Knoten, zeile: str) -> str:
 
     Die Pruefung liess beide Formen klaglos durch. Wer eine Kennung aus einem
     Explorer kopierte -- dort steht sie meist ohne Adresse -- bekam einen
-    Fehler, den nichts erklaerte. Aus dem Betrieb, 19.09.2026: "ich wuesste jetzt
-    nicht wie ich mich mit einem anderen knoten verbinden sollte".
+    Fehler, den nichts erklaerte. Aus dem Betrieb, 19.09.2026: damit war
+    unklar, wie man sich ueberhaupt mit einem anderen Knoten verbindet.
 
     Jetzt ist es egal, welche Form ankommt: fehlt die Adresse, wird sie im
     eigenen Graphen nachgeschlagen. Der Knoten weiss sie ohnehin -- er hat
@@ -1816,8 +1887,8 @@ def verbinde_gegenstelle(knoten: Knoten, zeile: str) -> str:
 
 # ── Einen Kanal oeffnen ────────────────────────────────────────────────────
 #
-# Aus dem Betrieb, 12.09.2026, nach der Bestandsaufnahme: "ja dann machen wir mal mit
-# Punkt 1 und 2 weiter" -- Kanal oeffnen und Lightning zahlen.
+# Aus dem Betrieb, 12.09.2026, nach der Bestandsaufnahme: weiter mit den
+# Punkten 1 und 2 -- Kanal oeffnen und Lightning zahlen.
 #
 # Bis hierher stand in der README: "No endpoint opens or closes a channel yet.
 # When one appears, it belongs behind the same PIN." Der Satz gilt weiter, er
@@ -1832,9 +1903,8 @@ KANAL_MIN_SAT = 20_000
 
 # Ab wo ein Kanal nicht mehr KNAPP ist -- und das ist keine Geschmacksfrage.
 #
-# Nachgelesen bei lightningnode.info am 12.09.2026, weil der Betreiber ausdruecklich
-# danach gefragt hat ("ist das alles nochmal validiert gegen unsere lndinfo
-# quelle?"). Die Seite nennt 200K-500K sat und begruendet es mit einem Risiko,
+# Nachgelesen bei lightningnode.info am 12.09.2026, weil im Betrieb
+# ausdruecklich nach einer Pruefung gegen diese Quelle gefragt wurde. Die Seite nennt 200K-500K sat und begruendet es mit einem Risiko,
 # das nichts mit Wirtschaftlichkeit zu tun hat:
 #
 #   "A channel too small will result in being unable to close when on-chain
@@ -1926,8 +1996,8 @@ def kanal_oeffnen(knoten: Knoten, zeile: str, betrag_sat: int,
 
 # ── Die Gegenstelle ansehen, BEVOR ein Kanal steht ────────────────────────
 #
-# Aus dem Betrieb, 12.09.2026: "gibt es uns die moeglichkeit einen channel den wir
-# verknuepfen wollen vorher zu scannen und zu warnen ob das sinn macht??"
+# Aus dem Betrieb, 12.09.2026: eine Gegenstelle soll sich vor dem Verbinden
+# pruefen lassen, mit einer Warnung, wenn es keinen Sinn ergibt.
 #
 # Ja -- und die Auskunft kommt aus dem EIGENEN Graphen, nicht von einer
 # fremden Seite. Jeder Knoten kuendigt sich per node_announcement selbst an;
@@ -2032,7 +2102,7 @@ def gegenstelle_ansehen(knoten: Knoten, zeile: str,
 
 # ── Wachtuerme ─────────────────────────────────────────────────────────────
 #
-# Aus dem Betrieb, 12.09.2026: "ich will wenn es um unser geld geht immer 100%!!"
+# Aus dem Betrieb, 12.09.2026: wo es um Geld geht, zaehlen nur hundert Prozent.
 #
 # Der Befund, der dazu gefuehrt hat: in der Konfiguration stand
 # wtclient.active=true -- "meine Kanaele sollen bewacht werden". Das schaltet
@@ -2265,7 +2335,7 @@ def wachturm_entfernen(knoten: Knoten, kennung: str) -> str:
 
 # ── Eine Lightning-Rechnung lesen und bezahlen ─────────────────────────────
 #
-# Der zweite Teil von des Betreibers "Punkt 1 und 2". Bis hierher konnte diese
+# Der zweite Teil von "Punkt 1 und 2". Bis hierher konnte diese
 # Anwendung On-Chain senden -- also die langsame, teure Art. Ueber Lightning
 # zu zahlen, wofuer der ganze Knoten da ist, konnte sie nicht.
 
@@ -2379,7 +2449,8 @@ def zahle(knoten: Knoten, rechnung: str, gebuehrengrenze_sat: int,
 
 # ── Zwischen eigenen Kanaelen umschichten ──────────────────────────────────
 #
-# Aus dem Betrieb, 12.09.2026: "kann ich dann mehre kanäle balancen??"
+# Aus dem Betrieb, 12.09.2026: die Frage, ob sich mehrere Kanaele
+# gegeneinander ausgleichen lassen.
 #
 # Ja -- und der Mechanismus ist derselbe, den ich beim Zahlen ausdruecklich
 # gesperrt habe: eine Zahlung AN SICH SELBST. Raus durch den einen Kanal,
@@ -2401,8 +2472,8 @@ UMSCHICHTEN_ZWECK = "satcortex: umschichten"
 
 # ── Empfangen: eine Rechnung ausstellen ───────────────────────────────────
 #
-# Aus dem Betrieb, 16.09.2026: "Rechnungen bezahlen gibt es ja schon ... solte halt
-# nur auch geld rein bekommen". Bis dahin konnte diese Anwendung ueber
+# Aus dem Betrieb, 16.09.2026: Rechnungen bezahlen ging schon, Geld empfangen
+# noch nicht. Bis dahin konnte diese Anwendung ueber
 # Lightning nur zahlen: rechnung_ausstellen gab es zwar, aber ausschliesslich
 # als Innenteil des Umschichtens -- ohne Endpunkt und ohne Oberflaeche. Ein
 # Knoten, der nicht empfangen kann, ist auf der halben Strecke taub.
@@ -2770,7 +2841,7 @@ def zahlung_abwarten(knoten: Knoten, kennung: str,
 
 # ── Der HTLC-Strom: was hindurchgeht -- und was NICHT ──────────────────────
 #
-# Aus dem Betrieb, 12.09.2026: "koennen wir noch den HTLC-Strom mit rein nehmen?"
+# Aus dem Betrieb, 12.09.2026: der Wunsch, auch den HTLC-Strom aufzunehmen.
 #
 # Bis hierher las die Anwendung LNDs /v1/switch -- die Historie der
 # ABGESCHLOSSENEN Weiterleitungen. Die sagt, was gelungen ist.
@@ -2904,7 +2975,7 @@ def htlc_zusammenfassen(zeilen: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 #
 # Aus dem Betrieb, 29.09.2026: In der Karte stand "An dich -- eine Zahlung in
 # Teilen kam nicht vollstaendig an, alles ging an den Absender zurueck". Der
-# Absender war der Betreiber selbst, bei einem Umschicht-Versuch. Beim
+# Absender war der eigene Knoten, bei einem Umschicht-Versuch. Beim
 # Umschichten ist man beide Enden, und die Karte zeigte es wie die Zahlung
 # eines Fremden.
 #
@@ -2924,10 +2995,9 @@ UMSCHICHT_ZAHLUNGEN_HOECHSTENS = 500
 UMSCHICHT_SPIELRAUM_MS = 5_000
 
 
-def umschicht_versuche(knoten: Knoten, seit_s: int,
-                       eigene_kanaele: Set[str]) -> List[Dict[str, Any]]:
-    """Jeder Versuch einer Zahlung an sich selbst seit seit_s: hinaus ueber
-    welchen Kanal, zurueck ueber welchen, wann, und was ankommen sollte."""
+def _zahlungen(knoten: Knoten, seit_s: int) -> List[Dict[str, Any]]:
+    """Die eigenen Zahlungen seit seit_s -- auch die unfertigen und
+    gescheiterten, jeweils mit allen Versuchen und ihren Wegen."""
     frage = urllib.parse.urlencode({
         "include_incomplete": "true",
         "reversed": "true",
@@ -2935,8 +3005,46 @@ def umschicht_versuche(knoten: Knoten, seit_s: int,
         "creation_date_start": str(max(0, int(seit_s))),
     })
     d = knoten.ruf("/v1/payments?" + frage) or {}
+    return list(d.get("payments") or [])
+
+
+def umschichtungen(knoten: Knoten, seit_s: int,
+                   eigene_kanaele: Set[str]) -> List[Dict[str, Any]]:
+    """Was gelungenes Umschichten gekostet hat -- je aufgefuelltem Kanal.
+
+    Je gelungenem Teil die Gebuehr SEINES Weges (route.total_fees_msat): bei
+    einer Zahlung in Teilen koennen zwei Kanaele aufgefuellt worden sein.
+    Eine Zahlung an sich selbst kommt ueber einen eigenen Kanal zurueck --
+    dieselbe Regel wie in umschicht_versuche.
+    """
+    liste = []
+    for zahlung in _zahlungen(knoten, seit_s):
+        if zahlung.get("status") != "SUCCEEDED":
+            continue
+        for versuch in zahlung.get("htlcs") or []:
+            if versuch.get("status") != "SUCCEEDED":
+                continue
+            weg = versuch.get("route") or {}
+            schritte = weg.get("hops") or []
+            if len(schritte) < 2:
+                continue
+            zurueck = htlc_kanal(schritte[-1].get("chan_id"))
+            if zurueck not in eigene_kanaele:
+                continue
+            liste.append({
+                "zeit_s": _zahl(versuch.get("attempt_time_ns")) // 1_000_000_000,
+                "rein_kanal": zurueck,
+                "gebuehr_sat": _zahl(weg.get("total_fees_msat")) // 1000,
+            })
+    return liste
+
+
+def umschicht_versuche(knoten: Knoten, seit_s: int,
+                       eigene_kanaele: Set[str]) -> List[Dict[str, Any]]:
+    """Jeder Versuch einer Zahlung an sich selbst seit seit_s: hinaus ueber
+    welchen Kanal, zurueck ueber welchen, wann, und was ankommen sollte."""
     versuche = []
-    for zahlung in d.get("payments") or []:
+    for zahlung in _zahlungen(knoten, seit_s):
         for versuch in zahlung.get("htlcs") or []:
             schritte = (versuch.get("route") or {}).get("hops") or []
             if len(schritte) < 2:
@@ -3033,8 +3141,8 @@ def htlc_strom(knoten: Knoten):
 
 # ── Einen Kanal schliessen ─────────────────────────────────────────────────
 #
-# Aus dem Betrieb, 12.09.2026: "kann ich dann auch selber ein kanal kuendigen oder
-# schliessen?"
+# Aus dem Betrieb, 12.09.2026: die Frage, ob man einen Kanal auch selbst
+# schliessen kann.
 #
 # Bis dahin nicht, und meine Begruendung war zu kurz: "ein Kanal, den eine
 # uebernommene Sitzung schliessen koennte, ist ein Verlust". Sein eigener Satz
@@ -3091,18 +3199,27 @@ def kanal_schliessen(knoten: Knoten, kanalpunkt: str, satz_sat_vb: int = 0,
 
 def setze_gebuehren(knoten: Knoten, basis_msat: int, satz_ppm: int,
                     zeitsperre: int = 144,
-                    kanalpunkt: str = "") -> Dict[str, Any]:
+                    kanalpunkt: str = "",
+                    hoechstbetrag_msat: int = 0) -> Dict[str, Any]:
     """Was dieser Knoten fuers Weiterleiten nimmt.
 
     Ohne Kanalpunkt gilt es fuer ALLE Kanaele. Mit Kanalpunkt nur fuer den
     einen -- und genau das ist der Betriebsgriff: teuer machen, wo ein Kanal
     leerlaeuft, billig, wo er aufgefuellt werden soll.
+
+    hoechstbetrag_msat ist max_htlc -- die groesste einzelne Zahlung, die
+    ueber diesen Kanal hinausgeht. 0 heisst: bleibt, wie er ist (LND liest
+    das Feld so). UpdateChannelPolicy setzt Basis, Satz und Zeitsperre
+    dagegen IMMER mit -- wer nur den Hoechstbetrag aendern will, muss die
+    geltenden Werte mitschicken (30.09.2026).
     """
     daten: Dict[str, Any] = {
         "base_fee_msat": str(int(basis_msat)),
         "fee_rate_ppm": int(satz_ppm),
         "time_lock_delta": int(zeitsperre),
     }
+    if int(hoechstbetrag_msat) > 0:
+        daten["max_htlc_msat"] = str(int(hoechstbetrag_msat))
     if kanalpunkt:
         txid, _, index = kanalpunkt.partition(":")
         daten["chan_point"] = {"funding_txid_str": txid,
@@ -3116,9 +3233,9 @@ def setze_gebuehren(knoten: Knoten, basis_msat: int, satz_ppm: int,
 def gebuehrenbericht(knoten: Knoten) -> Dict[str, Dict[str, int]]:
     """Was jeder Kanal JETZT verlangt, nach Kanalpunkt.
 
-    Aus dem Betrieb, 26.09.2026: "meine gesetzten gebueren nach jedem neu
-    start oder refresh weg ... nicht mehr angezeigt was ich da vom netzwerk
-    verlange". Weg waren sie nie -- LND fuehrt sie selbst. Gefragt hat ihn
+    Aus dem Betrieb, 26.09.2026: nach jedem Neustart oder Neuladen schienen die
+    gesetzten Gebuehren weg -- die Anzeige zeigte nicht mehr, was man vom Netz
+    verlangt. Weg waren sie nie -- LND fuehrt sie selbst. Gefragt hat ihn
     nur niemand, und die Felder standen nach jedem Laden wieder auf ihren
     festen Vorgaben.
 

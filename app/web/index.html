@@ -141,8 +141,8 @@
       <!-- Die Hauptentscheidung, und deshalb ganz oben -- genau wie in den
            Einstellungen. Bis 0.40.0 stand sie dort und hier NICHT: wer neu
            installierte, traf sie blind ueber drei Haekchen und fand danach
-           eine andere Darstellung vor. Aus dem Betrieb, 05.09.2026: "wenn jemand
-           das so neu installiert, hat er ja noch keine Ahnung." -->
+           eine andere Darstellung vor. Aus dem Betrieb, 05.09.2026: wer neu
+           installiert, weiss noch nichts. -->
       <div class="wahlgruppe oben" role="radiogroup" aria-labelledby="n-sicht-titel">
         <b id="n-sicht-titel" data-i18n="lnsicht_titel"></b>
         <p class="dim small" data-i18n="lnsicht_lead"></p>
@@ -291,9 +291,8 @@
         <button data-ansicht="ln-knoten"      data-i18n="nav_knoten"></button>
         <button data-ansicht="ln-einrichtung" data-i18n="nav_einrichtung"></button>
       </div>
-      <!-- Aus dem Betrieb, 26.09.2026: "dann solte es links einen neuen
-           reiter geben externe wallet oder so wo mann dann die sachen
-           findet!" Eine eigene Gruppe, weil sie beides traegt: Lightning
+      <!-- Aus dem Betrieb, 26.09.2026: links ein eigener Reiter fuer externe
+           Wallets, wo man alles dazu findet. Eine eigene Gruppe, weil sie beides traegt: Lightning
            (Zeus) und On-Chain (Sparrow). -->
       <div class="abschnitte">
         <h2 class="leiste-titel" data-i18n="nav_verbinden"></h2>
@@ -303,8 +302,8 @@
         <h2 class="leiste-titel" data-i18n="nav_karte"></h2>
         <button data-ansicht="welt" data-i18n="nav_welt"></button>
       </div>
-      <!-- Aus dem Betrieb, 10.09.2026: "der umrechner kann ja auch links nen
-           eigenden reiter bekommen." -->
+      <!-- Aus dem Betrieb, 10.09.2026: der Umrechner bekommt links einen
+           eigenen Reiter. -->
       <div class="abschnitte">
         <h2 class="leiste-titel" data-i18n="nav_werkzeug"></h2>
         <button data-ansicht="rechner" data-i18n="nav_rechner"></button>
@@ -549,9 +548,9 @@
            darunter die Kanaele in voller Breite, und das Nachschlagewerk --
            eigener Knoten und Weiterleitungen -- nebeneinander am Fuss. -->
       <!-- ── WALLET: das Geld ──────────────────────────────────────────
-           Aus dem Betrieb, 10.09.2026: "das wir momentan unter wallet sehen sind
-           alles wallet einstellungen!!! und nicht das wallet .. unter wallet
-           verstehe ich den inhalt den wir im knoten und kanaele haben!!"
+           Aus dem Betrieb, 10.09.2026: unter "Wallet" standen nur Einstellungen
+           der Wallet -- erwartet wird dort ihr Inhalt, das Geld im Knoten und in
+           den Kanaelen.
 
            Er hat recht, und die drei etablierten Oberflaechen (RTL,
            ThunderHub, Zeus) machen es alle gleich: das GELD an einer Stelle,
@@ -598,11 +597,11 @@
         </div>
 
         <!-- Zwei Bereiche, jeder mit Ueberschrift. Aus dem Betrieb, 29.09.2026:
-             "das mann das mal auseinander halten kann vernuenftig was ist on
-             chain was ist LND rechnung". Die Kaesten standen bis dahin in
+             on-chain und Lightning-Rechnung muessen sich klar auseinanderhalten
+             lassen. Die Kaesten standen bis dahin in
              einer Reihe, und "Empfangen" sagte nicht, dass es um Lightning
              geht. Das Guthaben oben springt mit seinen Knoepfen hinein. -->
-        <div class="w-bereich hidden" id="w-bereich-kette">
+        <div class="bereich-kopf hidden" id="w-bereich-kette">
           <h2><span data-i18n="wb_kette_titel"></span>
             <span class="kennzeichen">bc1…</span></h2>
           <p class="dim small" data-i18n="wb_kette_d"></p>
@@ -667,9 +666,9 @@
         </div>
 
         <!-- ── Senden ─────────────────────────────────────────────────
-             Die Bedingung des Betreibers vom 30.08.2026: "ich werde nix dahin
-             ueberweisen solange ich es nicht zurueck schicken kann". Eine
-             Wallet, aus der man nicht wieder herauskommt, ist keine.
+             Die Bedingung aus dem Betrieb vom 30.08.2026: eingezahlt wird
+             erst, wenn man das Geld auch zurueckschicken kann. Eine Wallet,
+             aus der man nicht wieder herauskommt, ist keine.
 
              Zwei Schritte, und der erste ist nicht ueberspringbar: erst
              "was kostet das", dann "jetzt senden". Aendert sich danach ein
@@ -748,7 +747,7 @@
           </div>
         </div>
 
-        <div class="w-bereich hidden" id="w-bereich-blitz">
+        <div class="bereich-kopf hidden" id="w-bereich-blitz">
           <h2><span data-i18n="wb_blitz_titel"></span>
             <span class="kennzeichen">lnbc…</span></h2>
           <p class="dim small" data-i18n="wb_blitz_d"></p>
@@ -853,8 +852,8 @@
           <div id="kk-urteil"></div>
           <p class="dim small" id="kk-erzwungen" data-i18n="kk_erzwungen"></p>
           <!-- Der Rechner dazu ("was muss ich einzahlen?") steht unter
-               "Rechner", nicht hier. Aus dem Betrieb, 11.09.2026: "wir haben ja
-               schon ein rechner reiter kann das da nicht mit rein?" -- und
+               "Rechner", nicht hier. Aus dem Betrieb, 11.09.2026: es gibt doch
+               schon den Rechner -- und
                dort liegt der Kurs, also steht dort neben den Satoshi auch
                der Betrag in Euro. Genau der ist die Zahl, in der man plant. -->
         </div>
@@ -867,10 +866,170 @@
              leer, und leer sieht aus wie kaputt. -->
         <p class="note hidden" id="ln-kanaele-leer" data-i18n="lk_leer"></p>
 
+        <!-- Der Ueberblick, wie bei der Wallet: die Zahlen, auf die es ankommt,
+             und Knoepfe zu den Handgriffen weiter unten. Aus dem Betrieb,
+             30.09.2026: die Kanaele-Seite sollte uebersichtlich werden. Bis dahin standen neun Kaesten untereinander, und jede
+             Aktion wollte ihren Kanal erst wieder aus einer Liste. -->
+        <div class="panel hidden" id="lk-ueberblick">
+          <h3 data-i18n="lu_titel"></h3>
+          <div id="lk-ueberblick-inhalt"></div>
+        </div>
+
         <div class="panel hidden" id="ln-kanalliste">
           <h3 data-i18n="lk_kanaele_titel"></h3>
           <p class="dim small" data-i18n="lk_kanaele_d"></p>
           <div id="ln-kanaele-inhalt"></div>
+        </div>
+
+        <div class="bereich-kopf hidden" id="lk-bereich-ertrag">
+          <h2 data-i18n="lb_ertrag_titel"></h2>
+          <p class="dim small" data-i18n="lb_ertrag_d"></p>
+        </div>
+
+        <!-- Was jeder Kanal einbringt und was er gekostet hat -- ohne das
+             weiss niemand, welcher Kanal sich lohnt. Die Gebuehr zaehlt beim
+             AUSGEHENDEN Kanal: dort wurde Liquiditaet verkauft. -->
+        <div class="panel hidden" id="lk-ertrag">
+          <h3 data-i18n="le_titel"></h3>
+          <p class="dim small" data-i18n="le_lead"></p>
+          <div class="segmente" id="le-zeitraum" role="group"
+               data-i18n-attr="aria-label=le_zeitraum">
+            <button type="button" data-tage="7" data-i18n="le_7"></button>
+            <button type="button" data-tage="30" class="an" data-i18n="le_30"></button>
+            <button type="button" data-tage="90" data-i18n="le_90"></button>
+            <button type="button" data-tage="0" data-i18n="le_alle"></button>
+          </div>
+          <div id="le-summe"></div>
+          <div id="le-monate"></div>
+          <div id="le-tabelle"></div>
+          <details id="le-geschlossen" class="hidden">
+            <summary data-i18n="le_geschlossen"></summary>
+            <div id="le-geschlossen-inhalt"></div>
+          </details>
+          <p class="dim small" data-i18n="le_fremd"></p>
+        </div>
+
+        <div class="bereich-kopf hidden" id="lk-bereich-steuern">
+          <h2 data-i18n="lb_steuern_titel"></h2>
+          <p class="dim small" data-i18n="lb_steuern_d"></p>
+        </div>
+
+        <div class="panel hidden" id="w-gebuehren">
+          <h3 data-i18n="gb_titel"></h3>
+          <p class="dim small" data-i18n="gb_lead"></p>
+
+          <!-- Was das NETZ nimmt -- aus dem eigenen Graphen gemessen, nicht
+               aus einer Zahl im Quelltext. Bis zum 18.09.2026 stand in
+               gb_lead "rund 143 ppm"; so eine Zahl altert still. -->
+          <div class="netzgebuehren" id="gb-netz">
+            <div class="netzgebuehren-kopf">
+              <b data-i18n="gb_netz_titel"></b>
+              <button type="button" class="btn schmal" id="gb-messen"
+                      data-i18n="gb_messen"></button>
+            </div>
+            <div id="gb-netz-zahlen" class="dim small"></div>
+            <!-- Wie sich die Saetze verteilen. Bis zum 21.09.2026 stand hier
+                 ein Absatz, der die Schiefe der Verteilung ERKLAERTE -- und
+                 der sich bei jedem Anzeigen ein weiteres Mal anhaengte. Eine
+                 Leiste sagt dasselbe auf einen Blick und dazu, wo die Masse
+                 liegt. -->
+            <div id="gb-netz-verteilung" class="gb-verteilung"></div>
+            <div id="gb-netz-band" class="dim small"></div>
+            <div id="gb-verlauf" class="gb-verlauf"></div>
+            <div class="netzgebuehren-fuss">
+              <button type="button" class="btn schmal" id="gb-uebernehmen"
+                      data-i18n="gb_uebernehmen"></button>
+              <span class="dim small" id="gb-netz-meldung"></span>
+            </div>
+          </div>
+
+          <label class="switch">
+            <input type="checkbox" id="gb-automatik">
+            <span><b data-i18n="gb_automatik"></b><br><span class="dim small" data-i18n="gb_automatik_d"></span></span>
+          </label>
+          <p class="dim small" id="gb-automatik-stand"></p>
+          <!-- Wie oft je Kanal hoechstens -- und ueber welchen Zeitraum der
+               Fuellstand gemittelt wird (aus dem Betrieb, 30.09.2026: "einmal
+               am tag statt finden oder 1 mal alle 3 tage"). -->
+          <label class="feld">
+            <b data-i18n="gb_abstand"></b>
+            <span class="dim small" data-i18n="gb_abstand_d"></span>
+            <select id="gb-abstand">
+              <option value="1" data-i18n="gb_abstand_1"></option>
+              <option value="3" data-i18n="gb_abstand_3"></option>
+            </select>
+          </label>
+
+          <label class="feld">
+            <b data-i18n="gb_kanal"></b>
+            <span class="dim small" data-i18n="gb_kanal_d"></span>
+            <select id="gb-kanal"></select>
+          </label>
+          <!-- Was der gewaehlte Kanal JETZT verlangt, aus LNDs eigenem
+               Bericht. Bis zum 26.09.2026 standen darunter nach jedem Laden
+               nur die festen Vorgaben -- aus dem Betrieb: "meine gesetzten
+               gebueren nach jedem neu start oder refresh weg". -->
+          <p class="dim small" id="gb-aktuell"></p>
+          <label class="feld">
+            <b data-i18n="gb_satz"></b>
+            <span class="dim small" data-i18n="gb_satz_d"></span>
+            <input type="number" id="gb-satz" min="0" max="10000" step="1" value="100">
+          </label>
+          <label class="feld">
+            <b data-i18n="gb_basis"></b>
+            <span class="dim small" data-i18n="gb_basis_d"></span>
+            <input type="number" id="gb-basis" min="0" max="100000" step="100" value="0">
+          </label>
+          <div style="display:flex;gap:12px;align-items:center;margin-top:12px">
+            <button type="button" class="btn" id="gb-setzen" data-i18n="gb_setzen"></button>
+            <span class="dim small" id="gb-meldung"></span>
+          </div>
+        </div>
+
+        <!-- Umschichten. Erscheint erst ab zwei Kanaelen -- mit einem gibt
+             es nichts umzuschichten, und ein Kasten, der nie geht, ist
+             schlechter als keiner. -->
+        <div class="panel hidden" id="ln-schichten">
+          <h3 data-i18n="us_titel"></h3>
+          <p class="dim small" data-i18n="us_lead"></p>
+
+          <label class="feld">
+            <b data-i18n="us_von"></b>
+            <span class="dim small" data-i18n="us_von_d"></span>
+            <select id="us-von"></select>
+          </label>
+          <label class="feld">
+            <b data-i18n="us_nach"></b>
+            <span class="dim small" data-i18n="us_nach_d"></span>
+            <select id="us-nach"></select>
+          </label>
+          <label class="feld">
+            <b data-i18n="us_betrag"></b>
+            <span class="dim small" data-i18n="us_betrag_d"></span>
+            <input type="number" id="us-betrag" min="1" step="1000">
+          </label>
+          <!-- Die Grenze der Gegenstelle, sobald sie enger ist als der
+               Kanal. Befund vom 24.09.2026 (LDK: 25 % gleichzeitig). -->
+          <div class="note hidden" id="us-grenze"></div>
+
+          <label class="feld hidden" id="us-pin-zeile">
+            <b data-i18n="tg_pin"></b>
+            <span class="dim small" data-i18n="sd_pin_d"></span>
+            <input type="password" id="us-pin" inputmode="numeric"
+                   autocomplete="off" maxlength="12">
+          </label>
+
+          <div style="display:flex;gap:12px;align-items:center;margin-top:14px">
+            <button type="button" class="btn" id="us-los"
+                    data-i18n="us_los"></button>
+            <span class="dim small" id="us-meldung"></span>
+          </div>
+          <div class="note ok hidden" id="us-fertig"></div>
+        </div>
+
+        <div class="bereich-kopf hidden" id="lk-bereich-oeffnen">
+          <h2 data-i18n="lb_oeffnen_titel"></h2>
+          <p class="dim small" data-i18n="lb_oeffnen_d"></p>
         </div>
 
         <!-- Einen Kanal oeffnen. Bis zum 12.09.2026 gab es das hier nicht,
@@ -895,9 +1054,9 @@
           </label>
           <!-- EIN Feld, drei Dinge, die man damit tun kann. Bis zum
                19.09.2026 stand "Verbinden" in einem anderen Reiter, mit
-               einem Feld, das genauso aussah -- der Betreiber: "ich wuesste
-               jetzt nicht wie ich mich mit einem anderen knoten verbinden
-               sollte ... da habe ich ja hier 2 moeglichkeiten". -->
+               einem Feld, das genauso aussah -- im Betrieb war damit unklar,
+               wie man sich mit einem anderen Knoten verbindet, bei zwei
+               Moeglichkeiten. -->
           <div style="display:flex;gap:12px;align-items:center;margin-top:8px;flex-wrap:wrap">
             <button type="button" class="btn ghost" id="ko-ansehen"
                     data-i18n="ko_ansehen"></button>
@@ -957,11 +1116,10 @@
           <div class="note ok hidden" id="ko-fertig"></div>
         </div>
 
-
-        <!-- Einen Kanal schliessen. Aus dem Betrieb, 12.09.2026: "kann ich dann
-             auch selber ein kanal kuendigen oder schliessen?" -- und sein
-             eigener Satz vom 30.08.: nichts dahin ueberweisen, solange man es
-             nicht zurueckschicken kann. Fuer Kanaele gilt dasselbe. -->
+        <!-- Einen Kanal schliessen. Aus dem Betrieb, 12.09.2026: die Frage, ob
+             man einen Kanal selbst schliessen kann -- und die Bedingung vom
+             30.08.: nichts einzahlen, solange man es nicht zurueckschicken
+             kann. Fuer Kanaele gilt dasselbe. -->
         <div class="panel hidden" id="ln-schliessen">
           <h3 data-i18n="ks_titel"></h3>
           <p class="dim small" data-i18n="ks_lead"></p>
@@ -994,45 +1152,40 @@
           <div class="note ok hidden" id="ks-fertig"></div>
         </div>
 
-        <!-- Umschichten. Erscheint erst ab zwei Kanaelen -- mit einem gibt
-             es nichts umzuschichten, und ein Kasten, der nie geht, ist
-             schlechter als keiner. -->
-        <div class="panel hidden" id="ln-schichten">
-          <h3 data-i18n="us_titel"></h3>
-          <p class="dim small" data-i18n="us_lead"></p>
+        <div class="bereich-kopf hidden" id="lk-bereich-beobachten">
+          <h2 data-i18n="lb_beobachten_titel"></h2>
+          <p class="dim small" data-i18n="lb_beobachten_d"></p>
+        </div>
 
-          <label class="feld">
-            <b data-i18n="us_von"></b>
-            <span class="dim small" data-i18n="us_von_d"></span>
-            <select id="us-von"></select>
-          </label>
-          <label class="feld">
-            <b data-i18n="us_nach"></b>
-            <span class="dim small" data-i18n="us_nach_d"></span>
-            <select id="us-nach"></select>
-          </label>
-          <label class="feld">
-            <b data-i18n="us_betrag"></b>
-            <span class="dim small" data-i18n="us_betrag_d"></span>
-            <input type="number" id="us-betrag" min="1" step="1000">
-          </label>
-          <!-- Die Grenze der Gegenstelle, sobald sie enger ist als der
-               Kanal. Befund vom 24.09.2026 (LDK: 25 % gleichzeitig). -->
-          <div class="note hidden" id="us-grenze"></div>
+        <!-- Der HTLC-Strom. Steht NACH den Nachschlage-Kaesten, aber vor den
+             Gebuehren: es ist die Auskunft, aus der die Gebuehrenentscheidung
+             folgt -- teuer machen, wo ein Kanal leerlaeuft. -->
+        <div class="panel hidden" id="ln-durchgang">
+          <h3 data-i18n="ht_titel"></h3>
+          <p class="dim small" data-i18n="ht_lead"></p>
+          <!-- Die Fehlschlaege ZUERST -- getrennt nach weitergeleitet, an
+               dich, von dir, und Proben fuer sich (29.09.2026). Eine Liste,
+               in der alles durcheinanderlaeuft, beantwortet die Frage
+               nicht, die man hier hat. -->
+          <div id="ht-gruende"></div>
+          <div id="ht-liste"></div>
+        </div>
 
-          <label class="feld hidden" id="us-pin-zeile">
-            <b data-i18n="tg_pin"></b>
-            <span class="dim small" data-i18n="sd_pin_d"></span>
-            <input type="password" id="us-pin" inputmode="numeric"
-                   autocomplete="off" maxlength="12">
-          </label>
+        <!-- Was LND ueber Wege gelernt hat (Mission Control). Aus dem
+             Abgleich gegen LNDs Umfang am 22.09.2026: routerrpc hat
+             neunzehn Routen, wir nutzten zwei -- und das hier ist die, die
+             beim Weiterleiten wirklich zaehlt. -->
+        <div class="panel">
+          <h3 data-i18n="wg_titel"></h3>
+          <p class="dim small" data-i18n="wg_lead"></p>
+          <div id="wg-zahlen" class="dim small"></div>
+          <div class="ausw-tabelle"><table id="wg-liste"></table></div>
+          <p class="dim small" id="wg-meldung"></p>
+        </div>
 
-          <div style="display:flex;gap:12px;align-items:center;margin-top:14px">
-            <button type="button" class="btn" id="us-los"
-                    data-i18n="us_los"></button>
-            <span class="dim small" id="us-meldung"></span>
-          </div>
-          <div class="note ok hidden" id="us-fertig"></div>
+        <div class="bereich-kopf hidden" id="lk-bereich-schutz">
+          <h2 data-i18n="lb_schutz_titel"></h2>
+          <p class="dim small" data-i18n="lb_schutz_d"></p>
         </div>
 
         <!-- Wachtuerme. Steht hier und nicht in einer Konfigurationsdatei,
@@ -1045,8 +1198,8 @@
           <div id="wt-stand"></div>
           <p class="dim small" data-i18n="wt_grenze"></p>
 
-          <!-- Der eigene Turm. Aus dem Betrieb, 12.09.2026: "unsere lightning node
-               kann ja schon ein eigender watch tower sein". Kann sie -- und
+          <!-- Der eigene Turm. Aus dem Betrieb, 12.09.2026: der eigene
+               Lightning-Knoten kann doch selbst ein Wachturm sein. Kann er -- und
                tut es seit Tag eins. Nur stand die Adresse nirgends, und ohne
                die kann niemand sie eintragen. -->
           <div id="wt-eigener" class="hidden">
@@ -1081,106 +1234,6 @@
                     data-i18n="wt_eintragen"></button>
             <span class="dim small" id="wt-meldung"></span>
           </div>
-        </div>
-
-        <div class="raster">
-          <div class="panel hidden" id="ln-ich">
-            <h3 data-i18n="lk_ich_titel"></h3>
-            <div id="ln-ich-inhalt"></div>
-          </div>
-
-          <div class="panel hidden" id="ln-weiter">
-            <h3 data-i18n="lk_weiter_titel"></h3>
-            <p class="dim small" data-i18n="lk_weiter_d"></p>
-            <div id="ln-weiter-inhalt"></div>
-          </div>
-        </div>
-
-        <!-- Der HTLC-Strom. Steht NACH den Nachschlage-Kaesten, aber vor den
-             Gebuehren: es ist die Auskunft, aus der die Gebuehrenentscheidung
-             folgt -- teuer machen, wo ein Kanal leerlaeuft. -->
-        <div class="panel hidden" id="ln-durchgang">
-          <h3 data-i18n="ht_titel"></h3>
-          <p class="dim small" data-i18n="ht_lead"></p>
-          <!-- Die Fehlschlaege ZUERST -- getrennt nach weitergeleitet, an
-               dich, von dir, und Proben fuer sich (29.09.2026). Eine Liste,
-               in der alles durcheinanderlaeuft, beantwortet die Frage
-               nicht, die man hier hat. -->
-          <div id="ht-gruende"></div>
-          <div id="ht-liste"></div>
-        </div>
-
-        <div class="panel hidden" id="w-gebuehren">
-          <h3 data-i18n="gb_titel"></h3>
-          <p class="dim small" data-i18n="gb_lead"></p>
-
-          <!-- Was das NETZ nimmt -- aus dem eigenen Graphen gemessen, nicht
-               aus einer Zahl im Quelltext. Bis zum 18.09.2026 stand in
-               gb_lead "rund 143 ppm"; so eine Zahl altert still. -->
-          <div class="netzgebuehren" id="gb-netz">
-            <div class="netzgebuehren-kopf">
-              <b data-i18n="gb_netz_titel"></b>
-              <button type="button" class="btn schmal" id="gb-messen"
-                      data-i18n="gb_messen"></button>
-            </div>
-            <div id="gb-netz-zahlen" class="dim small"></div>
-            <!-- Wie sich die Saetze verteilen. Bis zum 21.09.2026 stand hier
-                 ein Absatz, der die Schiefe der Verteilung ERKLAERTE -- und
-                 der sich bei jedem Anzeigen ein weiteres Mal anhaengte. Eine
-                 Leiste sagt dasselbe auf einen Blick und dazu, wo die Masse
-                 liegt. -->
-            <div id="gb-netz-verteilung" class="gb-verteilung"></div>
-            <div id="gb-netz-band" class="dim small"></div>
-            <div id="gb-verlauf" class="gb-verlauf"></div>
-            <div class="netzgebuehren-fuss">
-              <button type="button" class="btn schmal" id="gb-uebernehmen"
-                      data-i18n="gb_uebernehmen"></button>
-              <span class="dim small" id="gb-netz-meldung"></span>
-            </div>
-          </div>
-
-          <label class="switch">
-            <input type="checkbox" id="gb-automatik">
-            <span><b data-i18n="gb_automatik"></b><br><span class="dim small" data-i18n="gb_automatik_d"></span></span>
-          </label>
-          <p class="dim small" id="gb-automatik-stand"></p>
-
-          <label class="feld">
-            <b data-i18n="gb_kanal"></b>
-            <span class="dim small" data-i18n="gb_kanal_d"></span>
-            <select id="gb-kanal"></select>
-          </label>
-          <!-- Was der gewaehlte Kanal JETZT verlangt, aus LNDs eigenem
-               Bericht. Bis zum 26.09.2026 standen darunter nach jedem Laden
-               nur die festen Vorgaben -- aus dem Betrieb: "meine gesetzten
-               gebueren nach jedem neu start oder refresh weg". -->
-          <p class="dim small" id="gb-aktuell"></p>
-          <label class="feld">
-            <b data-i18n="gb_satz"></b>
-            <span class="dim small" data-i18n="gb_satz_d"></span>
-            <input type="number" id="gb-satz" min="0" max="10000" step="1" value="100">
-          </label>
-          <label class="feld">
-            <b data-i18n="gb_basis"></b>
-            <span class="dim small" data-i18n="gb_basis_d"></span>
-            <input type="number" id="gb-basis" min="0" max="100000" step="100" value="0">
-          </label>
-          <div style="display:flex;gap:12px;align-items:center;margin-top:12px">
-            <button type="button" class="btn" id="gb-setzen" data-i18n="gb_setzen"></button>
-            <span class="dim small" id="gb-meldung"></span>
-          </div>
-        </div>
-
-        <!-- Was LND ueber Wege gelernt hat (Mission Control). Aus dem
-             Abgleich gegen LNDs Umfang am 22.09.2026: routerrpc hat
-             neunzehn Routen, wir nutzten zwei -- und das hier ist die, die
-             beim Weiterleiten wirklich zaehlt. -->
-        <div class="panel">
-          <h3 data-i18n="wg_titel"></h3>
-          <p class="dim small" data-i18n="wg_lead"></p>
-          <div id="wg-zahlen" class="dim small"></div>
-          <div class="ausw-tabelle"><table id="wg-liste"></table></div>
-          <p class="dim small" id="wg-meldung"></p>
         </div>
       </section>
       <section data-ansicht="ln-knoten" class="hidden">
@@ -1217,6 +1270,11 @@
                     data-i18n="lgi_kopieren"></button>
             <span class="dim small" id="lgi-meldung"></span>
           </div>
+        </div>
+
+        <div class="panel hidden" id="ln-ich">
+          <h3 data-i18n="lk_ich_titel"></h3>
+          <div id="ln-ich-inhalt"></div>
         </div>
 
         <!-- Wo man Gegenstellen findet. Bewusst KEIN eigenes Verzeichnis:
@@ -1352,8 +1410,8 @@
                allein aus (Safari haelt sich nicht an autocomplete="off").
                Der Nutzer sieht davon nichts, LND bekommt eine Passphrase,
                die er nie gesetzt hat, und lehnt den Seed ab.
-               Aus dem Betrieb, 11.09.2026: "bin mir aber zu 100% sicher das dass
-               stimmt". Deshalb zaehlt dieses Feld nur, wenn es jemand
+               Aus dem Betrieb, 11.09.2026: die Woerter stimmten sicher, und
+               trotzdem lehnte LND ab. Deshalb zaehlt dieses Feld nur, wenn es jemand
                ABSICHTLICH aufgeklappt hat. -->
           <details style="margin-top:14px" id="wh-pass-block">
             <summary data-i18n="wh_pass_titel"></summary>
@@ -1392,9 +1450,8 @@
           <p class="dim small" id="wh-dauer"></p>
 
           <!-- Drei Wege, und die Wahl gehoert dem Nutzer. Aus dem Betrieb, am
-               10.09.2026: "das soll sich jeder nutzer aussuchen koennen ob
-               sich das wallet selbst entsperrt ob ich den tresor will ..
-               oder nicht". -->
+               10.09.2026: jeder waehlt selbst, ob sich die Wallet von allein
+               entsperrt. -->
           <div class="wahlgruppe" role="radiogroup"
                aria-labelledby="wh-weg-titel">
             <b id="wh-weg-titel" data-i18n="wl_weg_titel"></b>
@@ -1456,9 +1513,9 @@
           <p class="dim small" data-i18n="wl_probe_d"></p>
           <div id="w-probe-felder"></div>
           <!-- Die Meldung zur Wortprobe gehoert AN die Wortprobe. Sie stand
-               unten neben dem Knopf, also unter dem Passwortfeld -- der Betreiber
-               las dort "das stimmt so nicht, noch 3 Versuche" und bezog es
-               auf sein Passwort. Bei fuenf Versuchen und einem Zettel voll
+               unten neben dem Knopf, also unter dem Passwortfeld -- im Betrieb
+               las man dort "das stimmt so nicht, noch 3 Versuche" und bezog es
+               auf das Passwort. Bei fuenf Versuchen und einem Zettel voll
                Woerter ist das keine Kleinigkeit. -->
           <div class="note warn hidden" id="w-probe-fehler"></div>
           <!-- Das Passwortfeld ist jetzt IMMER da. Vorher erschien es nur
@@ -1473,9 +1530,8 @@
                vorher: er entscheidet nur noch, wo genau dieses Passwort
                liegt. -->
           <!-- Drei Wege, und die Wahl gehoert dem Nutzer. Aus dem Betrieb, am
-               10.09.2026: "das soll sich jeder nutzer aussuchen koennen ob
-               sich das wallet selbst entsperrt ob ich den tresor will ..
-               oder nicht". -->
+               10.09.2026: jeder waehlt selbst, ob sich die Wallet von allein
+               entsperrt. -->
           <div class="wahlgruppe" role="radiogroup"
                aria-labelledby="w-weg-titel">
             <b id="w-weg-titel" data-i18n="wl_weg_titel"></b>
@@ -1555,8 +1611,8 @@
              bewegen koennen -- Kanaele oeffnen gehoert bewusst nicht dazu. -->
         <!-- Was ein Kanal an On-Chain-Gebuehren kostet. Steht bewusst VOR
              dem Einzahlen: hier faellt die Entscheidung, ob jetzt ein guter
-             Zeitpunkt ist. Aus dem Betrieb, 04.09.2026: "damit es nicht zu boesen
-             Ueberraschungen kommt." -->
+             Zeitpunkt ist. Aus dem Betrieb, 04.09.2026: damit es keine boesen
+             Ueberraschungen gibt. -->
         <!-- Die Kanalsicherung. Steht eigenstaendig, weil sie eigenstaendig
              zaehlt: die vierundzwanzig Woerter stellen die On-Chain-Wallet
              wieder her, die Guthaben IN den Kanaelen nicht. -->
@@ -1680,11 +1736,10 @@
              weil ein roter Knopf, der immer offen liegt, irgendwann
              versehentlich getroffen wird.
 
-             Aus dem Betrieb, 09.09.2026: "mach es dann moeglich ein wallet zu
-             loeschen mit dem wallet passwort zum entsperren ... dann kann
-             ich die ganze initialisierung nochmal machen und testen."
-             Und am 10.09.2026 zur Stelle: "das dass direkt oben als erstes
-             steht find ich auch nicht gut das gehoert ans untere ende". -->
+             Aus dem Betrieb, 09.09.2026: eine Wallet soll sich mit ihrem
+             Passwort loeschen lassen, damit man die ganze Einrichtung noch
+             einmal durchlaufen und pruefen kann. Und am 10.09.2026 zur
+             Stelle: das gehoert ans untere Ende, nicht ganz nach oben. -->
         <details class="panel hidden" id="w-tilgen">
           <summary data-i18n="tg_titel"></summary>
           <p class="dim small" data-i18n="tg_lead"></p>
@@ -1698,8 +1753,8 @@
             <button type="button" class="btn ghost" id="tg-sperren"
                     data-i18n="tg_sperren_knopf"></button>
             <!-- DIREKT UNTER DEM KNOPF, und als Kasten statt als graue
-                 Kleinschrift. Aus dem Betrieb, 11.09.2026, zum zweiten Mal: "also
-                 hier passiert nix wenn ich auf wallet sperren druecke".
+                 Kleinschrift. Aus dem Betrieb, 11.09.2026, zum zweiten Mal:
+                 "Wallet sperren" gedrueckt, und nichts passierte.
                  Die Rueckmeldung stand in #tg-meldung -- das ist die
                  LETZTE Zeile des Kastens, hinter dem (versteckten)
                  Loeschformular, in dim small. Wer den Knopf drueckt, sieht
@@ -1804,8 +1859,8 @@
                 <span class="dim small" data-i18n="fz_stufe_voll_d"></span></span>
             </label>
           </div>
-          <!-- Sichtbar bei "voll" -- und das ist die Vorgabe, weil der
-               Betreiber genau das will. Gesagt werden muss es trotzdem. -->
+          <!-- Sichtbar bei "voll" -- und das ist die Vorgabe, weil es im
+               Betrieb genau so gewollt ist. Gesagt werden muss es trotzdem. -->
           <div class="note warn" id="fz-voll-warnung" data-i18n="fz_voll_warnung"></div>
 
           <label class="feld hidden" id="fz-pin-zeile">
@@ -2095,8 +2150,8 @@
       <!-- ── Einstellungen ── -->
       <section data-ansicht="einstellungen" class="hidden" id="einstellungen">
         <!-- Der Name des Knotens.
-             Aus dem Betrieb, 09.09.2026: "ich moechte nicht das alles immer nur
-             satoshicortex heisst!!" Bis dahin gab es dafuer kein einziges
+             Aus dem Betrieb, 09.09.2026: nicht jeder Knoten soll
+             "SatoshiCortex" heissen. Bis dahin gab es dafuer kein einziges
              Eingabefeld -- alias stand als Vorgabe in einer Datenklasse und
              wurde beim Einrichten nie uebergeben. Jeder Knoten dieser
              Software hiess gleich. -->
@@ -2141,9 +2196,9 @@
                waren es fuenf Absaetze zu je fuenf Zeilen, zwischen denen die
                Schalter untergingen. -->
           <!-- Die Hauptentscheidung, und deshalb ganz oben.
-               Aus dem Betrieb, 05.09.2026: "verstehe nicht, warum diese
-               Einstellungen nur fuer LND gelten und nicht generell fuer
-               unsere App?" -- gilt jetzt fuer beide Dienste. Die Haekchen
+               Aus dem Betrieb, 05.09.2026: warum gelten diese Einstellungen
+               nur fuer LND und nicht fuer die ganze Anwendung? Sie gelten
+               jetzt fuer beide Dienste. Die Haekchen
                darunter sind die Feinheit INNERHALB der Wahl. -->
           <div class="wahlgruppe oben" role="radiogroup" aria-labelledby="e-ln-titel">
             <b id="e-ln-titel" data-i18n="lnsicht_titel"></b>
@@ -2219,7 +2274,7 @@
                nicht -- jede Aenderung startet bitcoind neu, deshalb bleibt es
                bei einem bewussten Klick. Nur muss man das SEHEN: bis zum
                01.09.2026 stand hier ein stiller "Speichern"-Knopf, und
-               Des Betreibers Einstellungen waren nach jedem Neuladen wieder weg. -->
+               im Betrieb waren die Einstellungen nach jedem Neuladen wieder weg. -->
           <div class="note warn hidden" id="e-ungespeichert" data-i18n="e_ungespeichert"></div>
           <div style="display:flex;gap:12px;align-items:center;margin-top:12px">
             <button type="button" class="btn" id="e-adresse-speichern" data-i18n="e_speichern"></button>
@@ -2227,8 +2282,8 @@
           </div>
         </div>
         <!-- ── Die PIN ────────────────────────────────────────────────
-             Aus dem Betrieb, 08.09.2026: "eine art: PIN. fuer Zahlungen ansich
-             also knoten oeffnen oder schliessen geld transferieren".
+             Aus dem Betrieb, 08.09.2026: eine eigene PIN fuer alles, was Geld
+             bewegt -- Kanaele oeffnen und schliessen, Zahlungen, Ueberweisungen.
 
              Sie schuetzt gegen etwas anderes als der Entsperrweg: der
              entscheidet, was jemand mit der PLATTE anfangen kann, die PIN
@@ -2345,9 +2400,8 @@
 
         <!-- Ein Land aus der Naehe. AUFLAGE, kein Umbau: die Weltansicht
              darunter bleibt Zeichen fuer Zeichen, wie sie war. Aus dem Betrieb, am
-             05.09.2026: "das darf nur unter dem Reiter Welt als Funktion zur
-             Verfuegung stehen und darf sonst die Ansicht, die wir bis jetzt
-             haben, nicht veraendern." -->
+             05.09.2026: die Funktion gehoert nur unter den Reiter Welt und darf
+             die bisherige Ansicht nicht veraendern. -->
         <div id="welt-land" class="hidden" role="dialog" aria-modal="true"
              aria-labelledby="wl-titel">
           <div class="wl-kopf">
@@ -2380,11 +2434,10 @@
 
       <!-- ── Protokolle ── -->
       <!-- ── Nachrichten ──
-           Aus dem Betrieb, 06.09.2026, nachdem er die Chat-Idee selbst verworfen
-           hatte: "gibt ja schon viele chats und foren ... was aber vielleicht
-           meinen Cortex von anderen unterscheiden wuerde waere ein
-           Nachrichten-Feed". Und am Tag darauf der Zuschnitt: "wenn ich in
-           Algerien sitze, bringt mir Blocktrainer nichts."             -->
+           Aus dem Betrieb, 06.09.2026, nachdem die Chat-Idee verworfen war:
+           Chats und Foren gibt es genug, ein Nachrichten-Feed koennte diese
+           Anwendung unterscheiden. Am Tag darauf der Zuschnitt: wer in
+           Algerien sitzt, dem nuetzt ein deutschsprachiger Kanal nichts. -->
       <section data-ansicht="news" class="hidden">
         <h1 data-i18n="news_titel"></h1>
         <p class="lead" data-i18n="news_lead"></p>
@@ -2398,9 +2451,8 @@
           <p data-i18n="news_tor_text"></p>
         </div>
 
-        <!-- Der Kurs. Aus dem Betrieb, 06.09.2026: "könnten wir bei dem News
-             Feed dann noch oben drüber noch ein Bitcoin Chart in USD
-             haben?" — also hier, über der Liste, nicht als eigene
+        <!-- Der Kurs. Aus dem Betrieb, 06.09.2026: ein Bitcoin-Kursbild in USD
+             über den Nachrichten — also hier, über der Liste, nicht als eigene
              Ansicht. Gezeichnet als SVG von Hand: eine Diagramm-
              bibliothek waere hier eine Abhaengigkeit fuer eine Linie. -->
         <div id="kurs-kasten" class="kurs-kasten hidden">

@@ -72,10 +72,18 @@ Two ideas carry the whole project:
   moment it is paid; you can withdraw it, or look up any older one
 - **Move liquidity between your own channels**, with the peer's limit shown
   before you press and the outcome followed up by itself
-- **Fees per channel, measured against the network** — what each channel
-  charges, what the network charges today (median and spread, from your own
-  graph), and if you want, a rate that follows the network within the band of
-  the last four weeks
+- **Fees per channel, measured against the network** — what the network
+  charges today (median and spread, from your own graph), and if you want an
+  automation that prices **each channel by its fill level**: cheaper where your
+  side is full, dearer where it runs dry, anchored to the network median of the
+  last four weeks. It decides on the 24- or 72-hour average, never on a
+  snapshot, and touches a channel at most once a day (or every three days).
+  It never moves money — rebalancing stays a button you press, with your PIN
+- **A maximum per payment for each channel** (max HTLC), fixed by hand or
+  following the fill level, checked against what LND allows for that channel
+- **Earnings per channel** — fees earned against what the channel cost to open,
+  rebalance and close, per 7, 30 or 90 days or since the start, with a monthly
+  chart and the closed channels' final balance
 - **A watchtower both ways** — your node watches strangers' channels, and you
   can check whether the towers you rely on actually cover yours
 - **Channel backup to your own WebDAV** (Nextcloud or any other), pushed on
@@ -282,13 +290,36 @@ can give: what *your* mempool would put in the next block.
        alt="World map with peer locations and channel partners, and a metrics bar with the next block, fees and difficulty">
 </p>
 
-**Your channels.** The bar is the real statement: with everything on one side,
-the channel forwards nothing in that direction. Your share on the left, the
-peer's on the right.
+**Your channels.** An overview on top — capacity, your side, the far side, what
+the last 30 days earned net — and one row per channel below: the bar (with
+everything on one side, the channel forwards nothing in that direction), the
+fee and its automation step, the maximum per payment, how reachable the peer
+was, and the net of the last 30 days.
 
 <p align="center">
   <img src="assets/screenshots/13-channels.png" width="90%"
-       alt="Channels: capacity, local and remote balance per channel, and the dialog to open one">
+       alt="Channels: an overview with capacity, both sides and the net of the last 30 days, and one row per channel with balance bar, fee, maximum per payment, reachability and net">
+</p>
+
+**One channel, opened up.** A row unfolds into everything about that channel:
+its balance, the fee and the maximum per payment — automatic or fixed, with
+what the automation would set — what it has earned and cost since it was
+opened, and the buttons that act on exactly this channel.
+
+<p align="center">
+  <img src="assets/screenshots/25-channel-detail.png" width="90%"
+       alt="An unfolded channel row: state, steering of fee and maximum per payment, and earnings since opening, with buttons to rebalance, look at the node and close the channel">
+</p>
+
+**Earnings per channel.** The fee counts for the channel the payment left
+through — that is where you sold liquidity. Costs are opening (if you opened
+it), rebalancing (at the channel that was refilled) and closing. Per month as a
+chart, per channel as a table, and how much each million sat of capacity
+brings in a month.
+
+<p align="center">
+  <img src="assets/screenshots/24-earnings.png" width="90%"
+       alt="Earnings: earned, costs, net and forwards for the chosen period, a monthly chart of earned against costs, and a table per channel">
 </p>
 
 **What went through your node.** Forwards, your own rebalancing, payments to
@@ -302,13 +333,14 @@ their own: someone checking that a route to you holds.
 </p>
 
 **Fees, measured against the network.** What the network charges today, from
-your own graph, next to what each of your channels charges — and the rate you
-set stays in the field after a reload. **Receiving** is an invoice with a QR
-code that tells you by itself when it is paid.
+your own graph, and the automation that prices each channel by its fill level —
+decided on the average, never on the moment, at most once a day or every three
+days. **Receiving** is an invoice with a QR code that tells you by itself when
+it is paid.
 
 <p align="center">
   <img src="assets/screenshots/18-fees.png" width="49%"
-       alt="Fees: what the network charges, its distribution and four-week band, and the current fee of your channels">
+       alt="Fees: what the network charges, its distribution and four-week band, and the fee automation per channel with how often it may act">
   <img src="assets/screenshots/22-receive.png" width="49%"
        alt="Create a Lightning invoice: the invoice with its QR code, waiting for the payment">
 </p>
@@ -321,6 +353,16 @@ right under the balance.
 <p align="center">
   <img src="assets/screenshots/14-wallet.png" width="90%"
        alt="Wallet: the balance in two blocks, on-chain and in channels, each with its own buttons, and the transactions right below">
+</p>
+
+**On the phone.** Every table turns into stacked rows with the column names
+beside the values — no sideways scrolling, in any view.
+
+<p align="center">
+  <img src="assets/screenshots/26-mobile-channels.png" width="32%"
+       alt="The channel list on a phone: each channel with its bar, fee, maximum per payment, reachability and net, labelled">
+  <img src="assets/screenshots/27-mobile-earnings.png" width="32%"
+       alt="The earnings table on a phone: one block per channel, each value with its column name">
 </p>
 
 **External wallets.** Zeus on your phone, over Tor or over your router's VPN.

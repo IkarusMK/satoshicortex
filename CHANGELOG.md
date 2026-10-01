@@ -4,6 +4,77 @@ All notable changes to SatoshiCortex. Format loosely after
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning after
 [SemVer](https://semver.org/).
 
+## [1.5.0] — 2026-10-01
+
+### Added: fees per channel by fill level
+
+- The fee automation now prices **each channel by how full it is on your
+  side**: from 80 % half the anchor, 50–80 % the anchor, 20–50 % one and a
+  half times, below 20 % three times. The anchor is the network median within
+  the four-week band, as before.
+- It decides on the **average** fill level, never on the moment. Every channel
+  is measured hourly; the automation looks at the last 24 hours — or 72, if
+  you choose *every three days* — and touches a channel at most once in that
+  period. A channel without enough measurements (right after the update, or a
+  new one) waits until at least half the period is measured, and its row says
+  so. Five percentage points of slack at each step boundary.
+- One switch for all channels, and a choice per channel: *automatic* or
+  *fixed*. A fixed channel is never touched, the base fee never.
+- It **never moves money**. Rebalancing stays a button you press, with your
+  PIN.
+
+### Added: a maximum per payment for each channel
+
+The largest single payment a channel forwards (`max_htlc`), set in the
+channel's row: fixed by hand, or following the fill level — half of what is
+spendable on your side, rounded down to 10,000 sat, never below 1 % of the
+capacity. Checked against what LND accepts for that channel before anything
+is sent.
+
+### Added: earnings per channel
+
+Fees earned against what the channel cost to open, rebalance and close — per
+7, 30 or 90 days or since the start, with a monthly chart, a table per channel,
+the earnings per million sat of capacity, and the final balance of closed
+channels. The fee counts at the outgoing channel, rebalancing at the channel
+that was refilled, opening only if you opened it. Fees of outside swap
+services never reach LND and are not included; the page says so.
+
+### Changed: the Channels page
+
+- An overview on top — capacity, your side, the far side, the net of the last
+  30 days — with buttons to open, rebalance, fees and earnings.
+- One row per channel with bar, capacity, fee and automation step, maximum per
+  payment, reachability and the net of 30 days. A row unfolds into the
+  channel's balance, age, who opened it, the steering of fee and maximum, its
+  earnings since opening, and the buttons for exactly this channel.
+- The panels below sit in sections: *Earnings*, *Steer*, *Open & close*,
+  *Watch*, *Protection*.
+- The *Forwarded* summary is part of the earnings now. *Your node in the
+  network* moved to the *Node* tab.
+
+### Changed: every table fits a phone
+
+On a narrow screen each table — what went through your node, earnings, route
+knowledge, blocks, the countries on the map — turns into stacked rows with the
+column names beside the values. No view scrolls sideways at phone width.
+
+### Changed: housekeeping
+
+Comments and test descriptions describe reports from operation in their own
+words instead of quoting them, and every example address in the code and the
+tests comes from the documentation ranges.
+
+### Upgrading
+
+Only the application image is new; Bitcoin Core, LND and Tor keep running.
+Nothing to change in `docker-compose.yml` or `.env`.
+
+If the fee automation was switched on, it now steers each channel by its fill
+level and sets a maximum per payment that follows it — starting once about
+half a day of fill levels has been measured. Channels you want to keep as they
+are: open their row and choose *fixed*.
+
 ## [1.4.2] — 2026-09-29
 
 ### Changed: the wallet keeps on-chain and Lightning apart

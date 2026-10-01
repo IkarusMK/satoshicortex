@@ -50,17 +50,29 @@ const I18N = {
     gb_band_sammelt: "Das Vier-Wochen-Band braucht {braucht} Messtage. Bisher: {tage}.",
     gb_uebernehmen: "Median übernehmen",
     gb_uebernommen: "In das Feld unten eingetragen — gesetzt wird erst mit „Gebühren setzen“.",
-    gb_automatik: "Gebühren dem Netz nachführen",
-    gb_automatik_d: "Einmal am Tag den Satz auf den Netz-Median setzen — begrenzt auf die Spanne der letzten vier Wochen. Betrifft alle Kanäle und nie die Grundgebühr.",
-    gb_a_median: "Zuletzt auf {satz} ppm gesetzt — das ist der Netz-Median.",
-    gb_a_gedeckelt: "Zuletzt auf {satz} ppm gesetzt — der Netz-Median lag darüber, das Vier-Wochen-Band hat gedeckelt.",
-    gb_a_angehoben: "Zuletzt auf {satz} ppm gesetzt — der Netz-Median lag darunter, das Vier-Wochen-Band hat angehoben.",
-    gb_a_unveraendert: "Nichts zu tun: {satz} ppm ist bereits gesetzt.",
+    gb_automatik: "Gebühren-Automatik für alle Kanäle",
+    gb_abstand: "Wie oft je Kanal höchstens",
+    gb_abstand_d: "Über welchen Zeitraum der Füllstand gemittelt wird – und wie oft ein Kanal höchstens neu gesetzt wird. Ein kurzes Hin und Her ändert so nichts.",
+    gb_abstand_1: "Einmal am Tag (Schnitt über 24 Stunden)",
+    gb_abstand_3: "Alle 3 Tage (Schnitt über 72 Stunden)",
+    kz_wartet: "Gespeichert. Die Automatik wirkt, sobald sieben Tage Netzmessung vorliegen.",
+    kz_misst: "Gespeichert. Gesetzt wird, sobald der Füllstand dieses Kanals lange genug gemessen ist – mindestens den halben Zeitraum, über den gemittelt wird.",
+    kz_misst_noch: "misst noch den Füllstand",
+    gb_a_misst: "Eingeschaltet. Kanäle ohne ausreichende Messreihe warten, bis ihr Füllstand mindestens den halben Zeitraum gemessen ist – nach dem Augenblick wird nie entschieden.",
+    kz_kanal_unbekannt: "Diesen Kanal kennt LND nicht mehr – lade die Seite neu.",
+    kz_satz_fehlt: "Für „fest“ fehlt der Satz in ppm.",
+    kz_hb_fehlt: "Für einen festen Höchstbetrag fehlt der Betrag.",
+    kz_hb_zu_hoch: "Höchstens {grenze} sat – mehr nimmt LND für diesen Kanal nicht an.",
+    gb_automatik_d: "Je Kanal nach Füllstand, ausgerichtet am Netz-Median der letzten vier Wochen: Liegt viel auf deiner Seite, wird es günstiger, ist er fast leer, teurer. Entschieden wird über den Durchschnitt, nie über den Augenblick. Kanäle, die du in ihrer Zeile auf „fest“ stellst, fasst sie nicht an – und nie die Grundgebühr.",
+    gb_a_median: "Mitte zuletzt {satz} ppm – der Netz-Median. Je Kanal gilt davon die Stufe seines Füllstands.",
+    gb_a_gedeckelt: "Mitte zuletzt {satz} ppm – der Netz-Median lag darüber, das Vier-Wochen-Band hat gedeckelt.",
+    gb_a_angehoben: "Mitte zuletzt {satz} ppm – der Netz-Median lag darunter, das Vier-Wochen-Band hat angehoben.",
+    gb_a_unveraendert: "Mitte {satz} ppm – jeder Kanal steht schon auf der Stufe seines Füllstands.",
     gb_a_sammelt: "Eingeschaltet, greift aber noch nicht — es fehlen Messtage.",
     gb_a_keine_kanaele: "Eingeschaltet, greift aber noch nicht: ohne Kanal gibt es nichts zu setzen.",
     gb_a_keine_messung: "Eingeschaltet, greift aber noch nicht — es fehlt die erste Messung.",
-    gb_a_aus: "Aus. Der Satz bleibt, wo du ihn hingestellt hast.",
-    gb_a_wuerde: "Würde jetzt {satz} ppm setzen.",
+    gb_a_aus: "Aus. Kanäle, die du in ihrer Zeile auf Automatik stellst, steuert sie trotzdem; alle anderen bleiben, wo du sie hingestellt hast.",
+    gb_a_wuerde: "Die Mitte läge jetzt bei {satz} ppm; je Kanal gilt die Stufe seines Füllstands.",
     graph_nicht_aktuell: "Die Netzkarte ist noch nicht vollständig — gemessen wird erst, wenn sie steht.",
     graph_leer: "Im Netzgraphen steht noch kein einziger Kanal.",
     messung_fehlgeschlagen: "Die Messung kam nicht zustande.",
@@ -109,7 +121,6 @@ const I18N = {
     lk_reserve: "{n} sat davon sind Kanalreserve und lassen sich nicht ausgeben. Jeder Kanal hält auf beiden Seiten ein Prozent seiner Kapazität zurück — das ist das Pfand, das einen Betrugsversuch teuer macht. Bei kleinen Kanälen fällt es ins Gewicht.",
     lk_kanaele_titel: "Kanäle",
     lk_kanaele_d: "Der Balken ist die eigentliche Aussage: liegt alles auf einer Seite, leitet der Kanal in eine Richtung nichts mehr weiter. Links dein Anteil, rechts der der Gegenstelle.",
-    lk_erreichbar: "{p} % erreichbar",
     lk_erreichbar_titel: "Anteil der Zeit, in der deine Gegenstelle dich erreichen konnte — seit {seit}. LND führt das je Kanal mit.",
     lk_erreichbar_gesamt: "Über alle Kanäle warst du zu {p} % der Zeit erreichbar, gewichtet nach Laufzeit. Das ist die Zahl, an der andere Betreiber dich messen — und die du zusagst, wenn du dich auf einen Swap über Monate einlässt.",
     lk_keine_kanaele: "Noch keine Kanäle — und damit steht dein Knoten gar nicht im Graphen. Das Netz reicht die Namensmeldung eines Knotens erst weiter, wenn es von ihm einen angekündigten Kanal kennt (BOLT 7). Bis dahin sehen Verzeichnisse nur deinen Schlüssel, keinen Namen, keine Farbe, keine Adresse. Mit dem ersten öffentlichen Kanal ändert sich das auf einen Schlag.",
@@ -129,10 +140,110 @@ const I18N = {
     lk_kanal_drueben_kurz: "{n} drüben",
     lk_privat: "privat",
     lk_still: "still",
-    lk_weiter_titel: "Weitergeleitet",
-    lk_weiter_d: "Nicht deine eigenen Zahlungen, sondern fremde, die durch deinen Knoten gelaufen sind. Das ist der Moment, in dem er wirklich Teil des Netzes ist.",
+    lu_titel: "Überblick",
+    lu_kapazitaet: "Kapazität",
+    lu_kanaele: "{aktiv} aktiv · {still} still",
+    lu_hier: "Auf deiner Seite",
+    lu_ausgebbar: "davon {n} sat ausgebbar",
+    lu_drueben: "Auf der Gegenseite",
+    lu_empfangsraum: "dein Empfangsraum",
+    lu_ertrag: "Netto, letzte 30 Tage",
+    lu_ertrag_d: "+{ein} eingenommen · −{aus} Kosten",
+    lu_oeffnen: "Kanal öffnen",
+    lu_umschichten: "Umschichten",
+    lu_gebuehren: "Gebühren",
+    lu_ertrag_knopf: "Ertrag",
+    lb_ertrag_titel: "Ertrag",
+    lb_ertrag_d: "Was jeder Kanal eingebracht hat – und was er gekostet hat.",
+    lb_steuern_titel: "Steuern",
+    lb_steuern_d: "Gebühren und Umschichten: wie das Geld durch deine Kanäle fließt.",
+    lb_oeffnen_titel: "Öffnen & Schließen",
+    lb_oeffnen_d: "Kanäle anlegen und auflösen – beides über die Kette, beides kostet Gebühr.",
+    lb_beobachten_titel: "Beobachten",
+    lb_beobachten_d: "Was durch deinen Knoten lief und was er über Wege im Netz gelernt hat.",
+    lb_schutz_titel: "Schutz",
+    lb_schutz_d: "Wachtürme passen auf deine Kanäle auf, wenn dein Knoten nicht läuft.",
+    kz_sp_kanal: "Kanal",
+    kz_sp_verteilung: "Deine Seite · Gegenseite",
+    kz_sp_kapazitaet: "Kapazität",
+    kz_sp_gebuehr: "Gebühr",
+    kz_sp_hoechst: "Höchstbetrag",
+    kz_sp_erreichbar: "Erreichbar",
+    kz_sp_ertrag: "Netto 30 Tage",
+    kz_aufklappen: "Einzelheiten zu {name}",
+    kz_auto: "Automatik",
+    kz_fest: "fest",
+    kz_stufe: "Stufe {n}",
+    kz_fuellstand: "nach Füllstand",
+    kz_ein_kurz: "+{n} eingenommen",
+    kz_stand: "Stand",
+    kz_hier: "Auf deiner Seite",
+    kz_ausgebbar: "davon ausgebbar",
+    kz_drueben: "Gegenseite",
+    kz_reserve: "Reserve",
+    kz_alter: "Offen seit",
+    kz_tage: "{n} Tagen",
+    kz_eroeffnet: "Eröffnet von",
+    kz_von_dir: "dir",
+    kz_von_ihm: "der Gegenseite",
+    kz_steuerung: "Steuerung",
+    kz_gebuehr: "Gebühr",
+    kz_gb_auto: "Automatik nach Füllstand",
+    kz_gb_fest: "fest",
+    kz_jetzt: "jetzt {ppm} ppm",
+    kz_wuerde: "Automatik: {ppm} ppm – {stufe}",
+    kz_stufe_1: "viel auf deiner Seite, günstig",
+    kz_stufe_2: "ausgewogen, Netz-Mittel",
+    kz_stufe_3: "wird knapp, teurer",
+    kz_stufe_4: "fast leer, teuer",
+    kz_satz: "Satz (ppm)",
+    kz_basis: "Grundgebühr (msat)",
+    kz_hoechst: "Höchstbetrag pro Zahlung",
+    kz_hb_auto: "folgt dem Füllstand",
+    kz_hb_fest: "fest",
+    kz_hb_jetzt: "jetzt {n}",
+    kz_hb_wuerde: "Automatik: {n}",
+    kz_hb_grenze: "höchstens {n} möglich",
+    kz_hb_betrag: "Betrag (sat)",
+    kz_uebernehmen: "Übernehmen",
+    kz_gesetzt: "Gesetzt.",
+    kz_ertrag: "Seit Eröffnung",
+    kz_ertrag_leer: "Noch nichts eingenommen.",
+    kz_eingenommen: "Eingenommen",
+    kz_kosten_oeffnen: "Öffnen",
+    kz_kosten_umschichten: "Umschichten",
+    kz_netto: "Netto",
+    kz_weiterleitungen: "{n} Weiterleitungen",
+    kz_umschichten: "Umschichten von hier",
+    kz_ansehen: "Knoten ansehen",
+    kz_schliessen: "Kanal schließen",
+    ertrag_nicht_lesbar: "Der Ertrag ließ sich gerade nicht aus LND lesen. Beim nächsten Laden noch einmal.",
+    le_titel: "Ertrag je Kanal",
+    le_lead: "Die Gebühr zählt beim Kanal, über den die Zahlung hinausging – dort hast du Liquidität verkauft. Kosten sind das Öffnen (wenn du eröffnet hast), das Umschichten (beim Kanal, der aufgefüllt wurde) und das Schließen.",
+    le_zeitraum: "Zeitraum",
+    le_7: "7 Tage",
+    le_30: "30 Tage",
+    le_90: "90 Tage",
+    le_alle: "Seit Beginn",
+    le_eingenommen: "Eingenommen",
+    le_kosten: "Kosten",
+    le_netto: "Netto",
+    le_weiterleitungen: "Weiterleitungen",
+    le_sp_kanal: "Kanal",
+    le_sp_weiter: "Weiterl.",
+    le_sp_raus: "Hinaus (sat)",
+    le_sp_ein: "Eingenommen",
+    le_sp_kosten: "Kosten",
+    le_sp_netto: "Netto",
+    le_sp_rendite: "je Mio sat im Monat",
+    le_diagramm: "Eingenommen und Kosten je Monat",
+    le_monat_titel: "{monat}: +{ein} eingenommen, −{aus} Kosten, netto {netto} sat",
+    le_monate: "Je Monat",
+    le_leg_ein: "Eingenommen",
+    le_leg_aus: "Kosten",
+    le_geschlossen: "Geschlossene Kanäle ({n})",
+    le_fremd: "Nicht enthalten: Gebühren fremder Tauschdienste wie Boltz – die sieht dein Knoten nicht.",
     lk_weiter_keine: "Noch nichts weitergeleitet. Das kommt nicht am ersten Tag: LND wählt Wege nach vergangenen Erfolgen, und dein Knoten ist dort noch ein unbeschriebenes Blatt. Was hilft, sind Betriebszeit und Liquidität auf der richtigen Seite.",
-    lk_weiter_summe: "{n} Weiterleitungen · {menge} Sats bewegt · {gebuehr} Sats verdient",
     lg_titel: "Das Netz",
     lg_lead: "Wie groß der Graph ist, den dein Knoten kennt — und wie du dich darin ausnimmst.",
     lg_graph_laedt: "Der Graph wird noch geladen. Dein Knoten kennt bisher nur einen Teil des Netzes — diese Zahlen wachsen in den nächsten Stunden noch deutlich.",
@@ -1498,17 +1609,29 @@ const I18N = {
     gb_band_sammelt: "The four-week band needs {braucht} days of measurement. So far: {tage}.",
     gb_uebernehmen: "Use the median",
     gb_uebernommen: "Filled into the field below — nothing is set until you press “Set fees”.",
-    gb_automatik: "Track the network",
-    gb_automatik_d: "Once a day, set the rate to the network median — bounded by the range of the last four weeks. Applies to all channels and never to the base fee.",
-    gb_a_median: "Last set to {satz} ppm — that is the network median.",
-    gb_a_gedeckelt: "Last set to {satz} ppm — the network median was higher, the four-week band capped it.",
-    gb_a_angehoben: "Last set to {satz} ppm — the network median was lower, the four-week band raised it.",
-    gb_a_unveraendert: "Nothing to do: {satz} ppm is already set.",
+    gb_automatik: "Fee automation for all channels",
+    gb_abstand: "How often per channel at most",
+    gb_abstand_d: "Over which period the fill level is averaged – and how often a channel is set anew at most. A brief back-and-forth changes nothing.",
+    gb_abstand_1: "Once a day (24-hour average)",
+    gb_abstand_3: "Every 3 days (72-hour average)",
+    kz_wartet: "Saved. The automation acts once seven days of network measurement are in.",
+    kz_misst: "Saved. It is set once this channel's fill level has been measured long enough – at least half the period it averages over.",
+    kz_misst_noch: "still measuring the fill level",
+    gb_a_misst: "On. Channels without enough measurements wait until their fill level has been measured for at least half the period – it never decides on the moment.",
+    kz_kanal_unbekannt: "LND no longer knows this channel – reload the page.",
+    kz_satz_fehlt: "For “fixed” the rate in ppm is missing.",
+    kz_hb_fehlt: "For a fixed maximum the amount is missing.",
+    kz_hb_zu_hoch: "At most {grenze} sat – LND does not accept more for this channel.",
+    gb_automatik_d: "Per channel by fill level, anchored to the network median of the last four weeks: plenty on your side makes it cheaper, nearly empty makes it dearer. It decides on the average, never on the moment. Channels you set to “fixed” in their row are left alone – and the base fee always is.",
+    gb_a_median: "Centre last at {satz} ppm – the network median. Each channel gets the step for its fill level.",
+    gb_a_gedeckelt: "Centre last at {satz} ppm – the network median was higher, the four-week band capped it.",
+    gb_a_angehoben: "Centre last at {satz} ppm – the network median was lower, the four-week band raised it.",
+    gb_a_unveraendert: "Centre {satz} ppm – every channel is already on the step for its fill level.",
     gb_a_sammelt: "On, but not acting yet — days of measurement are still missing.",
     gb_a_keine_kanaele: "On, but not acting yet: without a channel there is nothing to set.",
     gb_a_keine_messung: "On, but not acting yet — the first measurement is missing.",
-    gb_a_aus: "Off. The rate stays where you put it.",
-    gb_a_wuerde: "Would set {satz} ppm now.",
+    gb_a_aus: "Off. Channels you set to automatic in their row are still steered; all others stay where you put them.",
+    gb_a_wuerde: "The centre would now be {satz} ppm; each channel gets the step for its fill level.",
     graph_nicht_aktuell: "The network map is not complete yet — measuring waits until it is.",
     graph_leer: "There is not a single channel in the network graph yet.",
     messung_fehlgeschlagen: "The measurement did not go through.",
@@ -1557,7 +1680,6 @@ const I18N = {
     lk_reserve: "{n} sat of that is channel reserve and cannot be spent. Every channel holds back one percent of its capacity on both sides — that is the stake that makes cheating expensive. On small channels it matters.",
     lk_kanaele_titel: "Channels",
     lk_kanaele_d: "The bar is the real statement: with everything on one side, the channel forwards nothing in one direction. Your share on the left, the peer's on the right.",
-    lk_erreichbar: "{p} % reachable",
     lk_erreichbar_titel: "Share of the time your peer could reach you — since {seit}. LND keeps this per channel.",
     lk_erreichbar_gesamt: "Across all channels you were reachable {p} % of the time, weighted by lifetime. This is the number other operators judge you by — and the one you promise when you commit to a swap lasting months.",
     lk_keine_kanaele: "No channels yet — which means your node is not in the graph at all. The network only relays a node's name announcement once it knows an announced channel of that node (BOLT 7). Until then, directories see only your key: no name, no colour, no address. Your first public channel changes all of it at once.",
@@ -1577,10 +1699,110 @@ const I18N = {
     lk_kanal_drueben_kurz: "{n} far side",
     lk_privat: "private",
     lk_still: "idle",
-    lk_weiter_titel: "Forwarded",
-    lk_weiter_d: "Not your own payments, but other people's that ran through your node. That is the moment it truly becomes part of the network.",
+    lu_titel: "Overview",
+    lu_kapazitaet: "Capacity",
+    lu_kanaele: "{aktiv} active · {still} idle",
+    lu_hier: "On your side",
+    lu_ausgebbar: "{n} sat of it spendable",
+    lu_drueben: "On the far side",
+    lu_empfangsraum: "your inbound room",
+    lu_ertrag: "Net, last 30 days",
+    lu_ertrag_d: "+{ein} earned · −{aus} costs",
+    lu_oeffnen: "Open channel",
+    lu_umschichten: "Rebalance",
+    lu_gebuehren: "Fees",
+    lu_ertrag_knopf: "Earnings",
+    lb_ertrag_titel: "Earnings",
+    lb_ertrag_d: "What each channel brought in – and what it cost.",
+    lb_steuern_titel: "Steer",
+    lb_steuern_d: "Fees and rebalancing: how money flows through your channels.",
+    lb_oeffnen_titel: "Open & close",
+    lb_oeffnen_d: "Create and dissolve channels – both on-chain, both cost a fee.",
+    lb_beobachten_titel: "Watch",
+    lb_beobachten_d: "What went through your node and what it learned about routes in the network.",
+    lb_schutz_titel: "Protection",
+    lb_schutz_d: "Watchtowers look after your channels while your node is down.",
+    kz_sp_kanal: "Channel",
+    kz_sp_verteilung: "Your side · far side",
+    kz_sp_kapazitaet: "Capacity",
+    kz_sp_gebuehr: "Fee",
+    kz_sp_hoechst: "Max amount",
+    kz_sp_erreichbar: "Reachable",
+    kz_sp_ertrag: "Net 30 days",
+    kz_aufklappen: "Details for {name}",
+    kz_auto: "Automatic",
+    kz_fest: "fixed",
+    kz_stufe: "step {n}",
+    kz_fuellstand: "by fill level",
+    kz_ein_kurz: "+{n} earned",
+    kz_stand: "State",
+    kz_hier: "On your side",
+    kz_ausgebbar: "of it spendable",
+    kz_drueben: "Far side",
+    kz_reserve: "Reserve",
+    kz_alter: "Open for",
+    kz_tage: "{n} days",
+    kz_eroeffnet: "Opened by",
+    kz_von_dir: "you",
+    kz_von_ihm: "the peer",
+    kz_steuerung: "Steering",
+    kz_gebuehr: "Fee",
+    kz_gb_auto: "Automatic by fill level",
+    kz_gb_fest: "fixed",
+    kz_jetzt: "now {ppm} ppm",
+    kz_wuerde: "Automatic: {ppm} ppm – {stufe}",
+    kz_stufe_1: "plenty on your side, cheap",
+    kz_stufe_2: "balanced, network median",
+    kz_stufe_3: "running low, dearer",
+    kz_stufe_4: "nearly empty, expensive",
+    kz_satz: "Rate (ppm)",
+    kz_basis: "Base fee (msat)",
+    kz_hoechst: "Maximum per payment",
+    kz_hb_auto: "follows the fill level",
+    kz_hb_fest: "fixed",
+    kz_hb_jetzt: "now {n}",
+    kz_hb_wuerde: "Automatic: {n}",
+    kz_hb_grenze: "at most {n} possible",
+    kz_hb_betrag: "Amount (sat)",
+    kz_uebernehmen: "Apply",
+    kz_gesetzt: "Set.",
+    kz_ertrag: "Since opening",
+    kz_ertrag_leer: "Nothing earned yet.",
+    kz_eingenommen: "Earned",
+    kz_kosten_oeffnen: "Opening",
+    kz_kosten_umschichten: "Rebalancing",
+    kz_netto: "Net",
+    kz_weiterleitungen: "{n} forwards",
+    kz_umschichten: "Rebalance from here",
+    kz_ansehen: "Look at the node",
+    kz_schliessen: "Close channel",
+    ertrag_nicht_lesbar: "The earnings could not be read from LND just now. It tries again on the next load.",
+    le_titel: "Earnings per channel",
+    le_lead: "The fee counts for the channel the payment left through – that is where you sold liquidity. Costs are opening (if you opened it), rebalancing (for the channel that was refilled) and closing.",
+    le_zeitraum: "Period",
+    le_7: "7 days",
+    le_30: "30 days",
+    le_90: "90 days",
+    le_alle: "Since the start",
+    le_eingenommen: "Earned",
+    le_kosten: "Costs",
+    le_netto: "Net",
+    le_weiterleitungen: "Forwards",
+    le_sp_kanal: "Channel",
+    le_sp_weiter: "Forwards",
+    le_sp_raus: "Out (sat)",
+    le_sp_ein: "Earned",
+    le_sp_kosten: "Costs",
+    le_sp_netto: "Net",
+    le_sp_rendite: "per 1M sat a month",
+    le_diagramm: "Earned and costs per month",
+    le_monat_titel: "{monat}: +{ein} earned, −{aus} costs, net {netto} sat",
+    le_monate: "Per month",
+    le_leg_ein: "Earned",
+    le_leg_aus: "Costs",
+    le_geschlossen: "Closed channels ({n})",
+    le_fremd: "Not included: fees of outside swap services such as Boltz – your node does not see those.",
     lk_weiter_keine: "Nothing forwarded yet. That does not come on day one: LND picks routes by past successes, and your node is still a blank page there. What helps is uptime and liquidity on the right side.",
-    lk_weiter_summe: "{n} forwards · {menge} sats moved · {gebuehr} sats earned",
     lg_titel: "The network",
     lg_lead: "How big the graph your node knows is — and how you look inside it.",
     lg_graph_laedt: "The graph is still loading. Your node knows only part of the network so far — these numbers will grow considerably over the next few hours.",
@@ -3401,8 +3623,8 @@ async function zeigeUebersicht() {
   // Vor der ersten Antwort stand hier nichts -- und wenn die erste Antwort
   // "bitcoind hat nicht geantwortet" war, stand da "Wird gestartet" in
   // Warnfarbe, samt "direkt nach der Einrichtung ist das normal". Bei jedem
-  // Neuladen. Aus dem Betrieb, 02.09.2026: "bei einem refresh sieht das so aus,
-  // als ob der ganze app container neu startet."
+  // Neuladen. Aus dem Betrieb, 02.09.2026: nach jedem Neuladen sah es aus,
+  // als starte der ganze Container neu.
   //
   // Er startet nicht -- sein Protokoll zeigt ueber zehn Minuten mit
   // mehreren Neuladungen genau EINEN Startblock. Die Oberflaeche hat es nur
@@ -3531,8 +3753,8 @@ async function zeigeUebersicht() {
       // Auskunft, die man dann braucht. SatoshiCortex schaltet txindex und
       // Blockfilter waehrend des Abgleichs ab und danach wieder ein; Core
       // baut sie dann stundenlang nach, und in dieser Zeit findet die
-      // Transaktionssuche nichts. Aus dem Betrieb, 08.09.2026: "vielleicht liegt
-      // es daran, dass das nicht geklappt hat."
+      // Transaktionssuche nichts. Aus dem Betrieb, 08.09.2026: genau das wurde
+      // nur vermutet.
       $("#d-sub2").textContent = indexZeile(k);
     }
 
@@ -3792,9 +4014,8 @@ async function abschliessen() {
 
 /* ── Ein Land aus der Naehe ─────────────────────────────────────────────────
    Nur unter dem Reiter Welt, und nur als Auflage: die Weltansicht darunter
-   wird nicht angefasst. Aus dem Betrieb, 05.09.2026: "das darf nur unter dem
-   Reiter Welt als Funktion zur Verfuegung stehen und darf sonst die Ansicht,
-   die wir bis jetzt haben, nicht veraendern."
+   wird nicht angefasst. Aus dem Betrieb, 05.09.2026: die Funktion gehoert nur
+   unter den Reiter Welt und darf die bisherige Ansicht nicht veraendern.
 
    Die Umrisse liegen als eigene Datei je Land bereit (regionen/DE.svg und so
    fort) und werden erst beim Klick geholt. 241 Laender waeren zusammen 14 MB
@@ -3963,9 +4184,8 @@ function gebietsmitte(svg, pfade) {
 
 /* Die Verbindungslinien im Land.
 
-   Aus dem Betrieb, 06.09.2026: "wenn mein Verbindungsstrich auf der Weltkarte in
-   ein Land geht und ich dann diesem Strich folge und auf das Land klicke --
-   zeigt der Strich dann auf die Region?"
+   Aus dem Betrieb, 06.09.2026: wer einem Verbindungsstrich in ein Land folgt
+   und es anklickt, soll den Strich in der Region enden sehen.
 
    Ja. Die Richtung kommt aus der Weltkarte: der Vektor vom eigenen Knoten zu
    diesem Land. Sie in der Landkarte fortzusetzen heisst, dass die Linie an
@@ -4035,9 +4255,8 @@ let GEWAEHLTES_GEBIET = 0;
 
 /* Ein Gebiet auswaehlen -- von der Karte aus oder aus der Tabelle.
 
-   Aus dem Betrieb, 06.09.2026: "ich klicke in Bild 2 auf ein leuchtendes oder
-   nicht leuchtendes Bundesland, und dann wird mir in der rechten Tabelle
-   die Zeile markiert, in der ich geklickt habe."
+   Aus dem Betrieb, 06.09.2026: ein Klick auf ein Gebiet, ob es leuchtet oder
+   nicht, markiert seine Zeile in der Tabelle rechts.
 
    Beides markiert dasselbe, und ein zweiter Klick nimmt es zurueck. Ohne
    das Zuruecknehmen bliebe die Markierung stehen, und es gaebe keinen Weg
@@ -4121,10 +4340,11 @@ function zeichneLand(d, ohneUmriss) {
     }
     zeilen.append(tr);
   }
+  tabelleStapelbar($(".wl-tabelle"));
 
   // Jeder Umriss weiss, zu welchem Gebiet er gehoert -- auch die ohne
-  // Gegenstellen. Der Betreiber ausdruecklich: "ein leuchtendes ODER NICHT
-  // leuchtendes Bundesland".
+  // Gegenstellen. Aus dem Betrieb ausdruecklich: auch ein Gebiet, das nicht
+  // leuchtet.
   for (const g of gebiete) {
     for (const iso of g.iso || []) {
       const pfad = $("#wl-karte").querySelector(
@@ -4342,10 +4562,9 @@ function zeichneLogQuellen() {
 // es ist sogar vernuenftig. Tor und diese Anwendung schreiben aber in der
 // eingestellten Ortszeit. In derselben Ansicht standen damit zwei Uhren.
 //
-// Aus dem Betrieb, 03.09.2026, mit einem Bildschirmfoto: "was ist denn jetzt hier
-// los ... ist das wieder kaputt???? das bitcoin protokoll hoert bei 20:08
-// auf". Es war 22:10 bei ihm, die Zeile also EINE MINUTE alt -- und sah aus
-// wie zwei Stunden Stillstand. Eine Anzeige, die zwei Zeitzonen mischt und
+// Aus dem Betrieb, 03.09.2026, mit einem Bildschirmfoto: das Bitcoin-Protokoll
+// schien zwei Stunden zuvor aufzuhoeren. Die Zeile war EINE MINUTE alt, nur in
+// UTC geschrieben -- und sah aus wie zwei Stunden Stillstand. Eine Anzeige, die zwei Zeitzonen mischt und
 // keine davon nennt, ist eine Falle.
 //
 // Umgerechnet wird nur ein Zeitstempel am ZEILENANFANG mit ausdruecklichem
@@ -4444,9 +4663,8 @@ async function ladeKarte(erzwingen, imErstsync) {
 
   // Einblenden bei JEDEM Aufruf, nicht nur beim ersten.
   //
-  // Aus dem Betrieb, 12.09.2026: "wenn sich die app sitzung abmeldet und ich mich
-  // wieder einlogge dann laedt die welt karte nicht automatisch ich muss dann
-  // erst nach dem anmelden die browser seite refreshen".
+  // Aus dem Betrieb, 12.09.2026: nach Ablauf der Sitzung und neuer Anmeldung
+  // lud die Weltkarte nicht von selbst -- erst nach einem Neuladen der Seite.
   //
   // Genau das war der Grund: das Ausblenden steht in zeigeTor(), das
   // Einblenden stand im Block darueber -- und der laeuft nur EINMAL je
@@ -4486,9 +4704,8 @@ function zeichneKarte(d) {
 
   // Eine leere Antwort ist KEINE Aussage ueber die Welt.
   //
-  // Aus dem Betrieb, 04.09.2026: "die weltkarte verschwindet mit der zeit immer
-  // mal wieder, dann ist der hintergrund unserer app schwarz und zeigt nix
-  // mehr an."
+  // Aus dem Betrieb, 04.09.2026: die Weltkarte verschwand mit der Zeit immer
+  // wieder, und der Hintergrund blieb schwarz.
   //
   // Genau hier lag es. Der Abruf gelingt, bringt aber kein Adressbuch mit --
   // das fuellt ein eigener Lauf nur alle dreissig Minuten, und bis dahin
@@ -4954,8 +5171,8 @@ function zeichneKartenrang(laender, hoechster) {
 
 
 /* ── Bitcoin-Kurs ───────────────────────────────────────────────────────────
-   Aus dem Betrieb, 06.09.2026: "könnten wir bei dem News Feed dann noch oben
-   drüber noch ein Bitcoin Chart in USD haben?"
+   Aus dem Betrieb, 06.09.2026: der Wunsch nach einem Bitcoin-Kursbild in USD
+   ueber den Nachrichten.
 
    Der Knoten kennt keinen Kurs -- ein Preis ist eine Meinung des Marktes,
    keine Eigenschaft der Kette. Er kommt also von aussen, und damit ueber Tor.
@@ -4972,9 +5189,8 @@ const KURS_ZEICHEN = { usd: "$", eur: "€", gbp: "£" };
 
 /* ── Der Umrechner ────────────────────────────────────────────────────────
 
-   Aus dem Betrieb, 10.09.2026: "dann brauchen wir auch noch mal nen richtigen
-   waehrungs rechner .. damit mann auch klar kommt mit den sat und bitcoin
-   und waehrungen".
+   Aus dem Betrieb, 10.09.2026: ein richtiger Waehrungsrechner, damit man mit
+   sat, Bitcoin und Waehrungen zurechtkommt.
 
    Vier Dinge sind hier anders als beim ueblichen Satoshi-Rechner:
 
@@ -5268,7 +5484,7 @@ function zeichneRechner(d) {
 
 /* Die Zeichnung.
 
-   ZWEIMAL NACHGEBESSERT, beide Male weil der Betreiber es im Bild gesehen hat:
+   ZWEIMAL NACHGEBESSERT, beide Male weil es im Betrieb im Bild auffiel:
 
    1. Ein festes viewBox="0 0 900 220" mit preserveAspectRatio="none", auf
       1850 Pixel gestreckt -- das streckt auch die SCHRIFT. Die viewBox kommt
@@ -5463,8 +5679,8 @@ function zeichneKurslinie(d) {
 }
 
 /* ── Ablesen: Fadenkreuz und Sprechblase ───────────────────────────────────
-   Der Betreiber: "ich will dann wie in einem richtigen chart auf nen punkt gehen
-   koennen mit uhrzeit tag oder so und dann kurs". Genau das.
+   Aus dem Betrieb: wie in einem richtigen Chart auf einen Punkt zeigen und
+   Tag, Uhrzeit und Kurs ablesen. Genau das.
 
    Bedienbar mit Maus, mit dem Finger und mit der Tastatur -- Letzteres nicht
    aus Pflichtgefuehl: ein Bild, das nur die Maus lesen kann, ist fuer ein
@@ -5617,11 +5833,10 @@ function kursNeuZeichnenBald() {
 addEventListener("resize", kursNeuZeichnenBald);
 
 /* ── Nachrichten ────────────────────────────────────────────────────────────
-   Aus dem Betrieb, 06.09.2026, nachdem er die Chat-Idee selbst verworfen hatte:
-   "gibt ja schon viele chats und foren ... was aber vielleicht meinen Cortex
-   von anderen unterscheiden wuerde waere ein Nachrichten-Feed". Und am Tag
-   darauf der Zuschnitt, der alles bestimmt hat: "wenn ich in Algerien sitze
-   und habe die Software am Laufen, bringt mir Blocktrainer nichts."
+   Aus dem Betrieb, 06.09.2026, nachdem die Chat-Idee verworfen war: Chats und
+   Foren gibt es genug, ein Nachrichten-Feed koennte diese Anwendung von
+   anderen unterscheiden. Am Tag darauf der Zuschnitt, der alles bestimmt hat:
+   wer in Algerien sitzt, dem nuetzt ein deutschsprachiger Kanal nichts.
 
    Deshalb Sprache statt Land. Das Kuerzel kommt aus der Weltkarte.
 
@@ -6013,6 +6228,7 @@ function zeigeAnsicht(name) {
     ladeLightning(true); ladeLightningKanaele(); wachtuermeLaden();
     ladeWegwissen();
     durchgangLaden();
+    ertragLaden();
     // Oeffnen, Schliessen und Umschichten fragen hier nach der PIN.
     // DER BEFUND VOM 24.09.2026: dieser Aufruf fehlte. Wer nach dem
     // Anmelden direkt hierher kam, sah kein Feld und bekam trotzdem
@@ -6098,9 +6314,9 @@ function zeichneLightning(d) {
   // NICHT zu tun ist. Ohne ihn liest man drei Zeilen und weiss danach immer
   // noch nicht, ob man warten soll oder etwas kaputt ist.
   // Er kannte bis zum 09.09.2026 NUR die Kette und nie den Wallet-Zustand.
-  // Der Betreiber hatte seine Wallet laengst angelegt und las hier weiter "der
+  // Im Betrieb war die Wallet laengst angelegt, und hier stand weiter "der
   // naechste Schritt ist die Wallet" -- ein Satz, der schlicht nicht mehr
-  // stimmte. "das stimmt ja auch nicht habe ja alles gemacht".
+  // stimmte.
   LN_LAGE = d;
   zeichneLnHinweis();
 }
@@ -6171,8 +6387,10 @@ async function ladeLightningKanaele() {
   if (!bereit) zeichneVerbindungen(null);
   // Solange LND nicht laeuft, bleibt hier NICHTS stehen. Leere Kacheln mi
   // Nullen sehen aus wie Daten und sind keine.
-  for (const id of ["#ln-ich", "#ln-guthaben", "#ln-kanalliste", "#ln-weiter",
-                    "#ln-wachturm"]) {
+  for (const id of ["#ln-ich", "#ln-guthaben", "#ln-kanalliste", "#ln-wachturm",
+                    "#lk-ueberblick", "#lk-ertrag", "#lk-bereich-ertrag",
+                    "#lk-bereich-steuern", "#lk-bereich-oeffnen",
+                    "#lk-bereich-beobachten", "#lk-bereich-schutz"]) {
     // ln-schliessen und ln-schichten haengen an der Kanalzahl, nicht am
     // Dienst -- die schalten sich beim Zeichnen der Liste selbst.
     $(id).classList.toggle("hidden", !bereit);
@@ -6208,8 +6426,8 @@ async function ladeLightningKanaele() {
     zeichneKennungswechsel(d.kennung_vorher, (d.knoten || {}).kennung);
   } else {
     // OHNE getinfo wurde der Adresskasten bisher gar nicht angefasst: er
-    // blieb leer, ohne ein Wort dazu. Aus dem Betrieb, 11.09.2026: "aber es wird
-    // mir noch keine verbindungs adresse angezeigt". Eine leere Flaeche
+    // blieb leer, ohne ein Wort dazu. Aus dem Betrieb, 11.09.2026: noch immer
+    // keine Verbindungsadresse. Eine leere Flaeche
     // ohne Grund ist die schlechteste aller Auskuenfte.
     zeichneEigeneAdresse({ adressen: [], sichtbarkeit: d.sichtbarkeit,
                            beschaeftigt: true });
@@ -6217,7 +6435,6 @@ async function ladeLightningKanaele() {
   zeichneGegenstellenwege();
   if (d.guthaben) zeichneLnGuthaben(d.guthaben);
   zeichneLnKanaele(d.kanaele || [], d.ausstehend || []);
-  if (d.weiterleitungen) zeichneLnWeiterleitungen(d.weiterleitungen);
   zeichneLnNetz(d.netz, d.kanaele || [], d.knoten);
   zeichneVerbindungen(d.verbindungen);
 }
@@ -6232,10 +6449,9 @@ function kurz(schluessel) {
 
 // Wo man Gegenstellen findet.
 //
-// Aus dem Betrieb, 04.09.2026: "meine idee war ja nicht ausgrenzen und unsere
-// software user machen ihr eigenes ding, sondern eher so wie in punkt 2: wir
-// zeigen auf lightning network organisationen und wir koennten dann mit der
-// software auch eine werden."
+// Aus dem Betrieb, 04.09.2026: nicht abgrenzen, sondern auf die
+// Lightning-Gemeinschaften zeigen -- und mit dieser Software selbst ein Teil
+// davon werden.
 //
 // Also ausdruecklich KEIN eigenes Verzeichnis. Der Lightning-Graph IST schon
 // ein oeffentliches Verzeichnis -- jeder Knoten kennt ihn. Was hier steht,
@@ -6283,8 +6499,8 @@ function zeichneGegenstellenwege() {
 
 /* Eine Zeile, deren Wert man WEITERGEBEN koennen muss.
 
-   Aus dem Betrieb, 10.09.2026: "unter Kennung: solte die volle kennung stehen
-   damit sie mal kopieren kann und genau das selbe gilt fuer angekuendigt".
+   Aus dem Betrieb, 10.09.2026: unter Kennung gehoert die volle Kennung, damit
+   man sie kopieren kann -- und dasselbe gilt fuer "angekuendigt".
 
    Er hat recht, und kurz() war hier von Anfang an falsch am Platz: es macht
    66 Zeichen lesbar, und genau das ist der Punkt -- eine gekuerzte Kennung
@@ -6394,7 +6610,7 @@ function zeichneKanalkosten(k) {
 
   // IST DAS GERADE TEUER ODER GUENSTIG?
   //
-  // Aus dem Betrieb, 11.09.2026: "das mann ne orientierung hat". Eine nackte Zahl
+  // Aus dem Betrieb, 11.09.2026: man braucht eine Orientierung. Eine nackte Zahl
   // wie "2,2 sat/vB" sagt einem Menschen nichts -- erst der Vergleich mit
   // der eigenen letzten Woche macht daraus eine Auskunft.
   //
@@ -6439,8 +6655,8 @@ function lagehinweis(k) {
 
 /* ── Was ein Kanal kostet, im Rechner ──────────────────────────────────────
 
-   Aus dem Betrieb, 11.09.2026: "wir haben ja schon ein rechner reiter kann das da
-   nicht mit rein?" -- und das ist die bessere Stelle, aus einem Grund, der
+   Aus dem Betrieb, 11.09.2026: es gibt doch schon den Rechner -- und das ist
+   die bessere Stelle, aus einem Grund, der
    im Wallet-Kasten fehlte: hier liegt der KURS. "160.339 sat" sagt einem
    Menschen nichts, "rund 112 Euro" sagt alles. Geplant wird in Euro. */
 
@@ -6850,6 +7066,7 @@ async function umschichtenVerfolgen(kennung) {
 // Der letzte Stand der Kanaele -- fuers Pruefen, ob jemand aus einem Kanal
 // in denselben schieben will.
 let KANAELE_LETZTE = [];
+let KANAELE_AUSSTEHEND = [];
 
 /* Die Auswahl fuers Schliessen. Ein Kanal, kein Tippen -- und der Name der
    Gegenstelle davor, damit niemand den falschen erwischt. */
@@ -6954,8 +7171,10 @@ function ausstehendZeile(k) {
 
 function zeichneLnKanaele(liste, ausstehend) {
   KANAELE_LETZTE = liste;
+  KANAELE_AUSSTEHEND = ausstehend || [];
   fuelleUmschichten(liste);
   fuelleSchliessen(liste);
+  zeichneKanalUeberblick();
   const ziel = $("#ln-kanaele-inhalt");
   ziel.textContent = "";
   // Die im Aufbau und Abbau zuerst -- auf die wartet man gerade.
@@ -6967,68 +7186,607 @@ function zeichneLnKanaele(liste, ausstehend) {
     }
     return;
   }
+  // Eine Zeile je Kanal, aufklappbar (30.09.2026, aus dem Betrieb: "damit da
+  // auch eine uebersichtlichkeit her kommt"). Zu - alle Kennzahlen in einer
+  // Zeile; auf - die Einzelheiten und jeder Handgriff zu GENAU diesem Kanal.
+  // Bis dahin wollte jeder Handgriff seinen Kanal erst wieder aus einer Liste.
+  ziel.append(kanalKopfzeile());
+  for (const k of liste) ziel.append(kanalZeile(k));
+}
+
+// Welche Zeilen aufgeklappt sind. Die Liste kommt im Takt neu -- ohne das
+// klappte jede Zeile nach ein paar Sekunden wieder zu.
+const KANAL_OFFEN = new Set();
+
+function kanalKopfzeile() {
+  const kopf = document.createElement("div");
+  kopf.className = "kz-spalten";
+  kopf.setAttribute("aria-hidden", "true");
+  for (const schluessel of ["kz_sp_kanal", "kz_sp_verteilung", "kz_sp_kapazitaet",
+                            "kz_sp_gebuehr", "kz_sp_hoechst", "kz_sp_erreichbar",
+                            "kz_sp_ertrag"]) {
+    const zelle = document.createElement("span");
+    zelle.textContent = t(schluessel);
+    kopf.append(zelle);
+  }
+  kopf.append(document.createElement("span"));
+  return kopf;
+}
+
+// Kurz und in der Sprache der Seite: 1,6 Mio. / 1.6M. In einer Tabellenzelle
+// liest sich "1.600.000 sat" schlechter als die Groessenordnung.
+function kompakt(n) {
+  return new Intl.NumberFormat(LANG === "de" ? "de-DE" : "en-US", {
+    notation: "compact", maximumFractionDigits: 1 }).format(n || 0);
+}
+
+function vorzeichen(n) {
+  return (n > 0 ? "+" : n < 0 ? "−" : "") + zahl(Math.abs(n || 0));
+}
+
+function kanalZeile(k) {
+  const offen = KANAL_OFFEN.has(k.nummer);
+  const zeile = document.createElement("div");
+  zeile.className = "kz" + (offen ? " offen" : "");
+
+  const kopf = document.createElement("button");
+  kopf.type = "button";
+  kopf.className = "kz-kopf";
+  kopf.setAttribute("aria-expanded", String(offen));
+  kopf.setAttribute("aria-label", t("kz_aufklappen", {
+    name: k.gegenstelle || kurz(k.kennung || "") }));
+
+  const name = document.createElement("span");
+  name.className = "kz-name";
+  const punkt = document.createElement("span");
+  punkt.className = "kanal-punkt" + (k.aktiv ? "" : " still");
+  const text = document.createElement("span");
+  text.className = "kz-text";
+  text.textContent = k.gegenstelle || kurz(k.kennung || "");
+  name.append(punkt, text);
+  if (k.privat) name.append(marke(t("lk_privat")));
+  if (!k.aktiv) name.append(marke(t("lk_still")));
+
+  const verteilung = document.createElement("span");
+  verteilung.className = "kz-verteilung";
+  const balken = document.createElement("span");
+  balken.className = "kanal-balken";
+  const hier = document.createElement("span");
+  hier.style.width = Math.round((k.anteil_hier || 0) * 100) + "%";
+  balken.append(hier);
+  const zahlen = document.createElement("span");
+  zahlen.className = "kz-klein";
+  zahlen.textContent = t("lk_kanal_hier_kurz", { n: kompakt(k.hier) }) + " · "
+    + t("lk_kanal_drueben_kurz", { n: kompakt(k.drueben) });
+  verteilung.append(balken, zahlen);
+
+  const steuer = k.steuerung || {};
+  const gebuehr = kzWert(
+    k.satz_ppm == null ? "—" : zahl(k.satz_ppm) + " ppm",
+    steuer.gebuehr === "automatik"
+      ? t("kz_auto") + (steuer.stufe ? " · " + t("kz_stufe", { n: steuer.stufe }) : "")
+      : t("kz_fest"));
+  const hoechst = kzWert(
+    k.hoechstbetrag_sat == null ? "—" : kompakt(k.hoechstbetrag_sat),
+    steuer.hoechstbetrag === "fuellstand" ? t("kz_fuellstand") : t("kz_fest"));
+  const anteil = erreichbarkeit(k);
+  const erreichbar = kzWert(anteil === null ? "—" : nachkomma(anteil * 100, 1) + " %", "");
+  if (anteil !== null) {
+    erreichbar.classList.add(anteil >= 0.99 ? "gut" : anteil >= 0.95 ? "mittel" : "schwach");
+    // Gemessen wird erst, seit LND zuletzt gestartet ist -- das gehoert dazu.
+    erreichbar.title = t("lk_erreichbar_titel", { seit: dauerGrob(k.laufzeit_s || 0) });
+  }
+  const ertrag = (ERTRAG_JE[k.nummer] || {}).tage30 || null;
+  const netto = kzWert(ertrag ? vorzeichen(ertrag.netto_sat) : "—",
+                       ertrag ? t("kz_ein_kurz", { n: zahl(ertrag.eingenommen_sat) }) : "");
+
+  const pfeil = document.createElement("span");
+  pfeil.className = "kz-pfeil";
+  pfeil.textContent = "▾";
+
+  // Der Spaltenname haengt an jeder Zelle -- in der schmalen Ansicht fehlt
+  // die Kopfzeile, und "1,7 Mio." allein sagt nicht, was es ist.
+  const kapazitaet = kzWert(kompakt(k.kapazitaet), "");
+  [[kapazitaet, "kz_sp_kapazitaet"], [gebuehr, "kz_sp_gebuehr"], [hoechst, "kz_sp_hoechst"],
+   [erreichbar, "kz_sp_erreichbar"], [netto, "kz_sp_ertrag"]].forEach(([zelle, titel]) => {
+    zelle.dataset.titel = t(titel);
+  });
+  kopf.append(name, verteilung, kapazitaet, gebuehr, hoechst, erreichbar, netto, pfeil);
+  kopf.addEventListener("click", () => {
+    if (KANAL_OFFEN.has(k.nummer)) KANAL_OFFEN.delete(k.nummer);
+    else KANAL_OFFEN.add(k.nummer);
+    zeile.replaceWith(kanalZeile(k));
+  });
+  zeile.append(kopf);
+  if (offen) zeile.append(kanalDetail(k));
+  return zeile;
+}
+
+// Eine Zelle: der Wert gross, darunter klein, was er bedeutet.
+function kzWert(wert, darunter) {
+  const zelle = document.createElement("span");
+  zelle.className = "kz-wert";
+  const oben = document.createElement("span");
+  oben.textContent = wert;
+  zelle.append(oben);
+  if (darunter) {
+    const unten = document.createElement("span");
+    unten.className = "kz-klein";
+    unten.textContent = darunter;
+    zelle.append(unten);
+  }
+  return zelle;
+}
+
+function kanalDetail(k) {
+  const detail = document.createElement("div");
+  detail.className = "kz-detail";
+  detail.append(kzStand(k), kzSteuerung(k), kzErtrag(k), kzHandgriffe(k));
+  return detail;
+}
+
+function kzGruppe(titel) {
+  const gruppe = document.createElement("div");
+  gruppe.className = "kz-gruppe";
+  const kopf = document.createElement("h4");
+  kopf.textContent = titel;
+  gruppe.append(kopf);
+  return gruppe;
+}
+
+function kzStand(k) {
+  const gruppe = kzGruppe(t("kz_stand"));
+  gruppe.append(zeile(t("kz_hier"), sats(k.hier)));
+  gruppe.append(zeile(t("kz_ausgebbar"), sats(k.verfuegbar)));
+  gruppe.append(zeile(t("kz_drueben"), sats(k.drueben)));
+  if (k.reserve) gruppe.append(zeile(t("kz_reserve"), sats(k.reserve)));
+  const tage = kanalAlterTage(k);
+  if (tage !== null) gruppe.append(zeile(t("kz_alter"), t("kz_tage", { n: zahl(tage) })));
+  if (typeof k.eroeffnet_von_dir === "boolean") {
+    gruppe.append(zeile(t("kz_eroeffnet"), t(k.eroeffnet_von_dir ? "kz_von_dir" : "kz_von_ihm")));
+  }
+  return gruppe;
+}
+
+// Wie alt ein Kanal ist -- aus der Blockhoehe in seiner Nummer (die oberen
+// 24 Bit der short_channel_id, BOLT 7), nicht aus LNDs "lifetime": die zaehlt
+// nur, seit LND zuletzt gestartet ist.
+function kanalAlterTage(k) {
+  const hoehe = (LN_LAGE || {}).hoehe;
+  if (!Number.isFinite(hoehe) || !k.nummer) return null;
+  let block = 0;
+  try {
+    block = Number(BigInt(k.nummer) >> 40n);
+  } catch (e) {
+    return null;
+  }
+  if (block <= 0 || block > hoehe) return null;
+  return Math.floor((hoehe - block) / 144);
+}
+
+function kzSteuerung(k) {
+  const gruppe = kzGruppe(t("kz_steuerung"));
+  const steuer = k.steuerung || {};
+  const formular = document.createElement("div");
+  formular.className = "kz-formular";
+
+  // Gebuehr: Automatik nach Fuellstand oder fest.
+  const gb = kzWahl("kz-gb-" + k.nummer, t("kz_gebuehr"),
+                    [["automatik", t("kz_gb_auto")], ["fest", t("kz_gb_fest")]],
+                    steuer.gebuehr === "automatik" ? "automatik" : "fest");
+  const gbStand = document.createElement("p");
+  gbStand.className = "dim small";
+  // Solange die Messreihe fehlt, ist "Automatik: ..." nur eine Vorschau
+  // aus dem Augenblick -- gesetzt wird danach nicht.
+  const misst = steuer.misst_noch
+    && (steuer.gebuehr === "automatik" || steuer.hoechstbetrag === "fuellstand");
+  gbStand.textContent = [
+    k.satz_ppm == null ? "" : t("kz_jetzt", { ppm: zahl(k.satz_ppm) }),
+    steuer.wuerde_ppm == null ? "" : t("kz_wuerde", {
+      ppm: zahl(steuer.wuerde_ppm), stufe: t("kz_stufe_" + steuer.stufe) }),
+    misst ? t("kz_misst_noch") : "",
+  ].filter(Boolean).join(" · ");
+  const satz = kzFeld(t("kz_satz"), "number", k.satz_ppm ?? "", { min: 0, max: 10000 });
+  const basis = kzFeld(t("kz_basis"), "number", k.basis_msat ?? 0, { min: 0, max: 100000, step: 100 });
+  const gbFest = document.createElement("div");
+  gbFest.className = "kz-felder";
+  gbFest.append(satz.label, basis.label);
+
+  // Hoechstbetrag: folgt dem Fuellstand oder fest.
+  const hb = kzWahl("kz-hb-" + k.nummer, t("kz_hoechst"),
+                    [["fuellstand", t("kz_hb_auto")], ["fest", t("kz_hb_fest")]],
+                    steuer.hoechstbetrag === "fest" ? "fest" : "fuellstand");
+  const hbStand = document.createElement("p");
+  hbStand.className = "dim small";
+  hbStand.textContent = [
+    k.hoechstbetrag_sat == null ? "" : t("kz_hb_jetzt", { n: sats(k.hoechstbetrag_sat) }),
+    steuer.wuerde_hoechstbetrag_sat == null ? "" :
+      t("kz_hb_wuerde", { n: sats(steuer.wuerde_hoechstbetrag_sat) }),
+    k.hinaus_hoechstens ? t("kz_hb_grenze", { n: sats(k.hinaus_hoechstens) }) : "",
+  ].filter(Boolean).join(" · ");
+  const betrag = kzFeld(t("kz_hb_betrag"), "number", k.hoechstbetrag_sat ?? "",
+                        { min: 1, max: k.hinaus_hoechstens || undefined, step: 1000 });
+  const hbFest = document.createElement("div");
+  hbFest.className = "kz-felder";
+  hbFest.append(betrag.label);
+
+  const sichtbar = () => {
+    gbFest.classList.toggle("hidden", gb.wert() !== "fest");
+    hbFest.classList.toggle("hidden", hb.wert() !== "fest");
+  };
+  gb.gruppe.addEventListener("change", sichtbar);
+  hb.gruppe.addEventListener("change", sichtbar);
+  sichtbar();
+
+  const leiste = document.createElement("div");
+  leiste.className = "kz-leiste";
+  const knopf = document.createElement("button");
+  knopf.type = "button";
+  knopf.className = "btn";
+  knopf.textContent = t("kz_uebernehmen");
+  const meldung = document.createElement("span");
+  meldung.className = "dim small";
+  meldung.setAttribute("role", "status");
+  knopf.addEventListener("click", () => kanalSteuern(k, {
+    gebuehr: gb.wert(), satz_ppm: Number(satz.feld.value),
+    basis_msat: Number(basis.feld.value), hoechstbetrag: hb.wert(),
+    hoechstbetrag_sat: Number(betrag.feld.value) }, knopf, meldung));
+  leiste.append(knopf, meldung);
+
+  formular.append(gb.gruppe, gbStand, gbFest, hb.gruppe, hbStand, hbFest, leiste);
+  gruppe.append(formular);
+  return gruppe;
+}
+
+// Zwei Moeglichkeiten als Umschalter, mit echten Radioknoepfen darunter --
+// die Tastatur und Bildschirmleser kennen die.
+function kzWahl(name, titel, moeglichkeiten, gewaehlt) {
+  const gruppe = document.createElement("fieldset");
+  gruppe.className = "kz-wahl";
+  const legende = document.createElement("legend");
+  legende.textContent = titel;
+  gruppe.append(legende);
+  for (const [wert, text] of moeglichkeiten) {
+    const label = document.createElement("label");
+    const feld = document.createElement("input");
+    feld.type = "radio";
+    feld.name = name;
+    feld.value = wert;
+    feld.checked = wert === gewaehlt;
+    const span = document.createElement("span");
+    span.textContent = text;
+    label.append(feld, span);
+    gruppe.append(label);
+  }
+  return { gruppe, wert: () => {
+    const an = gruppe.querySelector("input:checked");
+    return an ? an.value : gewaehlt;
+  } };
+}
+
+function kzFeld(titel, art, wert, grenzen) {
+  const label = document.createElement("label");
+  label.className = "kz-feld";
+  const text = document.createElement("span");
+  text.className = "dim small";
+  text.textContent = titel;
+  const feld = document.createElement("input");
+  feld.type = art;
+  feld.value = wert;
+  for (const [schluessel, grenze] of Object.entries(grenzen || {})) {
+    if (grenze !== undefined) feld.setAttribute(schluessel, String(grenze));
+  }
+  label.append(text, feld);
+  return { label, feld };
+}
+
+function kzErtrag(k) {
+  const gruppe = kzGruppe(t("kz_ertrag"));
+  const gesamt = (ERTRAG_JE[k.nummer] || {}).gesamt;
+  if (!gesamt) {
+    gruppe.append(hinweis(t("kz_ertrag_leer"), ""));
+    return gruppe;
+  }
+  gruppe.append(zeile(t("kz_eingenommen"), "+" + sats(gesamt.eingenommen_sat)));
+  if (gesamt.oeffnen_sat) gruppe.append(zeile(t("kz_kosten_oeffnen"), "−" + sats(gesamt.oeffnen_sat)));
+  if (gesamt.umschichten_sat) {
+    gruppe.append(zeile(t("kz_kosten_umschichten"), "−" + sats(gesamt.umschichten_sat)));
+  }
+  gruppe.append(zeile(t("kz_netto"), vorzeichen(gesamt.netto_sat) + " sat", "stark"));
+  const anzahl = document.createElement("p");
+  anzahl.className = "dim small";
+  anzahl.textContent = t("kz_weiterleitungen", { n: zahl(gesamt.weiterleitungen) });
+  gruppe.append(anzahl);
+  return gruppe;
+}
+
+function kzHandgriffe(k) {
+  const leiste = document.createElement("div");
+  leiste.className = "kz-handgriffe";
+  const knopf = (text, aktion) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "btn ghost";
+    b.textContent = text;
+    b.addEventListener("click", aktion);
+    leiste.append(b);
+    return b;
+  };
+  // Umschichten und Schliessen bleiben die gepruefte Strecke mit PIN -- der
+  // Knopf waehlt dort nur diesen Kanal vor und springt hin.
+  const umschichten = knopf(t("kz_umschichten"), () => {
+    $("#us-von").value = k.nummer;
+    zeigeUmschichtenGrenze();
+    springeZu("#ln-schichten");
+  });
+  umschichten.disabled = !k.aktiv || $("#ln-schichten").classList.contains("hidden");
+  knopf(t("kz_ansehen"), () => verbindungAnsehen(k.kennung));
+  knopf(t("kz_schliessen"), () => {
+    $("#ks-kanal").value = k.punkt;
+    $("#ks-kanal").dispatchEvent(new Event("change"));
+    springeZu("#ln-schliessen");
+  });
+  return leiste;
+}
+
+async function kanalSteuern(k, wunsch, knopf, meldung) {
+  knopf.disabled = true;
+  meldung.textContent = "";
+  try {
+    const antwort = await api("/lightning/kanal/steuerung", "POST",
+                              { punkt: k.punkt, ...wunsch });
+    // Automatik ohne Netzmessung: gespeichert, wirkt aber erst spaeter --
+    // das gehoert gesagt, sonst sieht "Gesetzt." nach sofort aus.
+    const grund = ((antwort || {}).automatik || {}).grund;
+    const wartet = ["sammelt_noch", "keine_messung"].includes(grund);
+    meldung.textContent = wartet ? t("kz_wartet")
+      : grund === "misst_fuellstand" ? t("kz_misst") : t("kz_gesetzt");
+    ladeLightningKanaele();
+  } catch (e) {
+    const d = (e && e.detail) || {};
+    meldung.textContent = d.meldung ? t(d.meldung, d) : t("err_net");
+  } finally {
+    knopf.disabled = false;
+  }
+}
+
+/* ── Ueberblick ueber die Kanaele ──────────────────────────────────────────
+   Wie das Guthaben in der Wallet: die Zahlen, auf die es ankommt, und
+   Knoepfe zu den Handgriffen weiter unten (30.09.2026). */
+function zeichneKanalUeberblick() {
+  const ziel = $("#lk-ueberblick-inhalt");
+  if (!ziel) return;
+  ziel.textContent = "";
+  const liste = KANAELE_LETZTE || [];
+  const summe = (feld) => liste.reduce((s, k) => s + (k[feld] || 0), 0);
+  const aktiv = liste.filter((k) => k.aktiv).length;
+  const ertrag = ERTRAG_SUMME_30;
+  const zahlen = document.createElement("div");
+  zahlen.className = "lu-zahlen";
+  for (const [bez, wert, unter] of [
+    [t("lu_kapazitaet"), sats(summe("kapazitaet")),
+     t("lu_kanaele", { aktiv: zahl(aktiv), still: zahl(liste.length - aktiv) })],
+    [t("lu_hier"), sats(summe("hier")), t("lu_ausgebbar", { n: zahl(summe("verfuegbar")) })],
+    [t("lu_drueben"), sats(summe("drueben")), t("lu_empfangsraum")],
+    [t("lu_ertrag"), ertrag ? vorzeichen(ertrag.netto_sat) + " sat" : "—",
+     ertrag ? t("lu_ertrag_d", { ein: zahl(ertrag.eingenommen_sat),
+                                 aus: zahl(ertrag.kosten_sat) }) : ""],
+  ]) {
+    const kasten = document.createElement("div");
+    kasten.className = "kennzahl-gross";
+    const w = document.createElement("div");
+    w.className = "wert";
+    w.textContent = wert;
+    const b = document.createElement("div");
+    b.className = "bez";
+    b.textContent = bez;
+    kasten.append(w, b);
+    if (unter) {
+      const u = document.createElement("div");
+      u.className = "dim small";
+      u.textContent = unter;
+      kasten.append(u);
+    }
+    zahlen.append(kasten);
+  }
+  ziel.append(zahlen);
   const gesamt = gesamterreichbarkeit(liste);
   if (gesamt !== null) {
     ziel.append(hinweis(
       t("lk_erreichbar_gesamt", { p: nachkomma(gesamt * 100, 2) }),
       gesamt >= 0.99 ? "ok" : gesamt >= 0.95 ? "" : "warn"));
   }
-  for (const k of liste) {
-    const reihe = document.createElement("div");
-    reihe.className = "kanal";
-
-    const kopf = document.createElement("div");
-    kopf.className = "kanal-kopf";
-    const punkt = document.createElement("span");
-    punkt.className = "kanal-punkt" + (k.aktiv ? "" : " still");
-    const name = document.createElement("span");
-    name.className = "kanal-name";
-    name.textContent = k.gegenstelle || kurz(k.kennung || "");
-    kopf.append(punkt, name);
-    if (k.privat) kopf.append(marke(t("lk_privat")));
-    if (!k.aktiv) kopf.append(marke(t("lk_still")));
-    const rechts = document.createElement("span");
-    rechts.className = "rechts";
-    rechts.textContent = sats(k.kapazitaet);
-    kopf.append(rechts);
-
-    const balken = document.createElement("div");
-    balken.className = "kanal-balken";
-    const hier = document.createElement("span");
-    hier.style.width = Math.round(k.anteil_hier * 100) + "%";
-    balken.append(hier);
-
-    const fuss = document.createElement("div");
-    fuss.className = "kanal-fuss";
-    const a = document.createElement("span");
-    a.textContent = t("lk_kanal_hier_kurz", { n: zahl(k.hier) });
-    const b = document.createElement("span");
-    b.className = "drueben";
-    b.textContent = t("lk_kanal_drueben_kurz", { n: zahl(k.drueben) });
-    fuss.append(a, b);
-
-    // Die Zahl, an der eine Zusage gemessen wird. LND fuehrt sie je Kanal
-    // mit: "lifetime" ist, wie lange es ihn gibt, "uptime", wie lange die
-    // Gegenstelle uns dabei erreichen konnte. Wir haben beides von Anfang an
-    // gelesen und nie gezeigt.
-    //
-    // Aus dem Betrieb, 05.09.2026 zu den Swap-Bindungen: "dann muss unser System so
-    // sauber und stabil laufen, dass wir wirklich 60 Monate am Stueck online
-    // bleiben". Was man zusagt, muss man auch nachhalten koennen.
-    const anteil = erreichbarkeit(k);
-    if (anteil !== null) {
-      const e = document.createElement("span");
-      e.className = "kanal-erreichbar " + (anteil >= 0.99 ? "gut"
-                                        : anteil >= 0.95 ? "mittel" : "schwach");
-      e.textContent = t("lk_erreichbar", { p: nachkomma(anteil * 100, 1) });
-      e.title = t("lk_erreichbar_titel", {
-        seit: dauerGrob(k.laufzeit_s || 0) });
-      fuss.append(e);
-    }
-
-    reihe.append(kopf, balken, fuss);
-    ziel.append(reihe);
+  const leiste = document.createElement("div");
+  leiste.className = "gh-knoepfe lu-knoepfe";
+  for (const [text, sprung] of [[t("lu_oeffnen"), "#ln-oeffnen"],
+                                [t("lu_umschichten"), "#ln-schichten"],
+                                [t("lu_gebuehren"), "#w-gebuehren"],
+                                [t("lu_ertrag_knopf"), "#lk-ertrag"]]) {
+    const knopf = document.createElement("button");
+    knopf.type = "button";
+    knopf.className = "btn ghost";
+    knopf.textContent = text;
+    knopf.dataset.sprung = sprung;
+    leiste.append(knopf);
   }
+  ziel.append(leiste);
+}
+
+/* ── Ertrag je Kanal ───────────────────────────────────────────────────────
+   Was jeder Kanal eingebracht hat und was er gekostet hat. Die Gebuehr
+   zaehlt beim AUSGEHENDEN Kanal -- dort wurde Liquiditaet verkauft. */
+let ERTRAG_TAGE = 30;
+let ERTRAG_JE = {};            // je Kanalnummer: tage30, gesamt
+let ERTRAG_SUMME_30 = null;
+
+async function ertragLaden(tage) {
+  if (Number.isFinite(tage)) ERTRAG_TAGE = tage;
+  let d;
+  try {
+    d = await api("/lightning/ertrag?zeitraum=" + ERTRAG_TAGE);
+  } catch (e) {
+    if (e && e.abgemeldet) return;
+    // Nicht still: ein leerer Kasten saehe aus wie "nichts verdient".
+    const grund = (e && e.detail && e.detail.meldung) || "err_net";
+    const ziel = $("#le-tabelle");
+    if (ziel) {
+      ziel.textContent = "";
+      ziel.append(hinweis(t(grund), "warn"));
+    }
+    return;
+  }
+  ERTRAG_JE = {};
+  for (const k of d.kanaele || []) ERTRAG_JE[k.nummer] = k;
+  ERTRAG_SUMME_30 = d.summe_30 || null;
+  zeichneErtrag(d);
+  // Die Kanalzeilen und der Ueberblick zeigen die 30 Tage mit.
+  if ((KANAELE_LETZTE || []).length) zeichneLnKanaele(KANAELE_LETZTE, KANAELE_AUSSTEHEND);
+}
+
+function zeichneErtrag(d) {
+  document.querySelectorAll("#le-zeitraum button").forEach((b) => {
+    b.classList.toggle("an", Number(b.dataset.tage) === ERTRAG_TAGE);
+    b.setAttribute("aria-pressed", String(Number(b.dataset.tage) === ERTRAG_TAGE));
+  });
+  const summe = d.summe || {};
+  const oben = $("#le-summe");
+  oben.textContent = "";
+  const zahlen = document.createElement("div");
+  zahlen.className = "lu-zahlen";
+  for (const [bez, wert] of [[t("le_eingenommen"), "+" + sats(summe.eingenommen_sat)],
+                             [t("le_kosten"), "−" + sats(summe.kosten_sat)],
+                             [t("le_netto"), vorzeichen(summe.netto_sat) + " sat"],
+                             [t("le_weiterleitungen"), zahl(summe.weiterleitungen)]]) {
+    const kasten = document.createElement("div");
+    kasten.className = "kennzahl-gross";
+    const w = document.createElement("div");
+    w.className = "wert";
+    w.textContent = wert;
+    const b = document.createElement("div");
+    b.className = "bez";
+    b.textContent = bez;
+    kasten.append(w, b);
+    zahlen.append(kasten);
+  }
+  oben.append(zahlen);
+
+  zeichneErtragMonate(d.monate || []);
+
+  const offen = (d.kanaele || []).filter((k) => k.offen);
+  const tabelle = $("#le-tabelle");
+  tabelle.textContent = "";
+  if (!summe.weiterleitungen && !offen.some((k) => k.zeitraum.kosten_sat)) {
+    tabelle.append(hinweis(t("lk_weiter_keine"), ""));
+  }
+  if (offen.length) tabelle.append(ertragTabelle(offen));
+  const zu = (d.kanaele || []).filter((k) => !k.offen);
+  $("#le-geschlossen").classList.toggle("hidden", !zu.length);
+  $("#le-geschlossen summary").textContent = t("le_geschlossen", { n: zahl(zu.length) });
+  const zuInhalt = $("#le-geschlossen-inhalt");
+  zuInhalt.textContent = "";
+  if (zu.length) zuInhalt.append(ertragTabelle(zu));
+}
+
+function ertragTabelle(kanaele) {
+  return htlcTabelle(
+    ["le_sp_kanal", "le_sp_weiter", "le_sp_raus", "le_sp_ein", "le_sp_kosten",
+     "le_sp_netto", "le_sp_rendite"],
+    kanaele.map((k) => {
+      const z = k.zeitraum || {};
+      return [[k.name || kurz(k.nummer), "text"],
+              [zahl(z.weiterleitungen), "zahl"],
+              [zahl(z.raus_sat), "zahl"],
+              ["+" + zahl(z.eingenommen_sat), "zahl"],
+              [z.kosten_sat ? "−" + zahl(z.kosten_sat) : "—", "zahl"],
+              [vorzeichen(z.netto_sat), "zahl" + (z.netto_sat < 0 ? " bad" : "")],
+              [k.pro_mio_monat_sat == null ? "—" : zahl(k.pro_mio_monat_sat), "zahl"]];
+    }));
+}
+
+// Monate als Balken: eingenommen nach oben, Kosten nach unten, eine Achse,
+// eine Nulllinie. Farben geprueft (dataviz-Pruefer, dunkler Grund): Orange
+// #d9720a und Blau #3f8fc4 bestehen Helligkeit, Buntheit, Farbfehlsicht
+// und Kontrast.
+function zeichneErtragMonate(monate) {
+  const ziel = $("#le-monate");
+  ziel.textContent = "";
+  if (!monate.length) return;
+  const hoch = Math.max(1, ...monate.map((m) => m.eingenommen_sat || 0));
+  const tief = Math.max(0, ...monate.map((m) => m.kosten_sat || 0));
+  // So breit wie der Kasten -- ein festes viewBox schrumpfte das Diagramm
+  // in die Mitte.
+  const breite = Math.max(320, Math.round(ziel.clientWidth || 640));
+  const oben = 110, unten = tief ? 60 : 0, rand = 22;
+  const spalte = breite / monate.length;
+  const balken = Math.min(34, spalte * 0.5);
+  const massstab = oben / Math.max(hoch, tief || 1);
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", `0 0 ${breite} ${oben + unten + rand * 2}`);
+  svg.setAttribute("class", "le-diagramm");
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", t("le_diagramm"));
+  const null_y = rand + oben;
+  const linie = document.createElementNS(svg.namespaceURI, "line");
+  linie.setAttribute("x1", "0"); linie.setAttribute("x2", String(breite));
+  linie.setAttribute("y1", String(null_y)); linie.setAttribute("y2", String(null_y));
+  linie.setAttribute("class", "le-null");
+  svg.append(linie);
+  const monatsname = new Intl.DateTimeFormat(LANG === "de" ? "de-DE" : "en-US",
+                                              { month: "short" });
+  monate.forEach((m, i) => {
+    const x = i * spalte + (spalte - balken) / 2;
+    const gruppe = document.createElementNS(svg.namespaceURI, "g");
+    const titel = document.createElementNS(svg.namespaceURI, "title");
+    titel.textContent = t("le_monat_titel", {
+      monat: m.monat, ein: zahl(m.eingenommen_sat), aus: zahl(m.kosten_sat),
+      netto: vorzeichen((m.eingenommen_sat || 0) - (m.kosten_sat || 0)) });
+    gruppe.append(titel);
+    // Die Trefferflaeche ist die ganze Spalte, nicht nur der Balken.
+    const flaeche = document.createElementNS(svg.namespaceURI, "rect");
+    flaeche.setAttribute("x", String(i * spalte)); flaeche.setAttribute("y", "0");
+    flaeche.setAttribute("width", String(spalte));
+    flaeche.setAttribute("height", String(oben + unten + rand * 2));
+    flaeche.setAttribute("class", "le-treffer");
+    gruppe.append(flaeche);
+    const ein = (m.eingenommen_sat || 0) * massstab;
+    if (ein > 0) {
+      const r = document.createElementNS(svg.namespaceURI, "rect");
+      r.setAttribute("x", String(x)); r.setAttribute("y", String(null_y - ein));
+      r.setAttribute("width", String(balken)); r.setAttribute("height", String(ein));
+      r.setAttribute("rx", "3"); r.setAttribute("class", "le-ein");
+      gruppe.append(r);
+    }
+    const aus = (m.kosten_sat || 0) * massstab;
+    if (aus > 0) {
+      const r = document.createElementNS(svg.namespaceURI, "rect");
+      r.setAttribute("x", String(x)); r.setAttribute("y", String(null_y + 2));
+      r.setAttribute("width", String(balken)); r.setAttribute("height", String(aus));
+      r.setAttribute("rx", "3"); r.setAttribute("class", "le-aus");
+      gruppe.append(r);
+    }
+    const name = document.createElementNS(svg.namespaceURI, "text");
+    name.setAttribute("x", String(i * spalte + spalte / 2));
+    name.setAttribute("y", String(oben + unten + rand * 2 - 4));
+    name.setAttribute("text-anchor", "middle");
+    name.setAttribute("class", "le-achse");
+    const [jahr, monat] = String(m.monat).split("-").map(Number);
+    name.textContent = monatsname.format(new Date(jahr, (monat || 1) - 1, 1));
+    gruppe.append(name);
+    svg.append(gruppe);
+  });
+  const legende = document.createElement("div");
+  legende.className = "le-legende";
+  const titel = document.createElement("b");
+  titel.textContent = t("le_monate");
+  legende.append(titel);
+  for (const [klasse, text] of [["le-ein", t("le_leg_ein")], ["le-aus", t("le_leg_aus")]]) {
+    const eintrag = document.createElement("span");
+    const farbe = document.createElement("i");
+    farbe.className = klasse;
+    eintrag.append(farbe, document.createTextNode(text));
+    legende.append(eintrag);
+  }
+  ziel.append(legende, svg);
 }
 
 function marke(text) {
@@ -7036,28 +7794,6 @@ function marke(text) {
   m.className = "kanal-marke";
   m.textContent = text;
   return m;
-}
-
-function zeichneLnWeiterleitungen(w) {
-  const ziel = $("#ln-weiter-inhalt");
-  ziel.textContent = "";
-  if (!w.anzahl) {
-    ziel.append(hinweis(t("lk_weiter_keine"), ""));
-    return;
-  }
-  ziel.append(hinweis(t("lk_weiter_summe", {
-    n: zahl(w.anzahl), menge: zahl(w.menge),
-    // Gebuehren kommen in Millisatoshi -- in Sats gerundet liest sie ein
-    // Mensch, in msat sieht jede kleine Weiterleitung nach viel aus.
-    gebuehr: zahl(Math.round(w.gebuehr_msat / 1000)) }), "ok"));
-  for (const e of w.letzte || []) {
-    // Die Gebuehr in Sats mit Nachkommastellen -- und zwar mit dem
-    // Trennzeichen der Sprache. "6.300" haetten deutsche Leser als
-    // sechstausenddreihundert gelesen, gemeint sind sechs Komma drei.
-    ziel.append(zeile(`${e.von || "?"} → ${e.nach || "?"}`,
-                      sats(e.menge) + "  (+" + nachkomma(e.gebuehr_msat / 1000, 3)
-                      + " sat)"));
-  }
 }
 
 async function unterschriftLeisten() {
@@ -7117,8 +7853,8 @@ function zeichneEigeneAdresse(k) {
   //   hybrid  dann fehlt schlicht die eigene Adresse in den Einstellungen.
   //
   // Bis zum 10.09.2026 stand fuer alle drei derselbe dimme Halbsatz neben
-  // dem Kopierknopf. Der Betreiber musste fragen, ob das ewig dauert -- bei
-  // "still" haette er ewig gewartet.
+  // dem Kopierknopf. Im Betrieb musste man fragen, ob das ewig dauert -- bei
+  // "still" haette man ewig gewartet.
   const warum = $("#lgi-warum");
   if (warum) {
     // Beschaeftigt schlaegt alles andere: solange getinfo nicht antwortet,
@@ -7142,9 +7878,9 @@ function zeichneEigeneAdresse(k) {
 
 /* Ist das noch derselbe Knoten?
 
-   Aus dem Betrieb, 11.09.2026, nach seiner Wiederherstellung: "keine ahnung habe
-   mir die kennung nicht vorher angesehen". Dass er sie sich von Hand haette
-   notieren sollen, war unser Versaeumnis -- die Anwendung kennt sie ohnehin
+   Aus dem Betrieb, 11.09.2026, nach einer Wiederherstellung: die Kennung war
+   vorher nicht notiert worden. Dass man sie sich von Hand haette notieren
+   sollen, war unser Versaeumnis -- die Anwendung kennt sie ohnehin
    und kann die Frage selbst beantworten.
 
    Die Kennung ist kein Geheimnis: sie ist der oeffentliche Schluessel dieses
@@ -7338,8 +8074,8 @@ function zeichneBeitrag(d) {
   // Die Summe der Aufteilung, ausdruecklich benannt. Ohne sie stand hier
   // eine Aufschluesselung ohne sichtbare Grundlage, direkt unter einer
   // GROESSEREN Zahl mit anderem Bezugsraum ("Ausgeliefert seit dem Start").
-  // Aus dem Betrieb, 17.09.2026: "in dem bild passen die daten auch nicht
-  // zusammen". Sie passten auch nicht -- sie zaehlten Verschiedenes.
+  // Aus dem Betrieb, 17.09.2026: die Zahlen im Bild passten nicht zusammen.
+  // Sie passten auch nicht -- sie zaehlten Verschiedenes.
   if (!ohneGegenstellen) {
     const basis = document.createElement("p");
     basis.className = "dim small";
@@ -7497,8 +8233,8 @@ let DIA_DATEN = null;
 const BLOCK_VB = 1e6;
 
 // Die Y-Achse ist LOGARITHMISCH, und das ist die eigentliche Aenderung vom
-// 08.09.2026. Linear war sie unbrauchbar, und der Betreiber hat es genau so
-// benannt: "das feeraten diagramm ist müll".
+// 08.09.2026. Linear war sie unbrauchbar, und so wurde es aus dem Betrieb
+// auch benannt.
 //
 // Er hatte recht, und zwar aus einem Grund, den man an seinem Bild sehen
 // kann: sein Mempool war fast leer (26 von 300 MB, Verwerfungsgrenze 0,1
@@ -7547,8 +8283,8 @@ function zeichneDiagramm(roh, verlauf, lage) {
 
   // Die ECHTE Groesse, nicht eine erfundene. Bis zum 07.09.2026 stand hier
   // ein festes viewBox 700x190 mit preserveAspectRatio="none" -- derselbe
-  // Fehler wie im Kursbild, und dort hat der Betreiber ihn "mehr als peinlich"
-  // genannt. "none" streckt naemlich nicht nur die Geometrie, sondern auch
+  // Fehler wie im Kursbild, und dort war er im Betrieb sofort aufgefallen.
+  // "none" streckt naemlich nicht nur die Geometrie, sondern auch
   // die SCHRIFT: gemessen auf seinem 1850er Schirm 2,23-fach in der Breite
   // bei unveraenderter Hoehe.
   const kasten = ziel.getBoundingClientRect();
@@ -8068,7 +8804,7 @@ function oeffneKachelBlock(i) {
     zelle(k.zuerst_ms ? datumZeit(k.zuerst_ms) : t("a_kx_ungesehen"), "zahl");
     tabelle.append(tr);
   }
-  huelle.append(tabelle);
+  huelle.append(tabelleStapelbar(tabelle));
   ziel.append(huelle);
 
   const einzeln = liste.filter((x) => !x.rest).length;
@@ -8328,7 +9064,7 @@ function zeichneBlockdetail(d) {
     tr.append(a, b2, c);
     tabelle.append(tr);
   });
-  huelle.append(tabelle);
+  huelle.append(tabelleStapelbar(tabelle));
   ziel.append(huelle);
 
   if (liste.length >= (d.grenze || 500)) {
@@ -8352,7 +9088,8 @@ function zeichneBloecke(liste) {
   // Die Botschaft hat jetzt eine eigene Spalte. Sie stand vorher nur im
   // title-Attribut der Pool-Zelle -- also fuer niemanden sichtbar, der nicht
   // zufaellig mit der Maus darauf stehenbleibt. Aus dem Betrieb, 08.09.2026:
-  // "muss man ne btc adresse haben um nachrichten ... zu lesen??" Nein.
+  // die Frage, ob man eine Bitcoin-Adresse braucht, um Botschaften zu lesen.
+  // Nein.
   [["a_sp_hoehe", ""], ["a_sp_pool", ""], ["a_sp_botschaft", "botschaft"],
    ["a_sp_tx", "zahl"],
    ["a_sp_bekannt", "zahl"], ["a_sp_dauer", "zahl"], ["a_sp_gebuehren", "zahl"]]
@@ -8391,6 +9128,7 @@ function zeichneBloecke(liste) {
     zelle(b.gebuehren_sat != null ? btc(b.gebuehren_sat) : "—", "zahl");
     tabelle.append(tr);
   });
+  tabelleStapelbar(tabelle);
 }
 
 /* Einen Block nachschlagen -- irgendeinen, nicht nur die letzten zwoelf.
@@ -8850,6 +9588,7 @@ async function ladeWegwissen() {
     }
     liste.append(tr);
   }
+  tabelleStapelbar(liste);
 }
 
 /* Was unter einer wartenden Ausgabe steht: immer ein Satz, der Knopf nur,
@@ -8999,8 +9738,8 @@ function zeichneQr(ziel, text, fehlerschluessel, meldungsfeld) {
 
 /* ── Empfangen ueber Lightning ─────────────────────────────────────────────
 
-   Aus dem Betrieb, 16.09.2026: "Rechnungen bezahlen gibt es ja schon ... solte halt
-   nur auch geld rein bekommen". Eine Rechnung fordert nur; bezahlbar ist sie
+   Aus dem Betrieb, 16.09.2026: Rechnungen bezahlen ging schon, Geld empfangen
+   noch nicht. Eine Rechnung fordert nur; bezahlbar ist sie
    erst, wenn auf der Gegenseite eines Kanals Guthaben liegt. Genau das sagt
    der Kasten oben, statt den Nutzer auf eine Zahlung warten zu lassen, die
    nie kommen kann. */
@@ -9220,9 +9959,8 @@ function zeichneRechnungen(d) {
 
 /* ── Die Uebersicht: Kurs, Wallet, Lightning ───────────────────────────────
 
-   Aus dem Betrieb, 16.09.2026: "lass uns mal noch was machen mit der leeren
-   uebersichts seite ... da können wir die BTC Kurs anzeigen lassen, Wallet
-   guthaben, knoten, so halt wirklich mal ne uebersicht".
+   Aus dem Betrieb, 16.09.2026: die leere Uebersicht soll eine echte werden --
+   Kurs, Guthaben, Knoten.
 
    Alles kommt aus Antworten, die ohnehin geholt werden: der Kurs aus dem
    Zwischenspeicher des Servers, Zustand und Guthaben aus der schlanken
@@ -9498,9 +10236,8 @@ function log_fehler(was, e) {
 function zeichneNeuerungen(alle) {
   const ziel = $("#e-neuerung");
   if (!alle) {
-    // Aus dem Betrieb, 03.09.2026: "die aktualisierungs abfrage gibt auch keinen
-    // ton mehr von sich -- ob ich den aktuellen stand habe oder ob da
-    // nachgeguckt wird". Der Kasten wird nur aus /status gefuellt; faellt
+    // Aus dem Betrieb, 03.09.2026: die Update-Pruefung sagte nichts mehr --
+    // weder ob der Stand aktuell ist noch ob nachgesehen wird. Der Kasten wird nur aus /status gefuellt; faellt
     // der Aufruf aus, blieb hier vorher ein leeres <div> stehen und sagte
     // gar nichts. Was schon dasteht, bleibt jetzt stehen -- und ist nichts
     // da, wird wenigstens gesagt, warum nichts dasteht.
@@ -9547,8 +10284,8 @@ function neuerungsBlock(n, titel, schluessel) {
   const nurAbbild = n.laeuft === false;
 
   // Zuerst die Tatsachen, dann die Erklaerung. Aus dem Betrieb, 03.09.2026:
-  // "entweder weiss er welche version wir haben und welche bereit steht
-  // oder er weiss es nicht". Beides steht jetzt immer da -- notfalls als
+  // entweder kennt die Anwendung die laufende und die bereitstehende Version,
+  // oder sie kennt sie nicht. Beides steht jetzt immer da -- notfalls als
   // "unbekannt", was auch eine Auskunft ist, aber niemals als Leerstelle.
   const zahlen = document.createElement("p");
   zahlen.className = "dim small";
@@ -9642,8 +10379,8 @@ function neuerungsBlock(n, titel, schluessel) {
 /* Wie man an die neue SatoshiCortex-Fassung kommt -- je nachdem, welchem Tag
    die Installation folgt.
 
-   Aus dem Betrieb, 23.09.2026: "ich will ja immer latest! und nicht gepinnt
-   auf eine version!" Der Kasten reichte ihm trotzdem SATCORTEX_VERSION=1.0.3
+   Aus dem Betrieb, 23.09.2026: gewollt ist immer latest, keine feste
+   Version. Der Kasten reichte trotzdem SATCORTEX_VERSION=1.0.3
    zum Abschreiben -- dieselbe Zeile wie fuer Core und LND. Wer latest folgt
    und sie uebernimmt, ist danach festgenagelt und bekommt nie wieder ein
    Update. Darunter stand zudem der Erklaertext fuer Core und LND, samt
@@ -9793,8 +10530,8 @@ let RPC_DATEN = null;
 
 /* ── Externe Wallets: Zeus ──────────────────────────────────────────────────
 
-   Aus dem Betrieb, 26.09.2026: "also wenn dann will ich vollen umfangreichen
-   funktionen also alles ... und es wird dann nur tor und vpn angeboten".
+   Aus dem Betrieb, 26.09.2026: der volle Funktionsumfang, wenn schon -- und
+   angeboten werden nur Tor und VPN.
 
    Die Oberflaeche stellt einen Schluessel aus und zeigt ihn EINMAL, als
    QR-Code und als Text. Sie hebt ihn nicht auf -- auch nicht im Speicher
@@ -9986,8 +10723,8 @@ function fzErgebnisWeg() {
 
 /* ── Electrum fuer BitBoxApp und Trezor Suite ─────────────────────────────
 
-   Aus dem Betrieb, 28.09.2026: "was will den trezor haben damit man trezor
-   direkt verbinden kann ???" -- beide Apps sprechen nur Electrum. Der
+   Aus dem Betrieb, 28.09.2026: die Frage, was Trezor fuer eine direkte
+   Verbindung braucht -- beide Apps sprechen nur Electrum. Der
    Server laeuft in der Anwendung; angemeldet wird ein Konto mit seinem
    OEFFENTLICHEN Schluessel. Der steht nach dem Anmelden nirgends mehr auf
    dieser Seite: das Feld wird geleert, die Liste nennt nur den Namen. */
@@ -10441,8 +11178,8 @@ async function speichereAdresse() {
 
 /* ── Senden ───────────────────────────────────────────────────────────────
 
-   Die Bedingung des Betreibers vom 30.08.2026: "ich werde nix dahin ueberweisen solange
-   ich es nicht zurueck schicken kann". Eine Wallet, aus der man nicht wieder
+   Die Bedingung aus dem Betrieb vom 30.08.2026: eingezahlt wird erst, wenn
+   man das Geld auch zurueckschicken kann. Eine Wallet, aus der man nicht wieder
    herauskommt, ist keine Wallet.
 
    ZWEI SCHRITTE, und der erste ist nicht ueberspringbar: erst "was kostet
@@ -10553,8 +11290,8 @@ async function sendenAusloesen() {
 
 /* ── Die PIN: das Schloss vor Handgriffen mit Folgen ──────────────────────
 
-   Aus dem Betrieb, 08.09.2026: "eine art: PIN. fuer Zahlungen ansich also knoten
-   oeffnen oder schliessen geld transferieren".
+   Aus dem Betrieb, 08.09.2026: eine eigene PIN fuer alles, was Geld bewegt --
+   Kanaele oeffnen und schliessen, Zahlungen, Ueberweisungen.
 
    Sie schuetzt gegen etwas anderes als der Entsperrweg: der entscheidet, was
    jemand mit der PLATTE anfangen kann, die PIN steht gegen eine uebernommene
@@ -10795,8 +11532,8 @@ async function gegenstelleAnsehen() {
 // wo man etwas tun kann, dem Handgriff. Mehrere Codes teilen sich einen
 // Text, wo sie fuer den Betreiber dasselbe heissen.
 //
-// Aus dem Betrieb, 29.09.2026: "UNKNOWN_INVOICE 2x · Kanal 0 ... was soll man
-// mit diesen infos". Bis dahin waren sechs von 53 Gruenden uebersetzt.
+// Aus dem Betrieb, 29.09.2026: mit "UNKNOWN_INVOICE 2x · Kanal 0" konnte niemand
+// etwas anfangen. Bis dahin waren sechs von 53 Gruenden uebersetzt.
 function htlcGrund(grund, richtung) {
   const gruppen = {
     ohne: ["UNKNOWN", "NO_DETAIL"],
@@ -10874,6 +11611,25 @@ function htlcGrundText(grund, richtung) {
 
 // Eine Tabelle wie bei den Wegen, die der Knoten gelernt hat: Kopfzeile
 // aus Schluesseln, jede Zelle [Text, Klasse].
+// Auf dem Handy wird jede Zeile ein Block, jeder Wert mit seinem
+// Spaltennamen davor (30.09.2026, aus dem Betrieb: "die extra handy ansicht
+// ... warum haben wir die nicht fuer alle anderen kategorien"). Bis dahin
+// schob sich jede Tabelle seitlich weg, und man musste wischen. Der Name
+// kommt aus der Kopfzeile; das Stapeln selbst macht die Stilvorlage.
+function tabelleStapelbar(tabelle) {
+  const kopf = tabelle.querySelector("tr");
+  const namen = kopf ? Array.from(kopf.children, (zelle) =>
+    zelle.tagName === "TH" ? zelle.textContent.trim() : "") : [];
+  if (!namen.some(Boolean)) return tabelle;
+  tabelle.classList.add("stapel");
+  tabelle.querySelectorAll("tr").forEach((reihe) => {
+    Array.from(reihe.children).forEach((zelle, i) => {
+      if (zelle.tagName === "TD" && namen[i]) zelle.dataset.titel = namen[i];
+    });
+  });
+  return tabelle;
+}
+
 function htlcTabelle(spalten, zeilen) {
   const rahmen = document.createElement("div");
   rahmen.className = "ausw-tabelle";
@@ -10897,7 +11653,7 @@ function htlcTabelle(spalten, zeilen) {
     }
     tabelle.append(tr);
   }
-  rahmen.append(tabelle);
+  rahmen.append(tabelleStapelbar(tabelle));
   return rahmen;
 }
 
@@ -10919,7 +11675,7 @@ async function durchgangLaden() {
   // Proben zuerst und fuer sich: kein Fehler, eher ein gutes Zeichen.
   if (d.proben) oben.append(hinweis(t("ht_proben", { n: zahl(d.proben) }), "ok"));
   // Was abgelehnt wurde -- als Tabelle, nach Richtung geordnet (aus dem
-  // Betrieb, 29.09.2026: "sonst haette man da ne art tabelle draus machen muessen").
+  // Betrieb, 29.09.2026: sonst wird es unuebersichtlich).
   const reihenfolge = ["weiter", "umschichten", "von_dir", "an_dich", "unbekannt"];
   const echte = gruende
     .filter((g) => htlcGrund(g.grund, g.richtung).text !== "ht_g_probe")
@@ -11473,8 +12229,8 @@ async function walletAnlegen() {
       ? t(d.meldung, { mindestens: PASSWORT_MIN, ...d })
       : t("e_fehler");
     // Ein Fehler an den WÖRTERN gehört an die Wörter. Er stand unten neben
-    // dem Knopf, also direkt unter dem Passwortfeld — der Betreiber las dort
-    // "das stimmt so nicht, noch 3 Versuche" und bezog es auf sein
+    // dem Knopf, also direkt unter dem Passwortfeld — im Betrieb las man dort
+    // "das stimmt so nicht, noch 3 Versuche" und bezog es auf das
     // Passwort. Bei fünf Versuchen und einem frisch beschriebenen Zettel
     // ist das keine Kleinigkeit.
     if (d.meldung === "gegenprobe_falsch") {
@@ -11528,8 +12284,8 @@ async function zeigeTilgung(stand) {
 /* Nach dem Sperren warten, bis die Wallet WIRKLICH zu ist -- und es
    solange sagen.
 
-   DER BEFUND VOM 11.09.2026. Der Betreiber: "dazu steht hier wallet sperren .. da
-   drueck ich drauf passiert nix". Es passierte sehr wohl etwas: LND wurde
+   DER BEFUND VOM 11.09.2026. Aus dem Betrieb: "Wallet sperren" gedrueckt, und
+   nichts passierte. Es passierte sehr wohl etwas: LND wurde
    beendet und neu gestartet, was bis zu neunzig Sekunden dauert. Nur sah
    man davon nichts -- der einzige Takt dieser Oberflaeche frischt die
    Uebersicht auf, nicht die Wallet-Ansicht. Der Kasten blieb also stehen,
@@ -11670,8 +12426,8 @@ function entsperrweg(vorsilbe) {
 
    Bis zum 10.09.2026 war das ein Haekchen mit zwei Saetzen, und der Satz
    fuer "an" stimmte nicht mehr: er versprach, SatoshiCortex wuerfele das
-   Passwort selbst. Das tat es seit dem 09.09. nicht mehr -- seit des Betreibers
-   Einwand waehlt der Nutzer es. Schlimmer noch: das Passwortfeld wurde bei
+   Passwort selbst. Das tat es seit dem 09.09. nicht mehr -- seit dem Einwand
+   aus dem Betrieb waehlt der Nutzer es. Schlimmer noch: das Passwortfeld wurde bei
    "an" AUSGEBLENDET, und ohne Passwort lehnt der Server das Anlegen ab. Wer
    automatisch entsperren wollte, kam gar nicht durch. */
 function entsperrwegFolge(vorsilbe) {
@@ -11732,8 +12488,8 @@ function entsperrwegWahlFolge() {
   // Start auf. "aus" und aus "merken" schreiben nichts -- dort waere die
   // Abfrage eine Huerde ohne Zweck.
   //
-  // Aus dem Betrieb, 10.09.2026: "habe aber gerade den Haken gesetzt bei fuer die
-  // Laufzeit merken aber das wird noch nicht uebernommen". Genau deshalb:
+  // Aus dem Betrieb, 10.09.2026: der Haken "fuer die Laufzeit merken" wurde
+  // nicht uebernommen. Genau deshalb:
   // die Oberflaeche verlangte ein Passwort und eine gesperrte Wallet, um auf
   // einen Weg zu wechseln, der gar nichts ablegt.
   $("#ew-probe").classList.toggle("hidden", !(ziel === "datei" && !liegt_vor));
@@ -11800,8 +12556,8 @@ async function walletEntsperren() {
   meldung.textContent = "";
   try {
     // Ein Geheimnis, ein Feld. Der Tresor stellte hier ein zweites daneben,
-    // das dasselbe tat -- genau der Tausch, den Aus dem Betrieb, 10.09.2026
-    // zerlegt hat.
+    // das dasselbe tat -- genau der Tausch, der am 10.09.2026 im Betrieb
+    // durchfiel.
     await api("/lightning/entsperren", "POST", { passwort: feld.value });
     feld.value = "";                    // nicht im Formular stehen lassen
     meldung.textContent = t("wl_entsperrt");
@@ -11843,11 +12599,12 @@ let whSicherung = "";        // base64, nur im Arbeitsspeicher
    sind. Ein vertipptes Wort scheitert davor, und die Meldung dazu landete
    bisher nur im Protokoll.
 
-   Aus dem Betrieb, 11.09.2026, nach einer Stunde Suche:
+   Aus dem Betrieb, 11.09.2026, nach einer Stunde Suche eine Zeile dieser
+   Art (das Wort hier ist ein ausgedachtes Beispiel):
 
-       word mopth isn't a part of default word list (index=7)
+       word cabbege isn't a part of default word list (index=3)
 
-   Gemeint war "month" -- das EINZIGE Wort der Liste, das einen Buchstaben
+   Gemeint ist "cabbage" -- das EINZIGE Wort der Liste, das einen Buchstaben
    davon entfernt liegt. Genau das gehoert ans Feld, waehrend man tippt. */
 
 /* Woerter der Liste, die sich um genau einen Buchstaben unterscheiden.
@@ -11944,7 +12701,7 @@ function whFelderBauen() {
     feld.setAttribute("list", "bip39-liste");
     feld.setAttribute("aria-label", t("wl_wort_nr", { nr }));
     // Beim Verlassen des Feldes pruefen, nicht bei jedem Tastendruck: waehrend
-    // man "month" tippt, ist "mont" nun einmal kein Wort der Liste.
+    // man "cabbage" tippt, ist "cabb" nun einmal kein Wort der Liste.
     feld.addEventListener("blur", () => whWortfehlerZeigen(whUnbekannteWoerter()));
     // Alle vierundzwanzig auf einmal einfuegen zu koennen ist kein Luxus:
     // wer sie aus einem Passwortmanager holt, hat sie als eine Zeile, und
@@ -12162,7 +12919,7 @@ function einzahlAdressform() {
 // werden soll.
 // Was jetzt zu tun ist -- oder nichts.
 //
-// Des Betreibers Befunde 1, 12 und 13: der Zustand stand dort, wo man nicht
+// Die Befunde 1, 12 und 13 aus dem Betrieb: der Zustand stand dort, wo man nicht
 // handeln kann, und das Handeln dort, wo man nicht hinsieht. Die Uebersicht
 // meldete "LND laeuft", waehrend der Knoten mit gesperrter Wallet stillstand;
 // die Kanalseite sagte "angelegt, aber gesperrt" ohne einen Weg zum
@@ -12175,8 +12932,8 @@ function zeigeTunzeile(schritt) {
   const zeile = $("#tunzeile");
   if (!zeile) return;
   if (!schritt) {
-    // Steht nichts an, verschwindet sie ganz. "wenn alles da, muss man ja
-    // nicht mehr sehen was zu tun ist" -- der Betreiber, 09.09.2026.
+    // Steht nichts an, verschwindet sie ganz: ist alles da, muss man nicht
+    // mehr sehen, was zu tun ist (aus dem Betrieb, 09.09.2026).
     zeile.classList.add("hidden");
     return;
   }
@@ -12329,11 +13086,10 @@ async function kopiere(feld, meldung, schluessel) {
 
 /* ── Was das Netz nimmt ──────────────────────────────────────────────────
  *
- * Aus dem Betrieb, 18.09.2026: „könnten wir hier im gebüren feld irgendwie immer
- * mal so den durchschnitt anzeigen lassen der letzten 4 wochen .. oder das
- * ganze irgendwie automatisieren“. Und auf die Rückfrage: „wenn dann 100%
- * und alle 3 Stufen gemeinsam! Obergrenze ist max wert der letzten 4 wochen
- * und untergrenze ist dann min wert der letzten 4 wochen für die automatik“.
+ * Aus dem Betrieb, 18.09.2026: im Gebührenfeld den Durchschnitt der letzten
+ * vier Wochen zeigen — oder es gleich automatisieren. Auf die Rückfrage: alle
+ * drei Stufen gemeinsam, oben begrenzt durch den höchsten, unten durch den
+ * niedrigsten Wert der letzten vier Wochen.
  *
  * Alles drei sitzt hier: die gemessene Zahl, das wandernde Band, und der
  * Schalter. Der Vorschlag steht auch dann da, wenn der Schalter aus ist —
@@ -12392,8 +13148,8 @@ function gbVerlaufBild(verlauf, band) {
 /* Wie sich die Gebuehrensaetze des Netzes verteilen -- als Leiste und als
    Zeile darunter.
 
-   Der Betreiber am 21.09.2026: "kann mann nicht einfach machen: 50% 0-100 die
-   anderen 50% 100-600". Kann man, und es ist die bessere Auskunft: der Absatz,
+   Aus dem Betrieb, 21.09.2026: lieber einfach die Anteile nennen, etwa "50 %
+   0-100, 50 % 100-600". Das ist die bessere Auskunft: der Absatz,
    der vorher hier stand, ERKLAERTE fuenf Zeilen lang, dass die Verteilung
    schief ist. Die Leiste zeigt das und sagt zusaetzlich, wo die Masse liegt.
 
@@ -12473,9 +13229,8 @@ function zeichneNetzgebuehren(d) {
     // DER BEFUND VOM 21.09.2026 aus dem Betrieb, mit Bild: hier stand ein
     // fuenfzeiliger Absatz, der ERKLAERTE, warum der Median nicht in der
     // Mitte der Spanne liegt -- und er stand NEUNMAL untereinander, weil er
-    // per zahlen.after() angehaengt und nie entfernt wurde. Dazu der
-    // Betreiber: "was das den bitte fuer ein riesen text ?? ... kann mann
-    // nicht einfach machen: 50% 0-100 die anderen 50% 100-600".
+    // per zahlen.after() angehaengt und nie entfernt wurde. Aus dem Betrieb
+    // dazu: viel zu viel Text -- lieber einfach die Anteile.
     //
     // Beides ist damit erledigt: die Verteilung wird GEZEIGT statt erklaert,
     // und sie geht in ein festes Element, das jedes Mal geleert wird. Sie
@@ -12503,6 +13258,7 @@ function zeichneNetzgebuehren(d) {
   gbVerlaufBild(d.verlauf, band);
 
   $("#gb-automatik").checked = !!d.automatik;
+  $("#gb-abstand").value = String(d.abstand_tage || 1);
   $("#gb-uebernehmen").disabled = !(heute && heute.median_ppm !== null);
   $("#gb-messen").disabled = !!d.misst_gerade;
 
@@ -12586,9 +13342,16 @@ async function gebuehrenautomatikUmschalten() {
   schalter.disabled = true;
   meldung.textContent = "";
   try {
-    await api("/lightning/gebuehrenautomatik", "POST",
-              { automatik: schalter.checked });
+    const antwort = await api("/lightning/gebuehrenautomatik", "POST",
+                              { automatik: schalter.checked,
+                                abstand_tage: Number($("#gb-abstand").value) || 1 });
     await ladeNetzgebuehren();
+    // Eingeschaltet, aber Kanaele ohne Messreihe: das gehoert gesagt, sonst
+    // wartet man auf eine Aenderung, die erst nach einem halben Tag kommt.
+    if (schalter.checked && (antwort || {}).grund === "misst_fuellstand") {
+      $("#gb-automatik-stand").textContent = t("gb_a_misst");
+    }
+    ladeLightningKanaele();
   } catch (e) {
     if (e && e.abgemeldet) return;
     schalter.checked = !schalter.checked;
@@ -12628,9 +13391,9 @@ function fuelleGebuehrenauswahl(kanaele) {
 
 /* Was die Kanaele JETZT verlangen -- fuer das Gebuehrenfeld.
  *
- * Aus dem Betrieb, 26.09.2026: "meine gesetzten gebueren nach jedem neu
- * start oder refresh weg sind und nicht mehr angezeigt werden was ich da vom
- * netzwerk verlange". Weg waren sie nie; das Feld zeigte nach jedem Laden nur
+ * Aus dem Betrieb, 26.09.2026: nach jedem Neustart oder Neuladen schienen die
+ * gesetzten Gebuehren weg, die Anzeige zeigte nicht mehr, was man vom Netz
+ * verlangt. Weg waren sie nie; das Feld zeigte nach jedem Laden nur
  * wieder seine feste Vorgabe. Die Werte kommen aus LNDs Gebuehrenbericht und
  * stehen seitdem an jedem Kanal der Kanalliste. */
 let GB_KANAELE = [];
@@ -13175,8 +13938,8 @@ async function start() {
   // "[object PointerEvent]" kein gueltiger Selektor ist. Der Knopf tat dann
   // gar nichts, ohne ein Wort.
   //
-  // Aus dem Betrieb, 11.09.2026: "also hier passiert nix wenn ich auf wallet
-  // sperren druecke". Genau das.
+  // Aus dem Betrieb, 11.09.2026: "Wallet sperren" gedrueckt, und nichts
+  // passierte. Genau das.
   $("#tg-sperren").addEventListener("click", () => walletSperren());
   $("#tg-loeschen").addEventListener("click", walletTilgen);
   // Die Knoepfe im Guthaben entstehen bei jedem Zeichnen neu -- deshalb
@@ -13184,6 +13947,15 @@ async function start() {
   $("#ln-guthaben-inhalt").addEventListener("click", (ereignis) => {
     const knopf = ereignis.target.closest("[data-sprung]");
     if (knopf) springeZu(knopf.dataset.sprung);
+  });
+  // Dasselbe im Ueberblick der Kanaele.
+  $("#lk-ueberblick-inhalt").addEventListener("click", (ereignis) => {
+    const knopf = ereignis.target.closest("[data-sprung]");
+    if (knopf) springeZu(knopf.dataset.sprung);
+  });
+  $("#le-zeitraum").addEventListener("click", (ereignis) => {
+    const knopf = ereignis.target.closest("button[data-tage]");
+    if (knopf) ertragLaden(Number(knopf.dataset.tage));
   });
   $("#ez-holen").addEventListener("click", () => einzahladresseHolen(false));
   $("#ez-neue").addEventListener("click", () => einzahladresseHolen(true));
@@ -13212,6 +13984,7 @@ async function start() {
   $("#gb-messen").addEventListener("click", netzgebuehrenMessen);
   $("#gb-uebernehmen").addEventListener("click", medianUebernehmen);
   $("#gb-automatik").addEventListener("change", gebuehrenautomatikUmschalten);
+  $("#gb-abstand").addEventListener("change", gebuehrenautomatikUmschalten);
   $("#sich-laden").addEventListener("click", ladeSicherungHerunter);
   $("#sich-einrichten").addEventListener("click", () => sicherungszielSetzen(false));
   $("#sich-entfernen").addEventListener("click", () => sicherungszielSetzen(true));

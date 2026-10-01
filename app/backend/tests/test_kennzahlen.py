@@ -1,8 +1,7 @@
 """Die Zahlen, die auf der Weltansicht unter der Karte stehen.
 
-Der Betreiber, 01.09.2026: "der naechste bitcoin block blocknummer inhalt ...
-netzwerk gebueren aktuell difficultly ... das sind so sachen die fehlen
-momentan auch noch".
+Aus dem Betrieb, 01.09.2026: es fehlten der naechste Block (Nummer, Inhalt),
+die aktuellen Netzgebuehren und die Difficulty.
 
 Sie fehlten wirklich -- die Difficulty sogar, obwohl getblockchaininfo sie bei
 jedem Abruf mitliefert und die Anwendung sie wegwarf.
@@ -189,9 +188,8 @@ def test_die_anpassung_wird_gekappt():
 
 # ── Was ein Kanal an Gebuehren kostet (04.09.2026) ──────────────────────────
 #
-# Der Betreiber: "die gebuehren lage beim oeffnen und schliessen, das sollte unsere
-# app dann direkt da wo es passiert sauber anzeigen, damit es nicht zu boesen
-# ueberraschungen kommt."
+# Aus dem Betrieb: die Gebuehrenlage beim Oeffnen und Schliessen gehoert genau
+# dorthin, wo es passiert -- damit es keine boesen Ueberraschungen gibt.
 #
 # Besonders wichtig bei einem kleinen Einstieg -- etwa hundert Euro. Zwei
 # Sats je vByte sind dann Kleingeld, zweihundert ein Drittel des Kanals.
@@ -229,9 +227,8 @@ def test_ohne_guthaben_wird_kein_anteil_erfunden():
 
 # ── Ist die Gebuehr gerade teuer oder guenstig? ────────────────────────────
 #
-# Aus dem Betrieb, 11.09.2026: "waere das nicht gut wenn er uns sagen wuerde ob das
-# momentan teuer oder guenstig ist im durchschnitt .. ?? das mann ne
-# orientierung hat".
+# Aus dem Betrieb, 11.09.2026: gewuenscht war eine Orientierung, ob es gerade
+# teuer oder guenstig ist, gemessen am Durchschnitt.
 #
 # Der Massstab kommt aus der EIGENEN Kette -- getblockstats sagt je Block, bei
 # welchen Saetzen wirklich bestaetigt wurde. Keine fremde Seite.
@@ -345,9 +342,8 @@ def test_die_ruecklage_kommt_von_lnd_durch():
 
 # ── Die Uhr der Kette: Halbierung ──────────────────────────────────────────
 #
-# Der Betreiber, 21.09.2026: "sone arte block zeit in der uebersicht .. anzahl
-# der bloecke bis zum naechsten halving .. geschaetztes datum .. und wie hoch
-# die revard ist beim naechsten halving".
+# Aus dem Betrieb, 21.09.2026: eine Blockzeit in der Uebersicht -- Bloecke bis
+# zum naechsten Halving, das geschaetzte Datum und die Belohnung danach.
 
 def test_die_belohnung_folgt_cores_eigener_rechnung():
     """Ganzzahlig geschoben, nicht in Gleitkomma geteilt.

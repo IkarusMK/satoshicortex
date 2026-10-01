@@ -166,6 +166,9 @@ ZUSAMMENGESETZT = {
     't(weg, werte)': [
         "ht_weg_weiter", "ht_weg_an_dich", "ht_weg_von_dir", "ht_weg_unbekannt",
         "ht_weg_raus", "ht_weg_zurueck"],
+    # Die Stufen der Gebuehren-Automatik je Kanal (30.09.2026).
+    't("kz_stufe_" + steuer.stufe)': [
+        "kz_stufe_1", "kz_stufe_2", "kz_stufe_3", "kz_stufe_4"],
     # Die Spaltenkoepfe der beiden Tabellen, aus htlcTabelle().
     't(spalte)': [
         "ht_sp_zeit", "ht_sp_richtung", "ht_sp_grund", "ht_sp_weg",
@@ -317,9 +320,9 @@ def sprachbloecke(text: str) -> dict:
 
 
 # Fuenf Fehler, die die Vollstaendigkeitspruefung NICHT sieht -- sie zaehlt
-# Schluessel, nicht Inhalte. Am 10.09.2026 nachgeruestet, nachdem der Betreiber um
-# eine saubere Uebersetzung "in allen Kategorien und Menuefenstern" gebeten
-# hat und die Suche danach genau diese Klassen zutage gefoerdert hat.
+# Schluessel, nicht Inhalte. Am 10.09.2026 nachgeruestet, nachdem aus dem
+# Betrieb um eine saubere Uebersetzung in allen Kategorien und Menues gebeten
+# wurde und die Suche danach genau diese Klassen zutage gefoerdert hat.
 _PLATZHALTER = re.compile(r"\{([a-z_][a-z0-9_]*)\}")
 _UMLAUT = re.compile(r"[\u00e4\u00f6\u00fc\u00c4\u00d6\u00dc\u00df]")
 _DEUTSCHE_WOERTER = re.compile(

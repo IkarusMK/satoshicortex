@@ -2,11 +2,12 @@
  *
  * WOZU: LND rechnet die Pruefsumme erst, wenn alle Woerter bekannt sind. Ein
  * vertipptes Wort scheitert davor, und seine Meldung landete bisher nur im
- * Protokoll. Gefunden nach einer Stunde Suche, die dort endete:
+ * Protokoll. Gefunden nach einer Stunde Suche, die bei einer Zeile dieser
+ * Art endete (das Wort hier ist ein ausgedachtes Beispiel):
  *
- *     word mopth isn't a part of default word list (index=7)
+ *     word cabbege isn't a part of default word list (index=3)
  *
- * Gemeint war "month" — das EINZIGE Wort der Liste, das einen Buchstaben
+ * Gemeint ist "cabbage" — das EINZIGE Wort der Liste, das einen Buchstaben
  * davon entfernt liegt. Das haette die Oberflaeche am Feld sagen muessen,
  * nicht das Protokoll hinterher.
  *

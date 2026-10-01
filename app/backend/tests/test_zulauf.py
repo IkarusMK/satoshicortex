@@ -109,7 +109,7 @@ def test_zaehlerueberlauf_ist_keine_luecke(z):
 
 
 def test_ein_sprung_in_der_mempoolfolge_ist_KEIN_verlust(z):
-    """Der Fehlalarm, der des Betreibers Uebersicht am 08.09.2026 mit "6070
+    """Der Fehlalarm, der die Uebersicht im Betrieb am 08.09.2026 mit "6070
     verlorene Meldungen in 24 h" beschriftet hat.
 
     Core zaehlt die Mempool-Folgenummer bei JEDER Entfernung hoch, auch bei

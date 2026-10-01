@@ -1,7 +1,7 @@
 """Anmeldung ueber einen fremden Ausweisdienst.
 
-Aus dem Betrieb, 11.09.2026: "damit ich quasie kein lock in fenster mehr habe
-sondern nur noch pocket id mich einloggt".
+Aus dem Betrieb, 11.09.2026: kein eigenes Anmeldefenster mehr, sondern nur
+noch der Ausweisdienst.
 
 Hier steht der Teil, der stimmen MUSS. Ein Ausweis, den wir zu leicht
 annehmen, ist die Eingangstuer zu einem Geraet mit einer Wallet darin --
@@ -198,7 +198,7 @@ def test_ohne_https_wird_nicht_gesprochen():
 
 # ── Pocket ID vergibt kein Secret mehr (12.09.2026) ────────────────────────
 #
-# Der Betreiber: "poket id erstellt mir kein secred mehr ?"
+# Aus dem Betrieb: Pocket ID erzeugte kein Client-Secret mehr.
 #
 # Stimmt, und es war meine falsche Annahme. Aus Pocket IDs eigener Doku:
 # "Only public clients are supported, so token_endpoint_auth_method must be
@@ -262,7 +262,7 @@ def test_ohne_secret_gilt_der_anmeldeweg_trotzdem_als_eingerichtet():
 
 # ── Die Pfade, die beim ersten Mal nicht durchlaufen wurden ────────────────
 #
-# Aus dem Betrieb, 12.09.2026: "warum nicht 100%??" -- die Zahl ist die Abdeckung,
+# Aus dem Betrieb, 12.09.2026: warum nicht 100 %? -- die Zahl ist die Abdeckung,
 # nicht die Bestehensquote. Beim Nachsehen fiel auf, dass hier Sicherheitscode
 # ungeprueft blieb: die zweite Signaturart und der Schluesselwechsel.
 
@@ -344,7 +344,7 @@ def test_der_grund_des_anbieters_geht_nicht_verloren(monkeypatch):
 def test_der_name_faellt_der_reihe_nach_zurueck():
     """Was in der Oberflaeche steht, wenn jemand sich angemeldet hat."""
     assert oidc.name_aus({"preferred_username": "testnutzer"}) == "testnutzer"
-    assert oidc.name_aus({"name": "der Betreiber H."}) == "der Betreiber H."
+    assert oidc.name_aus({"name": "Erika Muster"}) == "Erika Muster"
     assert oidc.name_aus({"email": "a@b.test"}) == "a@b.test"
     # Und wenn gar nichts dabeisteht, wenigstens die Kennung.
     assert oidc.name_aus({"sub": "xyz"}) == "xyz"

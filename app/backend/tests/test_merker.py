@@ -1,8 +1,8 @@
 """Der Merker haelt genau ein Geheimnis -- im Speicher, sonst nirgends.
 
-Er ist der Ersatz fuer den Tresor, den Aus dem Betrieb, 10.09.2026 zerlegt hat:
-"ich tausche ein passwort gegen das andere obwohl beide die selbe funktion
-unterm strich haben". Die Begruendung steht im Modul; hier steht, was er
+Er ist der Ersatz fuer den Tresor, der am 10.09.2026 im Betrieb durchfiel:
+ein Passwort gegen ein anderes getauscht, das unterm Strich dasselbe tut.
+Die Begruendung steht im Modul; hier steht, was er
 tatsaechlich tut.
 """
 import threading

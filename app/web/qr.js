@@ -1,7 +1,7 @@
 /* QR-Codes, selbst gerechnet.
 
-   Aus dem Betrieb, 15.09.2026: "aus ner bitcoin adresse mal direkt nen QR code
-   machen ... zum scannen macht das ueberweissen einfacher".
+   Aus dem Betrieb, 15.09.2026: aus einer Bitcoin-Adresse direkt einen QR-Code
+   machen -- zum Scannen, das macht das Ueberweisen einfacher.
 
    Keine fremde Bibliothek und kein Dienst: der Code entsteht hier im
    Browser, aus der Adresse, die der eigene Knoten gerade erzeugt hat. Ein

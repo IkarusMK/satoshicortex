@@ -379,7 +379,7 @@ def test_app_startet_auch_wenn_fast_nicht_beschreibbar_ist(tmp_path):
     datenbank im Konstruktor angelegt wird.
 
     Das Abbild war gebaut und veroeffentlicht; nur weil die CI das Abbild
-    WIRKLICH STARTET, ist es nicht auf des Betreibers Geraet gelandet.
+    WIRKLICH STARTET, ist es nicht auf einem Geraet im Betrieb gelandet.
 
     Der Test baut die Anwendung gegen einen schreibgeschuetzten Ordner. Sie
     muss stehen -- die Auswertung darf ausfallen, der Assistent nicht.
@@ -470,8 +470,8 @@ def test_keine_blockierenden_aufrufe_in_der_ereignisschleife():
 # ── Antworten der Schnittstelle duerfen nie aus dem Browser-Zwischenspeicher
 #    kommen ──────────────────────────────────────────────────────────────
 #
-# Der Betreiber, 01.09.2026: "das was dann in der webui gespeichert wird wird nach
-# einem refresh immer noch nicht gespeichert und wieder angezeigt". Das
+# Aus dem Betrieb, 01.09.2026: was in der Oberflaeche gespeichert wurde, stand
+# nach dem Neuladen nicht mehr da. Das
 # Ablegen war in Ordnung -- ueber einen vollstaendigen Neustart geprueft --
 # und die ausgelieferten Dateien byte-identisch mit der Fassung. Es war das
 # GET danach.
@@ -500,9 +500,9 @@ def test_die_oberflaeche_bleibt_nachfragbar(angemeldet):
 
 # ── Nichts von aussen ──────────────────────────────────────────────────────
 #
-# Aus dem Betrieb, 08.09.2026: "mit google wollen wir nix zu tun haben .. wir
-# bleiben unser eigener knoten und teil des netzwerkes, jede info die wir
-# brauchen kommt aus dem netzwerk und nicht von extern."
+# Aus dem Betrieb, 08.09.2026: keine grossen fremden Dienste -- der Knoten
+# bleibt sein eigener und Teil des Netzes, und jede Auskunft kommt aus dem
+# Netz selbst, nicht von aussen.
 #
 # Die Oberflaeche hielt das schon -- aber als Gewohnheit, nicht als Regel.
 # Eine einzige spaeter eingefuegte Zeile haette es still gebrochen.
@@ -555,9 +555,8 @@ def test_die_oberflaeche_laedt_nichts_von_fremden_adressen():
 
 # ── Anmeldung ueber Pocket ID, und die Nottuer dahinter (11.09.2026) ────────
 #
-# Der Betreiber: "damit ich quasie kein lock in fenster mehr habe sonder nur noch
-# pocket id mich einloggt" -- und auf die Rueckfrage, wie er dann noch
-# hereinkommt, wenn der Ausweisdienst ausfaellt: das lokale Konto bleibt, aber
+# Aus dem Betrieb: kein eigenes Anmeldefenster mehr, nur noch der
+# Ausweisdienst -- und auf die Rueckfrage, wie man dann noch hereinkommt, wenn der Ausweisdienst ausfaellt: das lokale Konto bleibt, aber
 # nur im Heimnetz.
 #
 # Auf einem Geraet mit einer Wallet darin ist "ausgesperrt" kein hinnehmbarer

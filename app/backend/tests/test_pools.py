@@ -86,8 +86,8 @@ def test_unbrauchbare_liste_ist_kein_fehler(tmp_path):
 
 # ── Gegen ECHTE Bloecke ───────────────────────────────────────────────────
 #
-# Nicht erfunden: des Betreibers Bloecke 966.077 bis 966.088 vom 08.09.2026, so wie
-# sein Knoten sie gesehen hat. In der Ansicht standen ACHT von zwoelf als
+# Nicht erfunden: die Bloecke 966.077 bis 966.088 vom 08.09.2026, so wie ein
+# Knoten im Betrieb sie gesehen hat. In der Ansicht standen ACHT von zwoelf als
 # "unbekannt" -- das sah aus wie eine kaputte Ansicht und war eine kaputte
 # Erkennung.
 #

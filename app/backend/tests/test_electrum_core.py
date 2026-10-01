@@ -1,7 +1,7 @@
 """Von Anfang bis Ende: echtes Core, echter Server, echte Verbindung.
 
-Aus dem Betrieb, 28.09.2026: "aber wir testen das dann vorher mit den
-befehlen selber aus!!"
+Aus dem Betrieb, 28.09.2026: vorher wird es mit den Befehlen selbst
+ausprobiert.
 
 Hier werden die Befehlsfolgen nachgespielt, die Trezor Suite und die
 BitBoxApp schicken (aus ihrem Quelltext, nur die Befehlsnamen und ihre

@@ -1,7 +1,7 @@
 """Der QR-Code der Einzahladresse (app/web/qr.js).
 
-Aus dem Betrieb, 15.09.2026: "aus ner bitcoin adresse mal direkt nen QR code machen
-... zum scannen macht das ueberweissen einfacher".
+Aus dem Betrieb, 15.09.2026: aus einer Bitcoin-Adresse direkt einen QR-Code
+machen -- zum Scannen, das macht das Ueberweisen einfacher.
 
 Ein QR-Code, der falsch gerechnet ist, scannt entweder gar nicht -- oder, und
 das waere schlimmer, er scannt etwas anderes. Deshalb zweierlei:

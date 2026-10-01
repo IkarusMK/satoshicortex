@@ -1,7 +1,7 @@
 """Nur-Lese-Wallets in Bitcoin Core -- die Grundlage fuer Electrum.
 
-Aus dem Betrieb, 28.09.2026: "was will den trezor haben damit man trezor
-direkt verbinden kann ???"
+Aus dem Betrieb, 28.09.2026: die Frage, was Trezor braucht, um sich direkt
+zu verbinden.
 
 BitBoxApp und Trezor Suite sprechen nur das Electrum-Protokoll. Fast alles
 darin beantwortet Bitcoin Core direkt. Die eine schwere Frage -- "welche

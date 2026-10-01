@@ -1,7 +1,7 @@
 """Nur-Lese-Wallets fuer Electrum: Schluessel lesen, Deskriptoren bauen.
 
-Aus dem Betrieb, 28.09.2026: "was will den trezor haben damit man trezor
-direkt verbinden kann ???" -- BitBoxApp und Trezor Suite sprechen nur
+Aus dem Betrieb, 28.09.2026: die Frage, was Trezor fuer eine direkte
+Verbindung braucht -- BitBoxApp und Trezor Suite sprechen nur
 Electrum. SatoshiCortex beantwortet es selbst; die Geschichte der Adressen
 kommt aus einer Nur-Lese-Wallet in Bitcoin Core, die nur den OEFFENTLICHEN
 Kontoschluessel kennt.

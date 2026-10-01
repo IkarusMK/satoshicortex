@@ -7,7 +7,7 @@ Zwangstrennung also hoechstens einen Tag lang richtig.
 Die Folge ist schlimmer als "wird nicht gefunden": Der Knoten kuendigt eine
 Adresse an, die inzwischen jemand anderem gehoert, und traegt sie im
 Gossip-Netz weiter. Am 26.08.2026 am Geraet gesehen -- angekuendigt war
-79.223.252.78, der Name zeigte laengst auf 84.134.34.64.
+198.51.100.78, der Name zeigte laengst auf 198.51.100.64.
 
 Deshalb steht in der Konfiguration die aufgeloeste IP und nicht der Name. Der
 Name bleibt in der gespeicherten Wahl; dieses Modul haelt die IP daneben
@@ -69,8 +69,8 @@ def _brauchbar(adresse: str) -> bool:
     """Adressen aussortieren, die als externalip nichts taugen.
 
     Der Anlass: bei der Probe am 31.08.2026 kam auf die AAAA-Frage
-    "::ffff:84.134.34.64" zurueck -- eine IPv4-Adresse in IPv6-Schreibweise.
-    Ungeprueft waere daraus "externalip=::ffff:84.134.34.64" geworden: eine
+    "::ffff:198.51.100.64" zurueck -- eine IPv4-Adresse in IPv6-Schreibweise.
+    Ungeprueft waere daraus "externalip=::ffff:198.51.100.64" geworden: eine
     Adresse, unter der den Knoten niemand erreicht, angekuendigt als waere
     sie echt.
 
@@ -95,7 +95,7 @@ def _aufloesen(name: str) -> List[str]:
     einziger Aufruf ohne Familienangabe -- der fragt A und AAAA zusammen und
     scheitert als GANZES, wenn eine der beiden Antworten nicht taugt.
 
-    Genau das ist am 31.08.2026 bei der Betreiber passiert: "[Errno -5] No address
+    Genau das ist am 31.08.2026 im Betrieb passiert: "[Errno -5] No address
     associated with hostname", waehrend derselbe Name von aussen ueber drei
     Resolver einwandfrei aufloeste. Sein Name hat kein AAAA; antwortet der
     DNS-Server darauf mit einem Fehler statt mit einer leeren Antwort, nimmt

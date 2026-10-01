@@ -236,8 +236,8 @@ def test_ein_boeser_quellenname_ist_ein_wert_und_kein_befehl(tmp_path):
 
 # ── Der Zaehler und die Liste muessen dasselbe meinen (11.09.2026) ─────────
 #
-# Der Betreiber: "er zeigt mir links unter nachrrichten 25 neue an und wenn ich
-# drauf klicke ist es vieleicht eine .. weil die andere ich garnicht wolte."
+# Aus dem Betrieb: links standen 25 neue Nachrichten, beim Anklicken war es
+# vielleicht eine -- weil die anderen aus abgeschalteten Quellen kamen.
 #
 # Die Vermutung war falsch, der Befund richtig. Nachgemessen: die Quellenwahl
 # wirkte auf BEIDE Abfragen gleich. Der Unterschied war die GRENZE -- gezaehlt
@@ -289,7 +289,7 @@ def test_zaehler_und_liste_sagen_immer_dasselbe(tmp_path):
 
 
 def test_abgeschaltete_quellen_zaehlen_nicht_mit(tmp_path):
-    """Das war des Betreibers Vermutung -- und sie stimmte nicht, die Wahl wirkte
+    """Das war die Vermutung aus dem Betrieb -- und sie stimmte nicht, die Wahl wirkte
     schon vorher auf beide Abfragen. Der Test haelt es fest, damit es so
     bleibt."""
     a = store.Ablage(str(tmp_path / "p.db"))
@@ -411,6 +411,45 @@ def test_eigene_fehlschlaege_kommen_einzeln_mit_zeit(tmp_path):
     assert [z["zeit_ms"] for z in zeilen] == [3_000, 2_000, 1_000]
     assert zeilen[0] == {"zeit_ms": 3_000, "grund": "INSUFFICIENT_BALANCE",
                          "rein_kanal": None, "raus_kanal": "222"}
+
+
+def test_der_fuellstand_wird_gemittelt_nicht_im_augenblick_gelesen(tmp_path):
+    """Aus dem Betrieb, 30.09.2026: ein Schwall, der einen Kanal fuer ein paar
+    Minuten leert und gleich zurueckfliesst, darf nichts umstellen.
+    Entschieden wird ueber den Durchschnitt der Messungen, nicht ueber die
+    letzte."""
+    a = store.Ablage(str(tmp_path / "p.db"))
+    stunde = 3600
+    for i in range(24):
+        a.fuellstand_merken([{"nummer": "1001", "anteil_hier": 0.6,
+                              "verfuegbar": 600_000}], 1_000_000 + i * stunde)
+    # Die letzte Messung: gerade leer gelaufen.
+    a.fuellstand_merken([{"nummer": "1001", "anteil_hier": 0.0,
+                          "verfuegbar": 0}], 1_000_000 + 24 * stunde)
+    mittel = a.fuellstand_mittel(seit_s=1_000_000)
+    assert mittel["1001"]["messungen"] == 25
+    assert mittel["1001"]["anteil"] == pytest.approx(0.576, abs=0.001)
+    assert mittel["1001"]["verfuegbar"] == 576_000
+    assert a.fuellstand_mittel(seit_s=1_000_000 + 24 * stunde)["1001"]["anteil"] == 0.0
+    assert a.fuellstand_letzte() == 1_000_000 + 24 * stunde
+
+
+def test_derselbe_zeitpunkt_wird_nicht_doppelt_gezaehlt(tmp_path):
+    a = store.Ablage(str(tmp_path / "p.db"))
+    kanal = [{"nummer": "1001", "anteil_hier": 0.5, "verfuegbar": 1}]
+    a.fuellstand_merken(kanal, 5000)
+    a.fuellstand_merken(kanal, 5000)
+    assert a.fuellstand_mittel(0)["1001"]["messungen"] == 1
+
+
+def test_alte_fuellstaende_werden_aufgeraeumt(tmp_path):
+    a = store.Ablage(str(tmp_path / "p.db"))
+    jetzt = int(time.time())
+    kanal = [{"nummer": "1001", "anteil_hier": 0.5, "verfuegbar": 1}]
+    a.fuellstand_merken(kanal, jetzt - 20 * 86400)
+    a.fuellstand_merken(kanal, jetzt)
+    assert a.fuellstand_aufraeumen(tage=14) == 1
+    assert a.fuellstand_mittel(0)["1001"]["messungen"] == 1
 
 
 def test_die_neuesten_ereignisse_stehen_vorne(tmp_path):

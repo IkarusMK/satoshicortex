@@ -23,8 +23,8 @@ import asyncio
 import contextlib
 
 from . import (auth, beitrag, betriebslog, coinbase, dyndns, electrum,
-               electrumbetrieb, erreichbar, fernzugang, lesewallet,
-               gebiete, gebuehren as netzgebuehren, geo, karte,
+               electrumbetrieb, erreichbar, ertrag, fernzugang, lesewallet,
+               gebiete, gebuehren as netzgebuehren, geo, kanalsteuerung, karte,
                kennzahlen, kurs, lnd, logs, mempoolstrom, merker,
                nachrichten, nodeconfig,
                oidc, onion, pools, profiles, rpc, services, settings,
@@ -192,10 +192,9 @@ class Leistungswahl(BaseModel):
     externe_adresse: str = Field("", max_length=255)
     # Dieselbe Wahl wie in den Einstellungen, mit denselben drei Werten.
     #
-    # Aus dem Betrieb, 05.09.2026: "wenn jemand das so neu installiert, hat er ja
-    # noch keine Ahnung -- die Installationsanleitung, die wir am Anfang
-    # unserer App haben, sollte mit den Funktionen, die wir dann alle schon
-    # drin haben, auch gefuehrt sein."
+    # Aus dem Betrieb, 05.09.2026: wer neu installiert, weiss noch nichts --
+    # die Einrichtung am Anfang soll durch alle Funktionen fuehren, die es
+    # schon gibt.
     #
     # Der Befund dahinter war schaerfer als die Frage: seit 0.38.0 fuehrte die
     # Einstellungsseite mit dieser Wahl, der Assistent zeigte weiterhin nur
@@ -221,15 +220,14 @@ class Gegenprobe(BaseModel):
     """Die abgefragten Woerter aus dem Seed -- und wie entsperrt werden soll."""
     antworten: Dict[str, str] = {}
     # Vorgabe AUS, und das ist eine Entscheidung, keine Bequemlichkeit.
-    # Aus dem Betrieb, 31.08.2026: "das ist ein sicherheits risiko". Er hat recht --
-    # nicht fuer den Fall, den er nannte (wer den laufenden Knoten uebernimmt,
+    # Aus dem Betrieb, 31.08.2026: ein Sicherheitsrisiko. Zu Recht -- nicht
+    # fuer den Fall, der genannt wurde (wer den laufenden Knoten uebernimmt,
     # findet ohnehin das admin.macaroon auf derselben Platte), aber fuer den
     # Fall, der wirklich zaehlt: gestohlene Platte, kopiertes Backup. Dort ist
     # ein Passwort, das danebenliegt, kein Passwort.
     automatisch_entsperren: bool = False
-    # Der dritte Weg, seit dem 10.09.2026. Der Betreiber: "das soll sich jeder
-    # nutzer aussuchen koennen ob sich das wallet selbst entsperrt ob ich den
-    # tresor will .. oder nicht". Leer heisst: das alte Haekchen darueber
+    # Der dritte Weg, seit dem 10.09.2026. Aus dem Betrieb: jeder Nutzer waehlt
+    # selbst, wie die Wallet wieder aufgeht. Leer heisst: das alte Haekchen darueber
     # gilt -- ein gespeicherter Assistentenzustand traegt womoeglich noch
     # nichts anderes.
     entsperrweg: str = Field("", max_length=16)
@@ -252,9 +250,8 @@ class Wiederherstellung(BaseModel):
     # create` mitbringt, kaeme ohne dieses Feld hier nicht weiter.
     passphrase: str = Field("", max_length=256)
     automatisch_entsperren: bool = False
-    # Der dritte Weg, seit dem 10.09.2026. Der Betreiber: "das soll sich jeder
-    # nutzer aussuchen koennen ob sich das wallet selbst entsperrt ob ich den
-    # tresor will .. oder nicht". Leer heisst: das alte Haekchen darueber
+    # Der dritte Weg, seit dem 10.09.2026. Aus dem Betrieb: jeder Nutzer waehlt
+    # selbst, wie die Wallet wieder aufgeht. Leer heisst: das alte Haekchen darueber
     # gilt -- ein gespeicherter Assistentenzustand traegt womoeglich noch
     # nichts anderes.
     entsperrweg: str = Field("", max_length=16)
@@ -296,8 +293,27 @@ class Gebuehren(BaseModel):
 
 
 class Gebuehrenautomatik(BaseModel):
-    """Soll der Knoten seinen Satz dem Netz nachfuehren?"""
+    """Soll der Knoten seinen Satz dem Netz nachfuehren?
+
+    Seit 30.09.2026 je Kanal nach Fuellstand, ausgerichtet am Netz-Mittel;
+    abstand_tage sagt, wie oft je Kanal hoechstens geaendert wird.
+    """
     automatik: bool = False
+    abstand_tage: Optional[int] = Field(None, ge=1, le=3)
+
+
+class Kanalsteuerung(BaseModel):
+    """Was fuer EINEN Kanal gilt (30.09.2026).
+
+    gebuehr: "automatik" (nach Fuellstand) oder "fest" (satz_ppm/basis_msat
+    von Hand). hoechstbetrag: "fuellstand" oder "fest" (hoechstbetrag_sat).
+    """
+    punkt: str = Field(..., min_length=3, max_length=128)
+    gebuehr: str = Field(..., pattern="^(automatik|fest)$")
+    satz_ppm: Optional[int] = Field(None, ge=0, le=10_000)
+    basis_msat: Optional[int] = Field(None, ge=0, le=100_000)
+    hoechstbetrag: str = Field(..., pattern="^(fuellstand|fest)$")
+    hoechstbetrag_sat: Optional[int] = Field(None, ge=1_000, le=2_100_000_000_000_000)
 
 
 class Sicherungsziel(BaseModel):
@@ -429,8 +445,8 @@ class Rechnungswunsch(BaseModel):
 class Sendung(BaseModel):
     """On-Chain senden -- der Weg zurueck aus der Wallet heraus.
 
-    Die Bedingung des Betreibers vom 30.08.2026: "ich werde nix dahin ueberweisen
-    solange ich es nicht zurueck schicken kann". Eine Wallet, aus der man
+    Die Bedingung aus dem Betrieb vom 30.08.2026: eingezahlt wird erst, wenn
+    man das Geld auch zurueckschicken kann. Eine Wallet, aus der man
     nicht wieder herauskommt, ist keine Wallet.
 
     Das Tempo ist KEINE Satoshi-je-vByte-Zahl, und das ist Absicht: die
@@ -486,9 +502,9 @@ class Netzwegewahl(BaseModel):
     tor_pause_beim_abgleich: bool = True
     # Was dieser Knoten von sich preisgibt -- fuer BEIDE Dienste.
     #
-    # Aus dem Betrieb, 05.09.2026: "verstehe nicht, warum diese Einstellungen nur
-    # fuer LND gelten und nicht generell fuer unsere App?" -- und gleich
-    # darauf: "kann ja auch fuer BTC gut sein, die Auswahl."
+    # Aus dem Betrieb, 05.09.2026: warum gelten diese Einstellungen nur fuer
+    # LND und nicht fuer die ganze Anwendung? Die Auswahl taugt auch fuer
+    # Bitcoin.
     #
     # Er hat recht, und es gab keinen guten Grund, nur einen historischen. Die
     # Faehigkeit war bei bitcoind laengst da: Tor an, IPv4 und IPv6 aus ergibt
@@ -505,9 +521,8 @@ class Netzwegewahl(BaseModel):
     # Aus welchem Netz eine Wallet-Software den Knoten benutzen darf. Leer
     # heisst: nur die Anwendung selbst, wie bisher.
     #
-    # Aus dem Betrieb, 05.09.2026: "was mir auch schmecken wuerde, wenn ich meine
-    # Transaktionen von meinem Hardware-Wallet dann auch ueber meinen
-    # BTC-Knoten machen koennte."
+    # Aus dem Betrieb, 05.09.2026: Transaktionen eines Hardware-Wallets sollen
+    # auch ueber den eigenen Knoten laufen koennen.
     rpc_heimnetz: str = Field("", max_length=64)
 
     _pruefe_heimnetz = field_validator("rpc_heimnetz")(_heimnetz_pruefen)
@@ -635,8 +650,8 @@ class Gegenstellenwahl(BaseModel):
 class Knotenname(BaseModel):
     """Wie dieser Knoten im Lightning-Netz heisst, aussieht -- und was er annimmt.
 
-    Aus dem Betrieb, 09.09.2026: "ich moechte nicht das alles immer nur
-    satoshicortex heisst!!" -- und er hatte recht: der Alias stand als
+    Aus dem Betrieb, 09.09.2026: nicht jeder Knoten soll "SatoshiCortex"
+    heissen -- zu Recht: der Alias stand als
     Vorgabe in einer Datenklasse und wurde beim Einrichten NIE uebergeben.
     Jeder Knoten dieser Software hiess damit gleich, was fuer ihn nutzlos
     und fuer das Netz verwirrend ist.
@@ -687,9 +702,8 @@ GEGENPROBE_VERSUCHE = 5
 # (stop_grace_period), hier genuegt weniger: es geht nur darum, dass der
 # Prozess wirklich weg ist, bevor jemand an seine Dateien geht.
 # Die drei Wege, auf denen eine Wallet wieder aufgeht. Die Wahl gehoert dem
-# Nutzer -- Aus dem Betrieb, 10.09.2026: "das soll sich jeder nutzer aussuchen
-# koennen ob sich das wallet selbst entsperrt ob ich den tresor will .. oder
-# nicht".
+# Nutzer -- Aus dem Betrieb, 10.09.2026: jeder waehlt selbst, ob sich die
+# Wallet von allein entsperrt oder nicht.
 #
 #   aus     nichts liegt irgendwo, und die Anwendung merkt sich nichts. Nach
 #           JEDEM Neustart tippt jemand das Wallet-Passwort -- auch nach
@@ -702,8 +716,8 @@ GEGENPROBE_VERSUCHE = 5
 #           Platte hat, hat beides.
 #
 # Der Tresor, der hier bis zum 10.09.2026 als dritter Weg stand, ist weg.
-# Der Betreiber hat ihn zerlegt: "ich tausche ein passwort gegen das andere obwohl
-# beide die selbe funktion unterm strich haben". Die Begruendung steht bei
+# Aus dem Betrieb kam der Einwand, der ihn erledigt hat: ein Passwort gegen
+# ein anderes zu tauschen, das unterm Strich dasselbe tut. Die Begruendung steht bei
 # merker.Merker; "merken" loest das Problem, das der Tresor loesen sollte,
 # ohne ein zweites Geheimnis und ohne eine zweite Datei.
 ENTSPERRWEGE = ("aus", "merken", "datei")
@@ -821,8 +835,8 @@ def _erlaubte_netze(wege: Dict, lage: Optional[Dict],
     # sich -> gib_frei() -> bitcoind startet neu. Kommt die Lage zurueck,
     # greift die Pause wieder -> onlynet zurueck -> noch ein Neustart. Jeder
     # davon kostet auf einem NAS Minuten zum Laden des chainstate, und in der
-    # Zeit hat der Knoten KEINE Verbindungen -- genau das Bild, das der Betreiber
-    # gemeldet hat: "quasi keine Verbindung mehr zu irgendwas".
+    # Zeit hat der Knoten KEINE Verbindungen -- genau das Bild, das aus dem
+    # Betrieb gemeldet wurde: scheinbar gar keine Verbindung mehr.
     #
     # Richtig ist: was gerade laeuft, bleibt. Die Schalter des Nutzers gelten
     # weiter -- ueber die entscheidet die Phase ohnehin nicht.
@@ -889,15 +903,15 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
                  "abbild": p.abbild, "variable": p.variable,
                  "laeuft": None, "versucht": None,
                  # Die beiden Zahlen, um die es eigentlich geht. Aus dem Betrieb, am
-                 # 03.09.2026: "entweder weiss er welche version wir haben
-                 # und welche bereit steht oder er weiss es nicht". Sie
+                 # 03.09.2026: entweder kennt die Anwendung die laufende und
+                 # die bereitstehende Version, oder sie kennt sie nicht. Sie
                  # gehoeren in die Antwort, nicht nur in einen Fliesstext.
                  "laufend": None, "neueste": None,
                  "fehlversuche": 0}
         for p in updates.PROJEKTE
     }
-    # Welchem Tag diese Installation folgt. Aus dem Betrieb, 23.09.2026: "ich
-    # will ja immer latest! und nicht gepinnt auf eine version!" -- und der
+    # Welchem Tag diese Installation folgt. Aus dem Betrieb, 23.09.2026: gewollt
+    # ist immer latest, keine feste Version -- und der
     # Kasten reichte ihm SATCORTEX_VERSION=1.0.3 zum Abschreiben. Wer das
     # uebernimmt, ist danach festgenagelt und bekommt nie wieder ein Update.
     neuerungen[updates.SATCORTEX.name]["folgt"] = konf.abbild_tag or None
@@ -1054,10 +1068,9 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
 
     # ── Anmeldung ueber Pocket ID, und die Nottuer dahinter ───────────────
     #
-    # Aus dem Betrieb, 11.09.2026: "generelle solte das sauber funktionieren so das
-    # ich quasie kein lock in fenster mehr habe sonder nur noch pocket id mich
-    # einloggt oder wenn ein neuer von mir freigebner pocket id nutzer sich da
-    # anmelden kann".
+    # Aus dem Betrieb, 11.09.2026: kein eigenes Anmeldefenster mehr, sondern
+    # nur noch der Ausweisdienst -- auch fuer weitere Nutzer, die dort
+    # freigegeben sind.
     #
     # WER hereindarf, entscheidet dabei Pocket ID, nicht diese Anwendung: ein
     # neuer OIDC-Client erlaubt dort zunaechst NIEMANDEM den Zugang, und man
@@ -1145,7 +1158,7 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
     # "callback" -- das einzige englische Wort in dieser sonst deutschen
     # Schnittstelle, und das mit Absicht.
     #
-    # Aus dem Betrieb, 12.09.2026: "wir machen das allgemein gueltig! mit callback".
+    # Aus dem Betrieb, 12.09.2026: allgemeingueltig, mit Rueckruf-Adresse.
     #
     # Der Standard schreibt keinen Pfad vor: RFC 6749 kennt einen
     # "Redirection Endpoint" und den Parameter redirect_uri, mehr nicht.
@@ -1392,10 +1405,9 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
     def lage_mit_grund_gebuendelt() -> Tuple[Optional[Dict], str]:
         """Die zuletzt gemessene Kettenlage. Fragt NICHT selbst nach.
 
-        Aus dem Betrieb, 04.09.2026: "der Aufruf der App dauert immer noch sehr
-        lange im Browser, bis man mal die Daten sieht ... vielleicht liegt es
-        daran, dass unsere App kein richtiges Backend und Frontend hat, wo die
-        Daten zur Bereitstellung liegen?"
+        Aus dem Betrieb, 04.09.2026: die Anwendung brauchte im Browser sehr
+        lange, bis Daten zu sehen waren -- vermutet wurde, dass ein Backend
+        fehlt, das sie bereithaelt.
 
         Der Einwand trifft. Bis hierher holte JEDER Aufruf die Lage selbst,
         sobald der Zwischenspeicher aelter als drei Sekunden war -- und
@@ -1518,8 +1530,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         # Waechter. Der schlief nach jedem Neustart erst zehn Minuten, und
         # danach stand die Einrichtung auch noch hinter zwei Abbruechen, die
         # mit Lightning nichts zu tun haben (Tor-Vorlage, Adressnachfuehrung).
-        # Aus dem Betrieb, 08.09.2026, nach dem Update auf 0.46.0: "das hat nicht
-        # geklappt" -- LND stand weiter auf "wartet auf Einrichtung".
+        # Aus dem Betrieb, 08.09.2026, nach dem Update auf 0.46.0: es klappte
+        # nicht -- LND stand weiter auf "wartet auf Einrichtung".
         #
         # Hier kostet es nichts: der Sammler hat die Lage ohnehin, und nach
         # dem ersten Mal ist es ein Blick auf einen Merker im Speicher.
@@ -1547,8 +1559,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
     def lage_ohne_warten() -> Optional[Dict]:
         """Die zuletzt geholte Lage -- OHNE neue Abfrage.
 
-        Aus dem Betrieb, 03.09.2026: "das dauert halt ewig .. solange der Bitcoin
-        Knoten wegschreibt kann die ganze App nix machen". Genau so war es,
+        Aus dem Betrieb, 03.09.2026: solange der Bitcoin-Knoten schreibt, steht
+        die ganze Anwendung. Genau so war es,
         und es lag nicht an bitcoind.
 
         Waehrend Core den chainstate schreibt, haelt es cs_main; jede frische
@@ -1958,8 +1970,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
     def kanalrechner() -> Dict:
         """Was ein Kanal kostet -- und was dafuer einzuzahlen ist.
 
-        Aus dem Betrieb, 11.09.2026: "wir haben ja schon ein rechner reiter kann das
-        da nicht mit rein?" Doch, und dort gehoert es hin: im Rechner steht
+        Aus dem Betrieb, 11.09.2026: es gibt doch schon den Rechner -- kann das
+        nicht dort hinein? Doch, und dort gehoert es hin: im Rechner steht
         der Kurs, also kann dort neben den Satoshi auch der Betrag in Euro
         stehen. Genau der ist die Zahl, in der man plant.
 
@@ -2078,8 +2090,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
     #
     # Alles davon kommt aus DIESEM Knoten. getrawmempool liefert, was in
     # seinem Mempool liegt, die Zeitstempel stehen in unserer eigenen Ablage.
-    # Nichts wird von aussen geholt -- Aus dem Betrieb, 08.09.2026: "jede info die
-    # wir brauchen kommt aus dem netzwerk und nicht von extern".
+    # Nichts wird von aussen geholt -- Aus dem Betrieb, 08.09.2026: jede Auskunft
+    # kommt aus dem Netz selbst, nicht von fremden Diensten.
     #
     # ZWEI EHRLICHE EINSCHRAENKUNGEN, die in die Ansicht gehoeren:
     #
@@ -2093,9 +2105,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
     #    deutlich mehr. Deshalb NUR auf Anforderung, mit Zwischenspeicher --
     #    und nicht im Takt des Waechters.
     kachelspeicher: Dict = {"wert": None, "zeit": 0.0}
-    # EIN Abruf zur Zeit. Der Befund vom 23.09.2026 aus dem Betrieb: "wenn ich
-    # da auf kacheln holen druecke brauch ich immer 5 mal klicken im schnitt
-    # damit was geht".
+    # EIN Abruf zur Zeit. Der Befund vom 23.09.2026 aus dem Betrieb: "Kacheln
+    # holen" brauchte im Schnitt fuenf Klicks, bis etwas geschah.
     #
     # Bei 83.000 Transaktionen und einem App-Container mit einer CPU dauerte
     # der Abruf laenger als die 25 Sekunden, die der Browser wartete. Der gab
@@ -2451,8 +2462,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
     # Der Seed lebt AUSSCHLIESSLICH hier: im Arbeitsspeicher, zwischen dem
     # Erzeugen und der Gegenprobe, mit Verfallsdatum. Er wird nicht
     # geschrieben, nicht protokolliert und nicht in den Zustand gelegt.
-    # Die Vorgabe des Betreibers dazu ist eindeutig und aelter als dieses Projekt: "eine
-    # wallet seed gehoert immer auf ein blatt papier nie auf platte irgendwo".
+    # Die Vorgabe aus dem Betrieb dazu ist eindeutig und aelter als dieses
+    # Projekt: ein Seed gehoert auf Papier, nie auf eine Platte.
     #
     # Ein Neustart der Anwendung wirft ihn damit weg. Das ist kein Mangel,
     # sondern die Probe aufs Exempel: wer ihn dann nicht auf Papier hat, hat
@@ -2477,9 +2488,9 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
 
         Bei eingeschaltetem Auto-Entsperren wuerfelte die Anwendung also
         selbst eines, schrieb es neben die Wallet und zeigte es NIE an --
-        auch spaeter nicht. Der Betreiber sah das sofort: "wenn ich auch das auto
-        entsperren aktiviere sollte ich das passwort selbst gewaehlt haben
-        oder es mir wenigstens anzeigen lassen".
+        auch spaeter nicht. Im Betrieb fiel das sofort auf: wer das automatische
+        Entsperren einschaltet, muss das Passwort selbst gewaehlt haben oder es
+        wenigstens sehen koennen.
 
         Er hat recht, und die Folge ist groesser als die Unbequemlichkeit:
         geht die Datei wallet.pass verloren, waehrend die Wallet bleibt, ist
@@ -2514,8 +2525,7 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         """Nach dem Anlegen: wie kommt die Wallet kuenftig wieder auf?
 
         Drei Wege, und die Wahl gehoert dem Nutzer. Aus dem Betrieb, 10.09.2026:
-        "das soll sich jeder nutzer aussuchen koennen ob sich das wallet
-        selbst entsperrt ob ich den tresor will .. oder nicht".
+        jeder waehlt selbst, ob sich die Wallet von allein entsperrt.
 
         Gespeichert wird nur die WAHL. Das Passwort geht bei "datei" in LNDs
         Entsperrdatei, bei "merken" in den Arbeitsspeicher und bei "aus"
@@ -2776,8 +2786,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
 
     # ── Die PIN: das Schloss vor jeder Geldbewegung ────────────────────
     #
-    # Aus dem Betrieb, 08.09.2026: "eine art: PIN. fuer Zahlungen ansich also
-    # knoten oeffnen oder schliessen geld transferieren".
+    # Aus dem Betrieb, 08.09.2026: eine eigene PIN fuer alles, was Geld bewegt --
+    # Kanaele oeffnen und schliessen, Zahlungen, Ueberweisungen.
     #
     # Sie schuetzt gegen etwas anderes als der Entsperrweg: der entscheidet,
     # was jemand mit der PLATTE anfangen kann, die PIN steht gegen eine
@@ -2898,9 +2908,9 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         Pruefen kann das nur LND, und nur an einer GESPERRTEN Wallet. Deshalb
         derselbe Umweg wie beim Loeschen: erst sperren, dann umstellen.
 
-        DAS GILT ABER NUR FUER DEN WEG "datei". Aus dem Betrieb, 10.09.2026: "habe
-        aber gerade den Haken gesetzt bei fuer die Laufzeit merken aber das
-        wird noch nicht uebernommen". Er hatte den Weg "aus" -- und diese
+        DAS GILT ABER NUR FUER DEN WEG "datei". Aus dem Betrieb, 10.09.2026: der
+        Haken "fuer die Laufzeit merken" wurde nicht uebernommen. Eingestellt
+        war der Weg "aus" -- und diese
         Funktion verlangte von ihm ein getipptes Passwort UND eine gesperrte
         Wallet, um auf "merken" zu wechseln. Fuer nichts:
 
@@ -3350,8 +3360,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
 
         # Fehlt die Onion, wird das GESAGT statt verschwiegen.
         #
-        # Der Betreiber hat am 01.09.2026 gemeldet, die Pruefung melde "immer nur
-        # IPv4, nie Tor" -- ueber Wochen, bei jedem Versuch. Die Ursache steht
+        # Aus dem Betrieb kam am 01.09.2026 die Meldung, die Pruefung zeige immer
+        # nur IPv4, nie Tor -- ueber Wochen, bei jedem Versuch. Die Ursache steht
         # seit dem 31.08. im Kommentar zu ABGLEICH_GRUND: waehrend der
         # Abgleich-Pause setzt die Konfiguration onlynet=ipv4,ipv6, und Cores
         # AddLocal() nimmt eine Adresse aus einem nicht erreichbaren Netz gar
@@ -3456,8 +3466,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
             # hat? Ohne diese Auskunft steht jemand vor einem Knopf, den er
             # gedrueckt hat, und sieht eine Minute lang nichts.
             #
-            # Aus dem Betrieb, 11.09.2026: "dazu steht hier wallet sperren .. da
-            # drueck ich drauf passiert nix". Es passierte sehr wohl etwas
+            # Aus dem Betrieb, 11.09.2026: "Wallet sperren" gedrueckt, und nichts
+            # passierte. Es passierte sehr wohl etwas
             # -- nur nicht auf dem Bildschirm.
             "arbeit_laeuft": bool(wallet_arbeit["laeuft"]),
         }
@@ -3500,8 +3510,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
 
     # ── Externe Wallets: Electrum fuer BitBoxApp und Trezor Suite ───────
     #
-    # Aus dem Betrieb, 28.09.2026: "was will den trezor haben damit man
-    # trezor direkt verbinden kann ???" -- und kein zweiter Container dafuer.
+    # Aus dem Betrieb, 28.09.2026: die Frage, was Trezor fuer eine direkte
+    # Verbindung braucht -- und kein zweiter Container dafuer.
     # Der Server spricht Electrum selbst (electrum.py); was er ueber die
     # Adressen weiss, kommt aus Nur-Lese-Wallets in Core, angelegt mit dem
     # OEFFENTLICHEN Kontoschluessel (lesewallet.py). Senden kann er nur, was
@@ -3579,10 +3589,9 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
 
     # ── Externe Wallets: Zeus als Fernbedienung ─────────────────────────
     #
-    # Aus dem Betrieb, 26.09.2026: "also wenn dann will ich vollen
-    # umfangreichen funktionen also alles weil du ja gesagt hast wir koennen
-    # dann die rechte fuer zeus in der app steuern! ... und es wird dann nur
-    # tor und vpn angeboten".
+    # Aus dem Betrieb, 26.09.2026: der volle Funktionsumfang, wenn schon -- die
+    # Rechte fuer Zeus werden in der Anwendung gesteuert, und angeboten werden
+    # nur Tor und VPN.
     #
     # Was ein Schluessel darf und was nicht, steht in fernzugang.py. Hier
     # gilt: ein Schluessel mit Geldrechten ist so viel wert wie das
@@ -3786,8 +3795,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
 
     # ── Senden: der Weg zurueck aus der Wallet heraus ──────────────────
     #
-    # Aus dem Betrieb, 30.08.2026: "ich werde nix dahin ueberweisen solange ich es
-    # nicht zurueck schicken kann". Genau richtig, und deshalb kam es nach
+    # Aus dem Betrieb, 30.08.2026: eingezahlt wird erst, wenn man das Geld auch
+    # zurueckschicken kann. Genau richtig, und deshalb kam es nach
     # der PIN und nicht davor.
     #
     # WAS SICH DAMIT AENDERT: das eigene Macaroon haelt ab jetzt
@@ -3801,8 +3810,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
     def sendesatz(tempo: str) -> int:
         """Satoshi je vByte fuer das gewaehlte Tempo -- aus dem EIGENEN Knoten.
 
-        Aus dem Betrieb, 30.08.2026: "jede info die wir brauchen kommt aus dem
-        netzwerk und nicht von extern". Hier ist es die Schaetzung des
+        Aus dem Betrieb, 30.08.2026: jede Auskunft kommt aus dem Netz selbst,
+        nicht von fremden Diensten. Hier ist es die Schaetzung des
         eigenen bitcoind, nicht die eines fremden Dienstes.
 
         Ohne Schaetzung gibt es KEINEN Satz. Eine Eins hinzuschreiben waere
@@ -4000,8 +4009,7 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
 
     # ── Einen Kanal oeffnen, und ueber Lightning zahlen ──────────────────
     #
-    # Aus dem Betrieb, 12.09.2026: "ja dann machen wir mal mit Punkt 1 und 2
-    # weiter." Bis hierher konnte diese Anwendung On-Chain senden -- also die
+    # Aus dem Betrieb, 12.09.2026: weiter mit den Punkten 1 und 2. Bis hierher konnte diese Anwendung On-Chain senden -- also die
     # langsame, teure Art -- aber weder einen Kanal oeffnen noch ueber
     # Lightning zahlen, wofuer der ganze Knoten da ist.
     #
@@ -4098,8 +4106,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
     def gegenstelle_ansehen(wunsch: Kanalwunsch) -> Dict:
         """Was der eigene Graph ueber diese Gegenstelle weiss. Bewegt nichts.
 
-        Aus dem Betrieb, 12.09.2026: "gibt es uns die moeglichkeit einen channel den
-        wir verknuepfen wollen vorher zu scannen".
+        Aus dem Betrieb, 12.09.2026: eine Gegenstelle soll sich vor dem
+        Verbinden pruefen lassen.
 
         Die Auskunft kommt aus dem EIGENEN Graphen -- jeder Knoten kuendigt
         sich selbst an, unser Knoten hat es mitgehoert. Keine fremde Seite,
@@ -4519,7 +4527,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
     def rechnung_erstellen(wunsch: Rechnungsanfrage) -> Dict:
         """Eine Rechnung ausstellen, um ueber Lightning zu EMPFANGEN.
 
-        Aus dem Betrieb, 16.09.2026: "solte halt nur auch geld rein bekommen".
+        Aus dem Betrieb, 16.09.2026: ueber Lightning soll auch Geld hereinkommen
+        koennen, nicht nur hinausgehen.
 
         Keine PIN: eine Rechnung fordert nur, sie bewegt nichts. Das
         Schwerste, was eine uebernommene Sitzung damit anrichten kann, ist
@@ -4706,8 +4715,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
     def kanal_schliessen(wunsch: Kanalschluss) -> Dict:
         """Einen Kanal schliessen.
 
-        Aus dem Betrieb, 12.09.2026: "kann ich dann auch selber ein kanal kuendigen
-        oder schliessen?"
+        Aus dem Betrieb, 12.09.2026: die Frage, ob man einen Kanal auch selbst
+        schliessen kann.
 
         Bis dahin nicht -- und die Begruendung dafuer war zu kurz. Sein
         eigener Satz trifft es besser: nichts dahin ueberweisen, solange man
@@ -4744,7 +4753,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
     def umschichten(wunsch: Umschichtung) -> Dict:
         """Liquiditaet von einem eigenen Kanal in einen anderen schieben.
 
-        Aus dem Betrieb, 12.09.2026: "kann ich dann mehre kanäle balancen??"
+        Aus dem Betrieb, 12.09.2026: die Frage, ob sich mehrere Kanaele
+        gegeneinander ausgleichen lassen.
 
         Das Geld bleibt die ganze Zeit seins -- es wechselt nur die Seite.
         Verloren gehen kann nur die Weiterleitungsgebuehr des Rundwegs, und
@@ -4858,18 +4868,25 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
                                       "einzelheit": str(fehler)})
         except lnd.NichtErreichbar:
             raise HTTPException(503, {"meldung": "lnd_antwortet_nicht"})
+        # Wer einen Kanal von Hand setzt, will ihn so -- die Automatik je
+        # Kanal ueberschriebe ihn sonst beim naechsten Lauf (30.09.2026).
+        if wahl.kanalpunkt:
+            gewaehlt = dict(zustand.laden().gebuehrenwahl or {})
+            eintraege = dict(gewaehlt.get("kanaele") or {})
+            eintraege[wahl.kanalpunkt] = {
+                **(eintraege.get(wahl.kanalpunkt) or {}), "gebuehr": "fest"}
+            gewaehlt["kanaele"] = eintraege
+            zustand.merke_gebuehrenwahl(gewaehlt)
+            linien_stand.clear()
         return {"ok": True, "fuer_alle": not wahl.kanalpunkt}
 
     # ------------------------------------------------- Gebuehren und das Netz
     #
-    # Aus dem Betrieb, 18.09.2026: "koennten wir hier im gebueren feld irgendwie
-    # immer mal so den durchschnitt anzeigen lassen der letzten 4 wochen ..
-    # oder das ganze irgendwie automatisieren das wir entweder immer den netz
-    # durchschnitt als gebueren nehemen und der sich automatisch anpasst am
-    # netz". Und auf die Rueckfrage, ob stufenweise: "wenn dann 100% und alle
-    # 3 Stufen gemeinsam! Obergrenze ist max wert der letzten 4 wochen und
-    # untergrenze ist dann min wert der letzten 4 wochen fuer die automatik ..
-    # die 4 wochen sind ja auch nicht fest sondern aendern sich ja mit".
+    # Aus dem Betrieb, 18.09.2026: im Gebuehrenfeld den Durchschnitt der letzten
+    # vier Wochen zeigen -- oder gleich automatisch dem Netz-Durchschnitt
+    # folgen. Auf die Rueckfrage, ob stufenweise: alle drei Stufen gemeinsam,
+    # oben begrenzt durch den hoechsten, unten durch den niedrigsten Wert der
+    # letzten vier Wochen -- und die vier Wochen wandern mit.
     #
     # Drei Stufen, und sie bauen aufeinander auf:
     #   1. messen, was das Netz nimmt -- taeglich, aus dem eigenen Graphen
@@ -4953,6 +4970,7 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
             "vorschlag": rat,
             "jetzt_ppm": jetzt,
             "automatik": bool(wahl.get("automatik")),
+            "abstand_tage": _abstand_tage(wahl),
             "zuletzt": {k: wahl.get(k) for k in
                         ("zuletzt_ppm", "zuletzt_am", "zuletzt_grund")},
             "verlauf": [{"tag": z.get("tag"), "median_ppm": z.get("median_ppm"),
@@ -4963,20 +4981,63 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
             "fehler": gebuehrenstand["fehler"],
         }
 
-    def _gebuehren_nachziehen() -> Dict[str, Any]:
-        """Die Automatik EINMAL anwenden -- wenn sie darf.
+    # Die eigene Seite jeder Kante, wie LND sie ankuendigt (GetChanInfo) --
+    # fuer den geltenden Hoechstbetrag und die Zeitsperre. Die Kanalliste
+    # kommt im Takt; die Linie aendert sich nur, wenn jemand sie setzt.
+    linien_stand: Dict[str, tuple] = {}
+    LINIE_FRISCH_SEKUNDEN = 300.0
 
-        Sie fasst ausschliesslich den Satz an, nie die Grundgebuehr, und sie
-        setzt ihn fuer ALLE Kanaele. Einzelne Kanaele nach Liquiditaets-
-        richtung zu steuern ist etwas anderes und bleibt Handarbeit: dafuer
-        braucht es den HTLC-Strom und nicht den Netz-Median.
+    def _linie(knoten: lnd.Knoten, kanal: Dict) -> Optional[Dict]:
+        nummer = kanal.get("nummer") or ""
+        if not nummer:
+            return None
+        alt = linien_stand.get(nummer)
+        if alt and time.monotonic() - alt[0] < LINIE_FRISCH_SEKUNDEN:
+            return alt[1]
+        try:
+            wert = lnd.kanal_linie(knoten, nummer, kanal.get("kennung") or "")
+        except (lnd.NichtErreichbar, lnd.LndFehler, lnd.Beschaeftigt,
+                OSError, ValueError) as fehler:
+            log.debug("Linie von %s nicht lesbar: %s", nummer, fehler)
+            wert = alt[1] if alt else None
+        linien_stand[nummer] = (time.monotonic(), wert)
+        return wert
+
+    def _abstand_tage(wahl: Dict) -> int:
+        tage = int(wahl.get("abstand_tage") or 1)
+        return tage if tage in kanalsteuerung.ABSTAENDE_TAGE else 1
+
+    def _gebuehren_nachziehen(sofort: bool = False,
+                              nur_punkt: str = "") -> Dict[str, Any]:
+        """Die Automatik anwenden -- JE KANAL, nach Fuellstand (30.09.2026).
+
+        Die Mitte ist der gemessene Netz-Median im Vier-Wochen-Band, wie
+        bisher fuer alle Kanaele; je nach eigenem Anteil wird er geviertelt
+        bis verdreifacht (kanalsteuerung.py). Entschieden wird ueber den
+        DURCHSCHNITT des Fuellstands seit dem letzten Abstand, und je Kanal
+        wird hoechstens einmal pro Abstand geaendert -- ausser "sofort"
+        (jemand hat gerade selbst umgeschaltet).
+
+        Sie fasst nie die Grundgebuehr an, und nie einen Kanal, der auf
+        "fest" steht. Umgeschichtet wird nichts: Geld bewegt sich nur von
+        Hand mit PIN.
         """
         lage = _gebuehrenlage()
-        if not lage["automatik"]:
+        wahl = dict(zustand.laden().gebuehrenwahl or {})
+        eintraege = dict(wahl.get("kanaele") or {})
+        alle = bool(wahl.get("automatik"))
+        if not alle and not any(
+                (e or {}).get("gebuehr") == "automatik"
+                or (e or {}).get("hoechstbetrag") == "fuellstand"
+                for e in eintraege.values()):
             return {"getan": False, "grund": "aus"}
         rat = lage["vorschlag"]
-        if not rat.get("handeln"):
+        # Einschalten darf man sofort, wirken darf sie erst, wenn es ein
+        # Band gibt -- dieselbe Sperre wie seit dem 18.09.2026.
+        if rat.get("grund") in ("keine_messung", "sammelt_noch") \
+                or rat.get("satz_ppm") is None:
             return {"getan": False, "grund": rat.get("grund")}
+        anker = int(rat["satz_ppm"])
         knoten = lndverbindung()
         if lnd.zustand(knoten)["stand"] != "bereit":
             return {"getan": False, "grund": "lightning_nicht_bereit"}
@@ -4985,21 +5046,139 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         # Ohne Kanaele gibt es nichts zu setzen. LND wuerde den Aufruf
         # klaglos annehmen und nichts tun -- und in der Oberflaeche staende
         # "gesetzt", wo nichts gesetzt wurde.
-        if not lnd.kanaele(knoten):
+        kanaele = lnd.kanaele(knoten)
+        if not kanaele:
             return {"getan": False, "grund": "keine_kanaele"}
-        wahl = dict(zustand.laden().gebuehrenwahl or {})
-        basis = int(wahl.get("basis_msat") or 0)
-        lnd.setze_gebuehren(knoten, basis, int(rat["satz_ppm"]))
-        wahl.update({"zuletzt_ppm": int(rat["satz_ppm"]),
-                     "zuletzt_am": netzgebuehren.heute(),
-                     "zuletzt_grund": rat.get("grund")})
+        try:
+            bericht = lnd.gebuehrenbericht(knoten)
+        except (lnd.NichtErreichbar, lnd.LndFehler) as fehler:
+            log.info("Gebuehrenautomatik ohne Gebuehrenbericht: %s", fehler)
+            bericht = {}
+        abstand = _abstand_tage(wahl)
+        jetzt = int(time.time())
+        mittel = auswertung.fuellstand_mittel(jetzt - abstand * 86_400)
+        getan: List[Dict[str, Any]] = []
+        misst_noch = False
+        for kanal in kanaele:
+            punkt = kanal.get("punkt") or ""
+            if not punkt or (nur_punkt and punkt != nur_punkt):
+                continue
+            eintrag = dict(eintraege.get(punkt) or {})
+            gebuehr, hoechst = kanalsteuerung.wahl(eintrag, alle)
+            if gebuehr != "automatik" and hoechst != "fuellstand":
+                continue
+            if not sofort and not kanalsteuerung.faellig(
+                    eintrag.get("zuletzt_s"), jetzt, abstand):
+                continue
+            reihe = mittel.get(kanal.get("nummer") or "")
+            # Nie nach dem Augenblick: ohne Messreihe wartet der Kanal,
+            # auch wenn gerade jemand umgeschaltet hat.
+            if not kanalsteuerung.messreihe_reicht(reihe, abstand):
+                misst_noch = True
+                continue
+            geltend = bericht.get(punkt) or {}
+            linie = _linie(knoten, kanal) or {}
+            plan = kanalsteuerung.planen(
+                kanal, reihe, anker, eintrag,
+                geltend.get("satz_ppm"), linie.get("hoechstbetrag_sat"))
+            eintrag["stufe"] = plan["stufe"]
+            neu_ppm = (plan["satz_ppm"] if gebuehr == "automatik"
+                       and plan["gebuehr_handeln"] else None)
+            neu_hb = (plan["hoechstbetrag_sat"] if hoechst == "fuellstand"
+                      and plan["hoechstbetrag_handeln"] else None)
+            if neu_ppm is None and neu_hb is None:
+                eintraege[punkt] = eintrag
+                continue
+            # UpdateChannelPolicy setzt Satz, Basis und Zeitsperre immer mit
+            # -- was nicht geaendert werden soll, geht mit dem geltenden Wert.
+            satz = neu_ppm if neu_ppm is not None else geltend.get("satz_ppm")
+            if satz is None:
+                satz = linie.get("satz_ppm")
+            if satz is None:
+                satz = plan["satz_ppm"] if plan["satz_ppm"] is not None else anker
+            basis = geltend.get("basis_msat")
+            if basis is None:
+                basis = linie.get("basis_msat", int(wahl.get("basis_msat") or 0))
+            lnd.setze_gebuehren(knoten, int(basis), int(satz),
+                                int(linie.get("zeitsperre") or 144), punkt,
+                                hoechstbetrag_msat=(neu_hb or 0) * 1000)
+            linien_stand.pop(kanal.get("nummer") or "", None)
+            eintrag["zuletzt_s"] = jetzt
+            eintraege[punkt] = eintrag
+            getan.append({"punkt": punkt, "stufe": plan["stufe"],
+                          "satz_ppm": int(satz), "hoechstbetrag_sat": neu_hb})
+            log.info("Gebuehrenautomatik: %s -- Stufe %s (im Schnitt %.0f %% "
+                     "auf deiner Seite), %s ppm%s.",
+                     kanal.get("gegenstelle") or punkt, plan["stufe"],
+                     plan["anteil"] * 100, satz,
+                     f", Hoechstbetrag {neu_hb} sat" if neu_hb else "")
+        wahl["kanaele"] = eintraege
+        if getan:
+            wahl.update({"zuletzt_ppm": anker,
+                         "zuletzt_am": netzgebuehren.heute(),
+                         "zuletzt_grund": rat.get("grund")})
         zustand.merke_gebuehrenwahl(wahl)
-        log.info("Gebuehrenautomatik: Satz auf %s ppm gesetzt (%s, Band "
-                 "%s-%s ppm aus %s Tagen).", rat["satz_ppm"],
-                 rat.get("grund"), lage["band"].get("unten_ppm"),
-                 lage["band"].get("oben_ppm"), lage["band"].get("tage"))
-        return {"getan": True, "satz_ppm": int(rat["satz_ppm"]),
-                "grund": rat.get("grund")}
+        grund = (rat.get("grund") if getan
+                 else "misst_fuellstand" if misst_noch else "unveraendert")
+        return {"getan": bool(getan), "satz_ppm": anker, "grund": grund,
+                "kanaele": getan}
+
+    def _steuerung_vorschau(knoten: lnd.Knoten,
+                            kanaele: List[Dict]) -> List[Dict]:
+        """Je Kanal: was gilt, was die Automatik setzen wuerde, der geltende
+        Hoechstbetrag. Auch fuer Kanaele auf "fest" -- man soll sehen, was
+        die Automatik taete, bevor man sie einschaltet."""
+        lage = _gebuehrenlage()
+        rat = lage["vorschlag"]
+        anker = rat.get("satz_ppm")
+        wahl = zustand.laden().gebuehrenwahl or {}
+        eintraege = wahl.get("kanaele") or {}
+        alle = bool(wahl.get("automatik"))
+        abstand = _abstand_tage(wahl)
+        mittel = auswertung.fuellstand_mittel(int(time.time()) - abstand * 86_400)
+        ergebnis = []
+        for kanal in kanaele:
+            eintrag = eintraege.get(kanal.get("punkt") or "") or {}
+            gebuehr, hoechst = kanalsteuerung.wahl(eintrag, alle)
+            linie = _linie(knoten, kanal) or {}
+            plan = kanalsteuerung.planen(
+                kanal, mittel.get(kanal.get("nummer") or ""), anker, eintrag,
+                kanal.get("satz_ppm"), linie.get("hoechstbetrag_sat"))
+            ergebnis.append({
+                **kanal,
+                "hoechstbetrag_sat": linie.get("hoechstbetrag_sat"),
+                "steuerung": {
+                    "gebuehr": gebuehr, "hoechstbetrag": hoechst,
+                    "stufe": plan["stufe"], "wuerde_ppm": plan["satz_ppm"],
+                    "wuerde_hoechstbetrag_sat": plan["hoechstbetrag_sat"],
+                    "zuletzt_s": eintrag.get("zuletzt_s"),
+                    "wartet": rat.get("grund") in ("keine_messung", "sammelt_noch"),
+                    "misst_noch": not kanalsteuerung.messreihe_reicht(
+                        mittel.get(kanal.get("nummer") or ""), abstand),
+                }})
+        return ergebnis
+
+    # Einmal die Stunde: wie voll ist jeder Kanal? Daraus mittelt die
+    # Automatik -- nie aus dem Augenblick (aus dem Betrieb, 30.09.2026).
+    FUELLSTAND_ABSTAND_SEKUNDEN = 3300
+
+    def fuellstand_wenn_faellig() -> None:
+        jetzt = int(time.time())
+        letzte = auswertung.fuellstand_letzte()
+        if letzte and jetzt - letzte < FUELLSTAND_ABSTAND_SEKUNDEN:
+            return
+        try:
+            knoten = lndverbindung()
+            if lnd.zustand(knoten)["stand"] != "bereit":
+                return
+            kanaele = lnd.kanaele(knoten)
+        except (lnd.NichtErreichbar, lnd.LndFehler, lnd.Beschaeftigt,
+                OSError, ValueError) as fehler:
+            log.debug("Fuellstand nicht messbar: %s", fehler)
+            return
+        if kanaele:
+            auswertung.fuellstand_merken(kanaele, jetzt)
+        auswertung.fuellstand_aufraeumen()
 
     def gebuehren_wenn_faellig() -> None:
         """Einmal am Tag messen -- und danach die Automatik anwenden.
@@ -5043,6 +5222,119 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         im_hintergrund("netzgebuehren", arbeit)
 
     app.state.gebuehren_wenn_faellig = gebuehren_wenn_faellig
+    app.state.fuellstand_wenn_faellig = fuellstand_wenn_faellig
+    app.state.gebuehren_nachziehen = _gebuehren_nachziehen
+
+    # ------------------------------------------------- Ertrag je Kanal
+    #
+    # Aus dem Betrieb, 30.09.2026: wer ein Routing-Netz aufbaut, muss wissen,
+    # welcher Kanal sich lohnt. Gerechnet wird in ertrag.py; hier wird nur
+    # gelesen. Die Rohdaten halten eine Minute -- der Wechsel zwischen 7, 30
+    # und 90 Tagen soll nicht jedes Mal die ganze Historie lesen.
+    ertrag_stand: Dict[str, Any] = {"zeit": None, "roh": None}
+    ERTRAG_FRISCH_SEKUNDEN = 60.0
+
+    @api.get("/lightning/ertrag", dependencies=geschuetzt)
+    def ertrag_lesen(zeitraum: int = 30) -> Dict:
+        tage = zeitraum if zeitraum in (7, 30, 90) else 0
+        knoten = lndverbindung()
+        if lnd.zustand(knoten)["stand"] != "bereit":
+            raise HTTPException(409, {"meldung": "lightning_nicht_bereit"})
+        zeit = ertrag_stand["zeit"]
+        roh = ertrag_stand["roh"]
+        if roh is None or zeit is None \
+                or time.monotonic() - zeit > ERTRAG_FRISCH_SEKUNDEN:
+            try:
+                offene = lnd.kanaele(knoten)
+                zu = lnd.geschlossene_kanaele(knoten)
+                oeffnen, schliessen = lnd.kanal_kosten(knoten)
+                eigene = {k["nummer"] for k in offene + zu if k.get("nummer")}
+                roh = {
+                    "offene": offene, "zu": zu, "oeffnen": oeffnen,
+                    "schliessen": schliessen,
+                    "weiter": lnd.weiterleitungen_seit(knoten),
+                    "umschichten": lnd.umschichtungen(knoten, 0, eigene),
+                }
+            except lnd.NichtErreichbar:
+                raise HTTPException(503, {"meldung": "lnd_antwortet_nicht"})
+            except (lnd.LndFehler, lnd.Beschaeftigt) as fehler:
+                log.info("Ertrag nicht lesbar: %s", fehler)
+                raise HTTPException(502, {"meldung": "ertrag_nicht_lesbar"})
+            ertrag_stand.update(zeit=time.monotonic(), roh=roh)
+        hoehe = (knotenstand.get("wert") or {}).get("hoehe")
+        return ertrag.rechnen(roh["weiter"], roh["oeffnen"], roh["schliessen"],
+                              roh["umschichten"], roh["offene"], roh["zu"],
+                              tage=tage, jetzt_s=int(time.time()), hoehe=hoehe)
+
+    # ------------------------------------------------- Ein Kanal, gesteuert
+    @api.post("/lightning/kanal/steuerung", dependencies=geschuetzt)
+    def kanal_steuern(wunsch: Kanalsteuerung) -> Dict:
+        """Gebuehr und Hoechstbetrag fuer GENAU diesen Kanal (30.09.2026).
+
+        "fest" wird sofort gesetzt; "automatik"/"fuellstand" merkt sich die
+        Wahl und entscheidet gleich einmal -- danach hoechstens einmal pro
+        Abstand. Keine PIN: hier bewegt sich kein Geld, nur ein Preis.
+        """
+        knoten = lndverbindung()
+        if lnd.zustand(knoten)["stand"] != "bereit":
+            raise HTTPException(409, {"meldung": "lightning_nicht_bereit"})
+        if not macaroon_sicherstellen(knoten):
+            raise HTTPException(503, {"meldung": "kein_macaroon"})
+        try:
+            kanal = next((k for k in lnd.kanaele(knoten)
+                          if k.get("punkt") == wunsch.punkt), None)
+        except lnd.NichtErreichbar:
+            raise HTTPException(503, {"meldung": "lnd_antwortet_nicht"})
+        if kanal is None:
+            raise HTTPException(404, {"meldung": "kz_kanal_unbekannt"})
+        if wunsch.gebuehr == "fest" and wunsch.satz_ppm is None:
+            raise HTTPException(400, {"meldung": "kz_satz_fehlt"})
+        if wunsch.hoechstbetrag == "fest":
+            if wunsch.hoechstbetrag_sat is None:
+                raise HTTPException(400, {"meldung": "kz_hb_fehlt"})
+            grenze = kanal.get("hinaus_hoechstens")
+            if grenze and wunsch.hoechstbetrag_sat > grenze:
+                raise HTTPException(400, {"meldung": "kz_hb_zu_hoch",
+                                          "grenze": grenze})
+        wahl = dict(zustand.laden().gebuehrenwahl or {})
+        eintraege = dict(wahl.get("kanaele") or {})
+        eintrag = {k: v for k, v in (eintraege.get(wunsch.punkt) or {}).items()
+                   if k != "zuletzt_s"}
+        eintrag.update(gebuehr=wunsch.gebuehr, hoechstbetrag=wunsch.hoechstbetrag)
+        eintraege[wunsch.punkt] = eintrag
+        wahl["kanaele"] = eintraege
+        zustand.merke_gebuehrenwahl(wahl)
+        try:
+            if wunsch.gebuehr == "fest" or wunsch.hoechstbetrag == "fest":
+                linie = _linie(knoten, kanal) or {}
+                geltend = lnd.gebuehrenbericht(knoten).get(wunsch.punkt) or {}
+                if wunsch.gebuehr == "fest":
+                    satz = int(wunsch.satz_ppm)
+                    basis = (wunsch.basis_msat if wunsch.basis_msat is not None
+                             else geltend.get("basis_msat") or 0)
+                else:
+                    satz = int(geltend.get("satz_ppm") or linie.get("satz_ppm") or 0)
+                    basis = geltend.get("basis_msat") or 0
+                lnd.setze_gebuehren(
+                    knoten, int(basis), satz, int(linie.get("zeitsperre") or 144),
+                    wunsch.punkt,
+                    hoechstbetrag_msat=(int(wunsch.hoechstbetrag_sat) * 1000
+                                        if wunsch.hoechstbetrag == "fest" else 0))
+                linien_stand.pop(kanal.get("nummer") or "", None)
+                log.info("Kanal %s von Hand gesetzt: %s ppm%s.",
+                         kanal.get("gegenstelle") or wunsch.punkt, satz,
+                         f", Hoechstbetrag {wunsch.hoechstbetrag_sat} sat"
+                         if wunsch.hoechstbetrag == "fest" else "")
+            automatik: Dict[str, Any] = {}
+            if wunsch.gebuehr == "automatik" or wunsch.hoechstbetrag == "fuellstand":
+                automatik = _gebuehren_nachziehen(sofort=True, nur_punkt=wunsch.punkt)
+        except lnd.LndFehler as fehler:
+            log.info("Kanalsteuerung abgelehnt: %s", fehler)
+            raise HTTPException(400, {"meldung": "gebuehren_abgelehnt",
+                                      "einzelheit": str(fehler)})
+        except lnd.NichtErreichbar:
+            raise HTTPException(503, {"meldung": "lnd_antwortet_nicht"})
+        return {"ok": True, "automatik": automatik}
 
     @api.get("/lightning/netzgebuehren", dependencies=geschuetzt)
     def netzgebuehren_lesen() -> Dict:
@@ -5092,13 +5384,16 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         """
         wahl = dict(zustand.laden().gebuehrenwahl or {})
         wahl["automatik"] = bool(wunsch.automatik)
+        if wunsch.abstand_tage in kanalsteuerung.ABSTAENDE_TAGE:
+            wahl["abstand_tage"] = int(wunsch.abstand_tage)
         zustand.merke_gebuehrenwahl(wahl)
-        log.info("Gebuehrenautomatik %s.",
-                 "eingeschaltet" if wunsch.automatik else "ausgeschaltet")
+        log.info("Gebuehrenautomatik %s (je Kanal hoechstens alle %s Tage).",
+                 "eingeschaltet" if wunsch.automatik else "ausgeschaltet",
+                 _abstand_tage(wahl))
         getan: Dict[str, Any] = {"getan": False, "grund": "aus"}
         if wunsch.automatik:
             try:
-                getan = _gebuehren_nachziehen()
+                getan = _gebuehren_nachziehen(sofort=True)
             except (lnd.NichtErreichbar, lnd.LndFehler,
                     lnd.Beschaeftigt) as fehler:
                 log.info("Automatik konnte nicht gleich greifen: %s", fehler)
@@ -5121,8 +5416,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         gehoert das Loeschen hin: an einer laufenden Kanal-Datenbank
         herumzuloeschen waere der sichere Weg in eine kaputte.
         """
-        # LAUT ins Protokoll, jeden Schritt. Aus dem Betrieb, 11.09.2026: "also
-        # hier passiert nix wenn ich auf wallet sperren druecke" -- und das
+        # LAUT ins Protokoll, jeden Schritt. Aus dem Betrieb, 11.09.2026: "Wallet
+        # sperren" gedrueckt, und nichts passierte -- und das
         # Protokoll schwieg dazu genauso wie der Bildschirm. Ein Vorgang, der
         # bis zu neunzig Sekunden dauern darf und dabei keine Spur
         # hinterlaesst, ist nicht nachpruefbar.
@@ -5187,9 +5482,9 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
     def wallet_loeschen(wahl: Wallettilgung) -> Dict:
         """Die Wallet tilgen -- und dabei beweisen, dass man sie besitzt.
 
-        Aus dem Betrieb, 09.09.2026: "mach es dann moeglich ein wallet zu loeschen
-        mit dem wallet passwort zum entsperren ... dann kann ich die ganze
-        initialisierung nochmal machen und testen."
+        Aus dem Betrieb, 09.09.2026: eine Wallet soll sich mit ihrem Passwort
+        loeschen lassen, damit man die ganze Einrichtung noch einmal
+        durchlaufen und pruefen kann.
 
         Sein Riegel ist der richtige, und er verlangt einen Umweg: LND kann
         sein Wallet-Passwort NUR beim Entsperren pruefen, also nur an einer
@@ -5247,8 +5542,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
     def gegenstelle_verbinden(wahl: Gegenstellenwahl) -> Dict:
         """Sich mit einer Gegenstelle verbinden -- ohne Kanal, ohne Geld.
 
-        Aus dem Betrieb, 09.09.2026: "man will sich ja nicht nur ein kanal oder
-        knoten erstellen sondern sich auch einen anschliessen."
+        Aus dem Betrieb, 09.09.2026: man will nicht nur selbst Kanaele anlegen,
+        sondern sich auch an andere Knoten anschliessen.
 
         Das Recht dafuer (peers:write) lag seit jeher im Macaroon, mit
         Kommentar und allem -- benutzt hat es nie jemand. Entweder bauen oder
@@ -5300,7 +5595,7 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
 
         Bis zum 09.09.2026 gab es dafuer kein einziges Eingabefeld. Der
         Knoten hiess "SatoshiCortex" und die Farbe war das Bitcoin-Orange,
-        beide fest verdrahtet. Fuer der Betreiber war sein Knoten damit im Netz
+        beide fest verdrahtet. Damit war der eigene Knoten im Netz
         nicht von einem fremden zu unterscheiden -- und ein Name, den man
         wiedererkennt, ist die Voraussetzung dafuer, dass jemand einen Kanal
         zu einem aufmacht.
@@ -5395,10 +5690,9 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
     def ausweis_pruefen(antwort: Dict) -> None:
         """Ist das noch derselbe Knoten wie vorher?
 
-        DER BEFUND VOM 11.09.2026. Der Betreiber hatte die Wiederherstellung aus
-        seinen vierundzwanzig Woertern durch und fragte hinterher: "keine
-        ahnung habe mir die kennung nicht vorher angesehen .. oder muss ich
-        alles noch mal neu machen weil ich die kennung nicht hatte?"
+        DER BEFUND VOM 11.09.2026. Im Betrieb war die Wiederherstellung aus den
+        vierundzwanzig Woertern durch, und hinterher kam die Frage, ob alles
+        neu gemacht werden muss, weil die Kennung vorher nicht notiert war.
 
         Musste er nicht -- aber dass er sie sich von Hand haette notieren
         sollen, war unser Versaeumnis. Die Anwendung kennt die Kennung
@@ -5459,8 +5753,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         antwort: Dict = {"eingerichtet": True, "stand": stand["stand"]}
         # Die gewaehlte Betriebsart gehoert mit in die Antwort.
         #
-        # Aus dem Betrieb, 10.09.2026: "unter knoten bekomme ich aber keine
-        # verbindungs adresse angezeigt oder dauert das nur ewig?" -- und im
+        # Aus dem Betrieb, 10.09.2026: unter "Knoten" stand keine
+        # Verbindungsadresse, und es war unklar, ob das nur dauert -- und im
         # Bild darauf ein leerer Kasten ohne ein Wort dazu.
         #
         # Die Anwendung WEISS die Antwort: bei "gar nicht ankuendigen" steht
@@ -5504,8 +5798,10 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
                             # kennt sie nicht. Befund vom 24.09.2026.
                             ("ausstehend",
                              lambda: lnd.ausstehende_kanaele(knoten)),
-                            ("netz", lambda: lnd.netzgraph(knoten)),
-                            ("weiterleitungen", lambda: lnd.weiterleitungen(knoten))):
+                            ("netz", lambda: lnd.netzgraph(knoten))):
+            # Die Weiterleitungen stehen seit dem 30.09.2026 im Ertrag
+            # (/lightning/ertrag) -- je Kanal, mit Kosten. Hier lasen sie bei
+            # jedem Neuladen die ganze Historie, fuer eine einzige Summe.
             try:
                 antwort[name] = holen()
             except (lnd.NichtErreichbar, lnd.LndFehler) as fehler:
@@ -5530,6 +5826,9 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
                 {**k, **bericht.get(k.get("punkt") or "",
                                     {"satz_ppm": None, "basis_msat": None})}
                 for k in antwort["kanaele"]]
+            # Dazu je Kanal: geltender Hoechstbetrag, was gilt (Automatik oder
+            # fest) und was die Automatik setzen wuerde (30.09.2026).
+            antwort["kanaele"] = _steuerung_vorschau(knoten, antwort["kanaele"])
 
         # Die Leitungen -- nur zusammen mit der Kanalliste. Ohne sie stuende
         # jede Verbindung als "ohne Kanal" da, und genau diese Verwechslung
@@ -5543,8 +5842,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
 
         # DER LETZTE BEKANNTE STAND, wenn getinfo gerade nicht antwortet.
         #
-        # Aus dem Betrieb, 11.09.2026: "aber es wird mir noch keine verbindungs
-        # adresse angezeigt". Sie steckt in getinfo -- und genau das lief
+        # Aus dem Betrieb, 11.09.2026: noch immer keine Verbindungsadresse.
+        # Sie steckt in getinfo -- und genau das lief
         # waehrend der Wiederherstellung ins Zeitlimit, weil LNDs Wallet die
         # Kette durchsuchte. Fiel das Feld weg, zeichnete die Oberflaeche den
         # Adresskasten GAR NICHT neu: er blieb leer, ohne ein Wort dazu.
@@ -5655,10 +5954,9 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
     def land_aufschluesseln(kuerzel: str) -> Dict:
         """Ein Land, nach Gebieten aufgeschluesselt.
 
-        Aus dem Betrieb, 05.09.2026: "dass man in der Weltkarte auf die einzelnen
-        Laender klicken kann und die dann gross werden und uns da in den
-        einzelnen Bundeslaendern zeigen, wo die Knoten sind" -- und gleich
-        darauf: "das gilt fuer jedes Land der Welt!"
+        Aus dem Betrieb, 05.09.2026: ein Land auf der Weltkarte anklicken, es
+        gross sehen und darin die Gebiete, in denen die Knoten stehen -- und
+        das fuer jedes Land der Welt.
 
         KEIN einziger neuer Aufruf an bitcoind: gezaehlt wurde schon, als die
         Weltkarte gebaut wurde. Hier wird nur nach Land geschnitten. Ein
@@ -5706,8 +6004,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
             }
             zeilen.append(zeile)
         # ALLE Gebiete, nicht nur die mit Zahlen. Aus dem Betrieb, 06.09.2026
-        # ausdruecklich: "ich klicke auf ein leuchtendes ODER NICHT
-        # leuchtendes Bundesland" -- ein Umriss, der sich nicht anklicken
+        # ausdruecklich: auch ein Gebiet, das nicht leuchtet, laesst sich
+        # anklicken -- ein Umriss, der sich nicht anklicken
         # laesst, sieht kaputt aus, auch wenn dahinter nur eine Null steht.
         # Sortiert bleibt trotzdem nach Gewicht: was etwas zu sagen hat,
         # steht oben.
@@ -5755,12 +6053,11 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
 
     # --------------------------------------------------------- Nachrichten
     #
-    # Aus dem Betrieb, 06.09.2026, nachdem er die Chat-Idee selbst verworfen hatte:
-    # "was aber vielleicht meinen Cortex von anderen unterscheiden wuerde
-    # waere ein Nachrichten-Feed ... von regional von wo ich bin bis
-    # international". Und einen Tag spaeter die Verschaerfung, die den
-    # Zuschnitt bestimmt hat: "wenn ich in Algerien sitze und habe die
-    # Software am Laufen, bringt mir Blocktrainer nichts".
+    # Aus dem Betrieb, 06.09.2026, nachdem die Chat-Idee verworfen war: ein
+    # Nachrichten-Feed, von regional bis international, koennte diese Anwendung
+    # von anderen unterscheiden. Einen Tag spaeter die Verschaerfung, die den
+    # Zuschnitt bestimmt hat: wer in Algerien sitzt, dem nuetzt ein
+    # deutschsprachiger Kanal nichts.
     #
     # Deshalb Sprache statt Land -- siehe nachrichten.SPRACHE_JE_LAND.
 
@@ -5783,8 +6080,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
             "beitraege": auswertung.nachrichten_lesen(fenster, gewaehlt),
             # DIESELBE Grenze wie die Liste, nicht "alle ungelesenen".
             #
-            # Aus dem Betrieb, 11.09.2026: "er zeigt mir links unter nachrrichten 25
-            # neue an und wenn ich drauf klicke ist es vieleicht eine". Genau
+            # Aus dem Betrieb, 11.09.2026: links standen 25 neue Nachrichten,
+            # beim Anklicken war es vielleicht eine. Genau
             # so war es: gezaehlt wurde ueber die ganze Ablage, gezeigt wurden
             # die neuesten sechzig. Was darunter lag, war nicht anzuklicken --
             # blieb also ungelesen, und der Zaehler ging nie wieder herunter.
@@ -5960,10 +6257,9 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
             # Ohne Sicherung sind die Kanal-Guthaben bei Datenverlust weg,
             # und zwar auch mit dem Zettel in der Hand. Das gehoert gesagt.
             #
-            # ABER: gesagt, nicht verlangt. Aus dem Betrieb, 09.09.2026: "das
-            # aufmerksam machen auf die kanal sicherung nervt! ... das
-            # sollten wir dem kunden ueberlassen, es sollte keine pflicht
-            # sein!" Er hat recht -- die anderen beiden Faelle verschwinden
+            # ABER: gesagt, nicht verlangt. Aus dem Betrieb, 09.09.2026: der
+            # staendige Hinweis auf die Kanalsicherung nervt -- das entscheidet
+            # der Nutzer, eine Pflicht ist es nicht. Zu Recht -- die anderen beiden Faelle verschwinden
             # von allein, sobald man sie erledigt. Dieser hier ist eine
             # WAHL, und eine Wahl, die man taeglich neu wegklicken muss,
             # ist keine. Deshalb abweisbar, und zwar dauerhaft.
@@ -5971,9 +6267,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
                     "dringend": False, "abweisbar": True}
         # KANAELE OHNE WACHTURM.
         #
-        # Aus dem Betrieb, 12.09.2026: "warum muss ich einen wachtum seperate
-        # anwaehlen wieso startet nicht einfach der wachtum selbstaendig wenn
-        # ich einen kanal aufmache???"
+        # Aus dem Betrieb, 12.09.2026: warum muss man einen Wachturm eigens
+        # waehlen, statt dass er beim ersten Kanal von selbst anlaeuft?
         #
         # Weil das Protokoll keine Wachturm-Suche kennt: Tuerme werden im
         # Graphen nicht angekuendigt, unser Knoten WEISS gar nicht, welche es
@@ -6273,8 +6568,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         sich den einzigen Weg ab, auf dem die Aenderung angekommen waere.
 
         Der Schalter stand also auf "nur ueber Tor", und der Knoten kuendigte
-        weiter die Wohnanschrift an. Der Betreiber hat am 09.09.2026 genau danach
-        gefragt, bevor er umgestellt hat -- gut, dass er es tat.
+        weiter die Wohnanschrift an. Im Betrieb wurde am 09.09.2026 genau danach
+        gefragt, bevor umgestellt wurde -- gut, dass es so war.
 
         Legt NICHTS an: das erste Schreiben bleibt bei
         lightning_bereitstellen, das auf die fertige Kette wartet.
@@ -6483,9 +6778,9 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         die Oberflaeche meldet vollkommen zu Recht "wartet auf Einrichtung".
 
         Damit war der ganze Lightning-Teil unerreichbar: kein Seed, keine
-        Wallet, keine Wiederherstellung. Aus dem Betrieb, 08.09.2026, nachdem seine
-        Kette durch war: "was ist mit dem LND der nicht laeuft anzeigt sondern
-        warte auf einrichtung?" -- eine Sackgasse, aus der die Oberflaeche
+        Wallet, keine Wiederherstellung. Aus dem Betrieb, 08.09.2026, nachdem die
+        Kette durch war: LND lief nicht und zeigte nur "wartet auf
+        Einrichtung" -- eine Sackgasse, aus der die Oberflaeche
         keinen Ausweg anbot.
 
         WARUM DAS VON ALLEIN GESCHIEHT und nicht auf Knopfdruck: ein LND ohne
@@ -6876,6 +7171,7 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         sicherung_nachziehen()
         karte_auffrischen()
         aufraeumen_wenn_faellig()
+        fuellstand_wenn_faellig()
         gebuehren_wenn_faellig()
 
     # Der Waechter laeuft sonst nur als Hintergrundaufgabe, alle paar Minuten.
@@ -7076,9 +7372,9 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
 
     # ── Die Regel, dass nichts von aussen nachgeladen wird ─────────────
     #
-    # Aus dem Betrieb, 08.09.2026: "mit google wollen wir nix zu tun haben .. wir
-    # bleiben unser eigener knoten und teil des netzwerkes, jede info die wir
-    # brauchen kommt aus dem netzwerk und nicht von extern."
+    # Aus dem Betrieb, 08.09.2026: keine grossen fremden Dienste -- der Knoten
+    # bleibt sein eigener und Teil des Netzes, und jede Auskunft kommt aus dem
+    # Netz selbst, nicht von aussen.
     #
     # Nachgesehen: die Oberflaeche haelt das schon. Keine fremde Schrift, kein
     # CDN, keine Zaehlpixel -- alles liegt im Abbild, die Schriftliste nennt

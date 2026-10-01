@@ -18,8 +18,8 @@ Genauigkeit: Land und GEBIET, nicht Stadt.
 
 Das Gebiet ist das, was DB-IP eine Region nennt und was auf der Karte ein
 Bundesland, ein Kanton, ein Staat oder eine Provinz ist. Aus dem Betrieb, am
-05.09.2026: "wo genau in Bayern ist auch egal, es sollte halt nur Bayern
-sein, welcher Ort genau sollte nicht interessieren." Genau diese Grenze ist
+05.09.2026: das Gebiet soll stimmen, der genaue Ort interessiert nicht.
+Genau diese Grenze ist
 hier gezogen -- und sie ist auch die, die die freie DB-IP-Liste ehrlich
 hergibt: ein Punkt laege ohnehin beim Rechenzentrum, nicht bei einem
 Menschen.

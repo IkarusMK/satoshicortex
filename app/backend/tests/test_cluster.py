@@ -41,8 +41,8 @@ def test_unbrauchbares_ergibt_keinen_cluster():
 
 # ── Haengt sie, oder wartet sie nur? (24.09.2026) ──────────────────────────
 #
-# Aus dem Betrieb: "das er mir jetzt bei jeder transaktion im wallet direkt
-# anzeigt 'gebueren erhoehen!'". Die Wartelage entscheidet, ob der Knopf
+# Aus dem Betrieb: bei jeder Transaktion in der Wallet stand gleich "Gebuehr
+# erhoehen". Die Wartelage entscheidet, ob der Knopf
 # ueberhaupt Sinn hat. Eintraege in Cores Format von getmempoolentry (v31.1).
 
 def _eintrag(chunk_btc=0.0000141, chunkweight=564, hoehe=900_000, **mehr):

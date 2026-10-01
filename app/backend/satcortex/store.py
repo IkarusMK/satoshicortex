@@ -43,8 +43,8 @@ NACHRICHTEN_TAGE = 60
 # Wieviele Meldungen die Liste hoechstens zeigt -- UND wieviele der Zaehler
 # hoechstens zaehlt. Dass das dieselbe Zahl ist, ist der ganze Punkt.
 #
-# Aus dem Betrieb, 11.09.2026: "er zeigt mir links unter nachrrichten 25 neue an und
-# wenn ich drauf klicke ist es vieleicht eine".
+# Aus dem Betrieb, 11.09.2026: links standen 25 neue Nachrichten, beim
+# Anklicken war es vielleicht eine.
 #
 # Der Zaehler zaehlte ALLE ungelesenen Zeilen, die Liste zeigte die neuesten
 # sechzig. Meldungen unterhalb dieser Grenze waren damit unerreichbar: sie
@@ -58,6 +58,10 @@ NACHRICHTEN_FENSTER = 60
 # hereinkommen, um sie Umschicht-Versuchen zuzuordnen. Eigene Zahlungen sind
 # wenige; die Grenze haelt nur einen Ausreisser aus dem Speicher.
 HTLC_EIGENE_HOECHSTENS = 5000
+
+# So lange bleiben die stuendlichen Fuellstaende der Kanaele liegen. Die
+# Automatik mittelt ueber hoechstens drei Tage; zwei Wochen lassen Luft.
+FUELLSTAND_TAGE = 14
 
 # Wie lange ein Schreibender auf die Sperre wartet, bevor er aufgibt.
 #
@@ -144,7 +148,7 @@ CREATE INDEX IF NOT EXISTS luecken_nach_zeit ON luecken(zeit_ms);
 
 -- Der HTLC-Strom: was durch diesen Knoten hindurchgeht -- und was NICHT.
 --
--- Aus dem Betrieb, 12.09.2026: "koennen wir noch den HTLC-Strom mit rein nehmen".
+-- Aus dem Betrieb, 12.09.2026: der Wunsch, auch den HTLC-Strom aufzunehmen.
 --
 -- Bis hierher las die Anwendung LNDs /v1/switch: die Historie der
 -- ABGESCHLOSSENEN Weiterleitungen. Die sagt, was gelungen ist. Das
@@ -163,6 +167,22 @@ CREATE TABLE IF NOT EXISTS htlc (
 );
 CREATE INDEX IF NOT EXISTS htlc_nach_zeit ON htlc(zeit_ms);
 CREATE INDEX IF NOT EXISTS htlc_nach_grund ON htlc(grund);
+
+-- Wie voll jeder Kanal auf unserer Seite ist, stuendlich gemessen.
+--
+-- Aus dem Betrieb, 30.09.2026: ein Schwall, der einen Kanal fuer ein paar
+-- Minuten leert und gleich zurueckfliesst, darf nichts umstellen. Die
+-- Gebuehren-Automatik je Kanal
+-- entscheidet deshalb ueber den Durchschnitt dieser Messungen, nie ueber den
+-- Augenblick. Zwei Wochen werden aufbewahrt.
+CREATE TABLE IF NOT EXISTS fuellstand (
+    kanal       TEXT NOT NULL,
+    zeit_s      INTEGER NOT NULL,
+    anteil      REAL NOT NULL,        -- 0.0 leer bei uns, 1.0 voll bei uns
+    verfuegbar  INTEGER NOT NULL,     -- ausgebbar auf unserer Seite, sat
+    PRIMARY KEY (kanal, zeit_s)
+);
+CREATE INDEX IF NOT EXISTS fuellstand_nach_zeit ON fuellstand(zeit_s);
 
 -- Was das NETZ fuers Weiterleiten nimmt, einmal am Tag gemessen.
 --
@@ -773,6 +793,39 @@ class Ablage:
             "ORDER BY zeit_ms DESC LIMIT ?",
             (int(seit_ms), int(grenze))).fetchall()]
 
+    # ── Der Fuellstand der Kanaele ────────────────────────────────────
+    def fuellstand_merken(self, kanaele: List[Dict], zeit_s: int) -> None:
+        """Eine Messung je Kanal. Derselbe Zeitpunkt zaehlt nur einmal."""
+        with self._schreibend() as v:
+            v.executemany(
+                "INSERT OR REPLACE INTO fuellstand (kanal, zeit_s, anteil,"
+                " verfuegbar) VALUES (?, ?, ?, ?)",
+                [(str(k["nummer"]), int(zeit_s), float(k.get("anteil_hier") or 0),
+                  int(k.get("verfuegbar") or 0))
+                 for k in kanaele if k.get("nummer")])
+
+    def fuellstand_mittel(self, seit_s: int) -> Dict[str, Dict]:
+        """Je Kanal der Durchschnitt seit seit_s -- und aus wie vielen
+        Messungen er stammt."""
+        return {r["kanal"]: {"anteil": round(r["anteil"], 3),
+                             "verfuegbar": int(round(r["verfuegbar"])),
+                             "messungen": r["messungen"]}
+                for r in self.v.execute(
+                    "SELECT kanal, AVG(anteil) AS anteil, AVG(verfuegbar) AS"
+                    " verfuegbar, COUNT(*) AS messungen FROM fuellstand"
+                    " WHERE zeit_s >= ? GROUP BY kanal", (int(seit_s),))}
+
+    def fuellstand_letzte(self) -> Optional[int]:
+        """Wann zuletzt gemessen wurde -- oder None."""
+        zeile = self.v.execute("SELECT MAX(zeit_s) FROM fuellstand").fetchone()
+        return int(zeile[0]) if zeile and zeile[0] is not None else None
+
+    def fuellstand_aufraeumen(self, tage: int = FUELLSTAND_TAGE) -> int:
+        grenze = int(time.time() - max(1, int(tage)) * 86400)
+        with self._schreibend() as v:
+            return v.execute("DELETE FROM fuellstand WHERE zeit_s < ?",
+                             (grenze,)).rowcount
+
     def netzgebuehren_merken(self, tag: str, zeit_s: int,
                              werte: Dict) -> None:
         """Die Tagesmessung festhalten -- oder die des Tages ersetzen."""
@@ -958,6 +1011,17 @@ class LeereAblage:
                                  grenze: int = HTLC_EIGENE_HOECHSTENS
                                  ) -> List[Dict]:
         return []
+
+    fuellstand_merken = _nichts
+
+    def fuellstand_mittel(self, seit_s: int) -> Dict[str, Dict]:
+        return {}
+
+    def fuellstand_letzte(self) -> Optional[int]:
+        return None
+
+    def fuellstand_aufraeumen(self, tage: int = FUELLSTAND_TAGE) -> int:
+        return 0
 
     def htlc_aufraeumen(self, tage: int = NACHRICHTEN_TAGE) -> int:
         return 0

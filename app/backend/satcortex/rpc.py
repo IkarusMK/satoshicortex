@@ -394,8 +394,8 @@ def kettenlage(knoten: Knoten, peers=None, gesamt=None) -> Optional[dict]:
         # als MESSWERT: "0 von mir aufgebaut · 0 von aussen angenommen",
         # "noch keine eigene Adresse bekannt". Waehrend jedes
         # chainstate-Schreibvorgangs, alle paar Minuten. Genau das Bild, das
-        # Aus dem Betrieb, 02.09.2026 als "ich habe quasi keine Verbindung mehr zu
-        # irgendwas" gemeldet hat.
+        # aus dem Betrieb am 02.09.2026 als scheinbar voelliger
+        # Verbindungsverlust gemeldet wurde.
         log.debug("getnetworkinfo nicht moeglich: %s", fehler)
 
     fortschritt = float(kette.get("verificationprogress", 0.0))
@@ -582,9 +582,8 @@ def _indizes(knoten: Knoten, zeitlimit: float) -> Optional[Dict]:
     nichts, und Wallet-Software, die sich anschliessen will, bekommt keine
     Antwort.
 
-    Bis zum 08.09.2026 stand darueber NIRGENDS etwas. Der Betreiber hat es von
-    selbst vermutet ("vielleicht liegt es daran, dass das nicht geklappt
-    hat") -- und genau das ist der Punkt: eine Anwendung, in der man raten
+    Bis zum 08.09.2026 stand darueber NIRGENDS etwas. Im Betrieb wurde es
+    nur vermutet -- und genau das ist der Punkt: eine Anwendung, in der man raten
     muss, was ihr Knoten gerade tut, erklaert ihn nicht.
 
     None heisst "nicht abrufbar", ein leeres Verzeichnis "kein Index aktiv"

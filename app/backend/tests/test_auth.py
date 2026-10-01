@@ -7,9 +7,9 @@ die API-Tests, die sie benutzen, aber nicht befragen. 91 % Abdeckung ohne
 eine einzige Zeile, die sich fuer den Riegel selbst interessiert.
 
 Vor dem Bau der zweiten Stufe (Passphrase-Tresor -> PIN -> TOTP) muss die
-erste nachweislich halten. Aus dem Betrieb, 09.09.2026: "muss alles sauber sein und
-vorallem jede funktion geprueft !!!! immer !!" -- hier geht es um die Tuer vor
-dem Geld.
+erste nachweislich halten. Aus dem Betrieb, 09.09.2026: alles muss sauber sein,
+und jede Funktion wird geprueft, immer -- hier geht es um die Tuer vor dem
+Geld.
 """
 import json
 import os
@@ -313,8 +313,8 @@ def test_eine_zerschossene_sitzungsdatei_beginnt_leer(tmp_path, inhalt):
 
 # ── Die PIN: das Schloss vor jeder Geldbewegung ────────────────────────────
 #
-# Aus dem Betrieb, 08.09.2026: "eine art: PIN. fuer Zahlungen ansich also knoten
-# oeffnen oder schliessen geld transferieren".
+# Aus dem Betrieb, 08.09.2026: eine eigene PIN fuer alles, was Geld bewegt --
+# Kanaele oeffnen und schliessen, Zahlungen, Ueberweisungen.
 #
 # SIE SCHUETZT GEGEN ETWAS ANDERES ALS DER TRESOR, und das ist der ganze
 # Grund, warum es beide gibt:

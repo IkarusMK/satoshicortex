@@ -1,8 +1,8 @@
 """Der Electrum-Dienst: beantwortet, was BitBoxApp und Trezor Suite fragen.
 
-Aus dem Betrieb, 28.09.2026: "was will den trezor haben damit man trezor
-direkt verbinden kann ???" -- und dann: "ich bin da kein fan von ... das ist
-wieder ein docker stack dabei". Deshalb kein electrs daneben, sondern das
+Aus dem Betrieb, 28.09.2026: gefragt war, was Trezor braucht, um sich direkt
+zu verbinden -- und ausdruecklich kein weiterer Docker-Stapel daneben.
+Deshalb kein electrs daneben, sondern das
 Protokoll hier selbst.
 
 Protokoll 1.4 (spesmilo/electrum-protocol). Das sprechen beide Apps fest

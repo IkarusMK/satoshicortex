@@ -278,8 +278,8 @@ def test_ein_kanal_ohne_kapazitaet_teilt_nicht_durch_null():
 
 # ── Kanaele im Aufbau und im Abbau (24.09.2026) ────────────────────────────
 #
-# Aus dem Betrieb: "ich habe ja jetzt einen kanal geoeffnet zu den anderen
-# partner B ... nur warum seh ich das nur in wallet und nicht unter kanal ?"
+# Aus dem Betrieb: ein frisch geoeffneter Kanal stand nur in der Wallet, nicht
+# unter Kanaele.
 # /v1/channels kennt nur OFFENE Kanaele. Bis die Gegenstelle genug
 # Bestaetigungen hat, steht ein neuer Kanal nur in /v1/channels/pending --
 # Feldnamen aus lightning.swagger.json, v0.21.3-beta.
@@ -381,9 +381,8 @@ def test_guthaben_zaehlt_kette_und_kanaele_nicht_zusammen():
 
 
 def test_der_gebuehrenbericht_nennt_was_jeder_kanal_verlangt():
-    """Aus dem Betrieb, 26.09.2026: "meine gesetzten gebueren nach jedem neu
-    start oder refresh weg ... nicht mehr angezeigt was ich da vom netzwerk
-    verlange". Weg waren sie nie -- LND vergisst sie nicht. Nur gefragt hat
+    """Aus dem Betrieb, 26.09.2026: nach jedem Neustart oder Neuladen schienen
+    die gesetzten Gebuehren weg. Weg waren sie nie -- LND vergisst sie nicht. Nur gefragt hat
     ihn niemand: die Felder standen fest auf 100 und 0.
 
     Feldnamen aus lnrpc/lightning.proto am Tag v0.21.3-beta (ChannelFeeReport:
@@ -401,15 +400,16 @@ def test_der_gebuehrenbericht_nennt_was_jeder_kanal_verlangt():
     assert k.gerufen == [("/v1/fees", None)]
 
 
-def test_weiterleitungen_werden_summiert():
+def test_weiterleitungen_kommen_alle_mit():
     k = FakeRuf({"/v1/switch": {"forwarding_events": [
         {"timestamp": "1780000000", "amt_out": "10000", "fee_msat": "1500",
          "peer_alias_in": "A", "peer_alias_out": "B"},
         {"timestamp": "1780000100", "amt_out": "20000", "fee_msat": "2500",
          "peer_alias_in": "B", "peer_alias_out": "C"}]}})
-    d = lnd.weiterleitungen(k)
-    assert d["anzahl"] == 2 and d["menge"] == 30000 and d["gebuehr_msat"] == 4000
-    assert d["letzte"][0]["von"] == "B", "die neueste zuerst"
+    d = lnd.weiterleitungen_seit(k)
+    assert len(d) == 2
+    assert sum(e["raus_sat"] for e in d) == 30000
+    assert sum(e["gebuehr_msat"] for e in d) == 4000
 
 
 def test_die_uebersicht_kommt_auch_ohne_kanaele_zurecht():
@@ -505,8 +505,8 @@ def test_der_zeitpunkt_kommt_aus_dem_nicht_veralteten_feld():
                 "amt_out": "1000", "fee_msat": "500",
                 "peer_alias_in": "A", "peer_alias_out": "B"}]}
 
-    d = lnd.weiterleitungen(Attrappe())
-    assert d["letzte"][0]["zeitpunkt"] == 1_788_400_000
+    d = lnd.weiterleitungen_seit(Attrappe())
+    assert d[0]["zeit_s"] == 1_788_400_000
 
 
 def test_ohne_nanosekunden_gilt_das_alte_feld():
@@ -518,16 +518,14 @@ def test_ohne_nanosekunden_gilt_das_alte_feld():
                 "timestamp": "1788400000", "amt_out": "1000",
                 "fee_msat": "500"}]}
 
-    d = lnd.weiterleitungen(Alt())
-    assert d["letzte"][0]["zeitpunkt"] == 1_788_400_000
+    d = lnd.weiterleitungen_seit(Alt())
+    assert d[0]["zeit_s"] == 1_788_400_000
 
 
 # ── Sich gegenueber einem Dienst ausweisen (04.09.2026) ─────────────────────
 #
-# Der Betreiber: "was ich auch gesehen habe, das mann im LightningNetwork+ sich
-# signieren muss ... ich hoffe das unsere knoten dann auch alle notwendingen
-# funktionen beherscht die wir brauchen um uns groessere netzwerke
-# anzuschliessen."
+# Aus dem Betrieb: bei LightningNetwork+ muss man signieren -- der Knoten soll
+# alles koennen, was es braucht, um sich groesseren Netzen anzuschliessen.
 #
 # Er hat richtig hingesehen: message:write fehlte in unserem eigenen
 # Macaroon. LNDs rpcserver.go, v0.21.3-beta:
@@ -545,8 +543,8 @@ def test_onchain_write_ist_das_schwerste_recht_in_der_liste():
     auch Coins senden -- LND trennt das nicht, und ein Macaroon kennt keine
     Betragsgrenze.
 
-    Es ist jetzt drin, aus die Bedingung des Betreibers vom 30.08.2026: "ich werde nix
-    dahin ueberweisen solange ich es nicht zurueck schicken kann". Eine
+    Es ist jetzt drin, wegen der Bedingung aus dem Betrieb vom 30.08.2026:
+    eingezahlt wird erst, wenn man das Geld auch zurueckschicken kann. Eine
     Wallet, aus der man nicht wieder herauskommt, ist keine.
 
     Was den Ausschlag gab: fuer jemanden mit der PLATTE aendert es nichts --
@@ -736,8 +734,8 @@ def test_zu_kleine_dateien_sind_keine_sicherung():
 
 # ═════════════════════════════ Einzahladresse: Typ und Bestaendigkeit ═══
 #
-# Aus dem Betrieb, 09.09.2026: "wenn ich einzahlen will muss ich erst eine neue
-# adresse erzeugen?? sollte ich nicht eine wallet adresse haben?"
+# Aus dem Betrieb, 09.09.2026: die Frage, warum man zum Einzahlen erst eine neue
+# Adresse erzeugen muss, statt eine feste zu haben.
 #
 # Die Frage trifft zwei Dinge. Das eine ist ein Missverstaendnis -- eine
 # Wallet hat keine Adresse, sie hat beliebig viele, und eine frische je
@@ -833,8 +831,8 @@ def test_die_pruefung_nimmt_die_gleiche_kodierung_wie_das_unterschreiben():
 # benutzten. Doppelt schlecht: die Funktion fehlte, und die Linie dieses
 # Projekts lautet, nur zu halten, was gebraucht wird.
 #
-# Aus dem Betrieb, 09.09.2026: "man will sich ja nicht nur ein kanal oder knoten
-# erstellen sondern sich auch einen anschliessen".
+# Aus dem Betrieb, 09.09.2026: man will nicht nur selbst Kanaele anlegen,
+# sondern sich auch an andere Knoten anschliessen.
 
 def test_verbinden_zerlegt_die_uebliche_zeile():
     m = Mitschrift({})
@@ -874,9 +872,8 @@ def test_verbinden_nimmt_umschliessende_leerzeichen_hin():
 
 # ══════════════════════════ die Wallet wieder loswerden ════════════════
 #
-# Aus dem Betrieb, 09.09.2026: "mach es dann moeglich ein wallet zu loeschen mit
-# dem wallet passwort zum entsperren ... dann kann ich die ganze
-# initialisierung nochmal machen und testen."
+# Aus dem Betrieb, 09.09.2026: eine Wallet soll sich mit ihrem Passwort loeschen
+# lassen, damit man die ganze Einrichtung noch einmal durchlaufen kann.
 #
 # Das Passwort ist der richtige Riegel: bei abgeschaltetem Auto-Entsperren
 # liegt es NIRGENDS auf der Platte. Eine uebernommene Browser-Sitzung hat
@@ -975,26 +972,24 @@ def kleine_seite(monkeypatch):
 def test_die_summe_umfasst_auch_die_weiterleitung_nummer_501(kleine_seite):
     """Sonst friert das Verdiente ein, ohne dass es jemand merkt."""
     k = Blaetterer(1234)
-    d = lnd.weiterleitungen(k)
-    assert d["anzahl"] == 1234
-    assert d["menge"] == 1234 * 1000
-    assert d["gebuehr_msat"] == 1234 * 500
+    d = lnd.weiterleitungen_seit(k)
+    assert len(d) == 1234
+    assert sum(e["raus_sat"] for e in d) == 1234 * 1000
+    assert sum(e["gebuehr_msat"] for e in d) == 1234 * 500
     assert k.seiten == 13, "12 volle Seiten und eine angebrochene"
 
 
-def test_die_letzten_sind_die_neuesten_und_nicht_die_von_seite_eins(kleine_seite):
+def test_die_neuesten_sind_dabei_und_nicht_nur_die_von_seite_eins(kleine_seite):
     k = Blaetterer(1234)
-    letzte = lnd.weiterleitungen(k)["letzte"]
-    assert len(letzte) == lnd.WEITERLEITUNG_ZEIGEN
-    assert letzte[0]["nach"] == "Z1233", "die neueste zuerst"
-    assert letzte[-1]["nach"] == "Z1214"
+    d = lnd.weiterleitungen_seit(k)
+    assert d[-1]["raus_name"] == "Z1233"
 
 
 def test_ein_knoten_mit_wenig_verkehr_wird_einmal_gefragt():
     """Die Seite ist absichtlich gross: Blaettern ist der Ausnahmefall."""
     k = Blaetterer(3)
-    d = lnd.weiterleitungen(k)
-    assert d["anzahl"] == 3 and k.seiten == 1
+    d = lnd.weiterleitungen_seit(k)
+    assert len(d) == 3 and k.seiten == 1
 
 
 def test_das_blaettern_hat_ein_ende_auch_wenn_lnd_sich_verschluckt():
@@ -1012,14 +1007,13 @@ def test_das_blaettern_hat_ein_ende_auch_wenn_lnd_sich_verschluckt():
             ] * wieviel, "last_offset_index": "0"}
 
     k = Klemmt()
-    lnd.weiterleitungen(k)
+    lnd.weiterleitungen_seit(k)
     assert k.seiten <= lnd.WEITERLEITUNG_SEITEN_HOECHSTENS
 
 
 def test_ohne_weiterleitungen_wird_nicht_geblaettert():
     k = FakeRuf({"/v1/switch": {"forwarding_events": []}})
-    d = lnd.weiterleitungen(k)
-    assert d == {"anzahl": 0, "menge": 0, "gebuehr_msat": 0, "letzte": []}
+    assert lnd.weiterleitungen_seit(k) == []
     assert len(k.gerufen) == 1
 
 
@@ -1083,8 +1077,8 @@ def test_die_reserve_kann_das_verfuegbare_nicht_negativ_machen():
 
 # ── Die Anker-Ruecklage ────────────────────────────────────────────────────
 #
-# Aus dem Betrieb, 11.09.2026: "dein knoten soll die menge an sat haben dann musst
-# du aber das plus exit und gebueren an sat einzahlen".
+# Aus dem Betrieb, 11.09.2026: wer einen Kanal anlegt, soll gleich lesen, was er
+# einzahlen muss -- den Betrag plus Reserve fuer den Ausstieg und die Gebuehren.
 #
 # Sein Gefuehl stimmt, der Mechanismus ist nur ein anderer: die Schliessgebuehr
 # wird beim einvernehmlichen Schliessen vom KANALGUTHABEN abgezogen, nicht
@@ -1140,7 +1134,7 @@ def test_ohne_antwort_gibt_es_keine_ruecklage():
 
 # ── Einen Kanal oeffnen (12.09.2026) ───────────────────────────────────────
 #
-# Der Betreiber: "ja dann machen wir mal mit Punkt 1 und 2 weiter."
+# Aus dem Betrieb: weiter mit den Punkten 1 und 2.
 
 KENNUNG = "02" + "ab" * 32          # 66 Hexzeichen, wie im Graphen
 
@@ -1322,8 +1316,8 @@ def test_die_vorgeschlagene_grenze_waechst_mit_dem_betrag():
 
 # ── Die Gegenstelle ansehen, bevor ein Kanal steht (12.09.2026) ────────────
 #
-# Der Betreiber: "gibt es uns die moeglichkeit einen channel den wir verknuepfen
-# wollen vorher zu scannen und zu warnen ob das sinn macht??"
+# Aus dem Betrieb: eine Gegenstelle soll sich vor dem Verbinden pruefen lassen,
+# mit einer Warnung, wenn es keinen Sinn ergibt.
 #
 # Aus dem EIGENEN Graphen. Und ausdruecklich OHNE Note oder Vertrauenswert --
 # das waere erfundene Genauigkeit. Es sind Tatsachen, und drei davon sagen
@@ -1760,7 +1754,8 @@ def test_die_zaehler_kommen_aus_lnds_statistik():
 
 # ── Zwischen eigenen Kanaelen umschichten (12.09.2026) ─────────────────────
 #
-# Der Betreiber: "kann ich dann mehre kanäle balancen??"
+# Aus dem Betrieb: die Frage, ob sich mehrere Kanaele gegeneinander ausgleichen
+# lassen.
 #
 # Der Mechanismus ist derselbe, den ich beim ZAHLEN ausdruecklich gesperrt
 # habe: eine Zahlung an sich selbst. Beim Bezahlen einer fremden Rechnung ist
@@ -1920,7 +1915,7 @@ def test_rechnungen_ausstellen_braucht_das_recht_dafuer():
 
 # ── Einen Kanal schliessen (12.09.2026) ────────────────────────────────────
 #
-# Der Betreiber: "kann ich dann auch selber ein kanal kuendigen oder schliessen?"
+# Aus dem Betrieb: die Frage, ob man einen Kanal auch selbst schliessen kann.
 #
 # Bis dahin nicht -- meine Begruendung war zu kurz. Sein eigener Satz vom
 # 30.08.2026 trifft es besser: nichts dahin ueberweisen, solange man es nicht
@@ -1991,9 +1986,8 @@ def test_ohne_schliesstransaktion_gibt_es_keine_erfolgsmeldung():
 
 # ── Der eigene Turm (12.09.2026) ───────────────────────────────────────────
 #
-# Der Betreiber: "unsere lightning node kann ja schon ein eigender watch tower sein
-# .. und wenn andere unsere watch tower benutzen kann bekommen wir doch auch
-# gebueren oder?"
+# Aus dem Betrieb: der eigene Lightning-Knoten kann doch selbst ein Wachturm
+# sein -- und bringt das Gebuehren, wenn andere ihn nutzen?
 #
 # Kann sie, und tut es seit Tag eins. Gebuehren gibt es dafuer aber nicht --
 # nachgelesen in LNDs eigener Doku: "an altruist watchtower returns all of the
@@ -2031,7 +2025,7 @@ def test_ohne_turm_ist_er_nicht_aktiv():
 
 # ── Der HTLC-Strom (12.09.2026) ────────────────────────────────────────────
 #
-# Der Betreiber: "koennen wir noch den HTLC-Strom mit rein nehmen?"
+# Aus dem Betrieb: der Wunsch, auch den HTLC-Strom aufzunehmen.
 #
 # Bis hierher las die Anwendung /v1/switch -- die Historie der ABGESCHLOSSENEN
 # Weiterleitungen. Die sagt, was gelungen ist. Das Betriebswissen steckt im
@@ -2164,8 +2158,8 @@ def test_unbekannte_meldungen_stoeren_den_strom_nicht():
 
 # ── Wofuer ein HTLC war (29.09.2026) ───────────────────────────────────────
 #
-# Aus dem Betrieb: "UNKNOWN_INVOICE 2x · Kanal 0" -- "was soll man mit diesen
-# infos". Kanal 0 heisst bei LND "kein Kanal": beim Senden ist der eingehende
+# Aus dem Betrieb: mit "UNKNOWN_INVOICE 2x · Kanal 0" konnte niemand etwas
+# anfangen. Kanal 0 heisst bei LND "kein Kanal": beim Senden ist der eingehende
 # 0, beim Empfangen der ausgehende (router.proto v0.21.3, HtlcEvent).
 
 def test_kanal_null_heisst_kein_kanal():
@@ -2248,8 +2242,8 @@ def test_gleichzeitige_zahlungen_finden_ihren_eigenen_beginn():
 # ── Umschichten erkennen (29.09.2026) ──────────────────────────────────────
 #
 # Aus dem Betrieb: "An dich -- eine Zahlung in Teilen kam nicht vollstaendig
-# an, alles ging an den Absender zurueck". Der Absender war der Betreiber
-# selbst, bei einem Umschicht-Versuch. Beide Enden sind er.
+# an, alles ging an den Absender zurueck". Der Absender war der eigene Knoten,
+# bei einem Umschicht-Versuch. Beide Enden sind er.
 
 class Zahlungsattrappe:
     def __init__(self, zahlungen):
@@ -2440,7 +2434,6 @@ AUFRUFE = [
     ("verbindungen", lambda k: lnd.verbindungen(k, [])),
     ("gegenstellen", lambda k: lnd.gegenstellen(k)),
     ("netzgraph", lambda k: lnd.netzgraph(k)),
-    ("weiterleitungen", lambda k: lnd.weiterleitungen(k)),
     ("unterschreibe", lambda k: lnd.unterschreibe(k, "hallo")),
     ("backe_macaroon", lambda k: lnd.backe_macaroon(k)),
     ("einzahladresse", lambda k: lnd.einzahladresse(k)),
@@ -2479,6 +2472,13 @@ AUFRUFE = [
         k, "123456789", KENNUNG_TEST, 1000, 10)),
     ("htlc_strom", lambda k: next(iter(lnd.htlc_strom(k)))),
     ("umschicht_versuche", lambda k: lnd.umschicht_versuche(k, 0, {"1"})),
+    ("umschichtungen", lambda k: lnd.umschichtungen(k, 0, {"1"})),
+    ("_zahlungen", lambda k: lnd._zahlungen(k, 0)),
+    ("_weiterleitungs_seiten", lambda k: list(lnd._weiterleitungs_seiten(k, 0))),
+    ("kanal_linie", lambda k: lnd.kanal_linie(k, "123", KENNUNG_TEST)),
+    ("weiterleitungen_seit", lambda k: lnd.weiterleitungen_seit(k, 0)),
+    ("kanal_kosten", lambda k: lnd.kanal_kosten(k)),
+    ("geschlossene_kanaele", lambda k: lnd.geschlossene_kanaele(k)),
     ("kanal_schliessen", lambda k: lnd.kanal_schliessen(k, KANALPUNKT_TEST, 5)),
     ("setze_gebuehren", lambda k: lnd.setze_gebuehren(k, 1000, 100)),
     ("gebuehrenbericht", lambda k: lnd.gebuehrenbericht(k)),
@@ -2831,8 +2831,8 @@ def test_brocken_uebersetzt_einen_fehler_von_lnd(tmp_path, monkeypatch):
 #
 # Die Pruefung liess beide klaglos durch. Wer eine Kennung aus einem Explorer
 # kopierte -- dort steht sie meist ohne Adresse -- bekam einen Fehler, den
-# nichts erklaerte. Aus dem Betrieb, 19.09.2026: "ich wuesste jetzt nicht wie ich
-# mich mit einem anderen knoten verbinden sollte".
+# nichts erklaerte. Aus dem Betrieb, 19.09.2026: damit war unklar, wie man sich
+# ueberhaupt mit einem anderen Knoten verbindet.
 
 class Verbindungsattrappe:
     """Ein Knoten, der den Graphen kennt und mitschreibt, wohin verbunden wird."""
@@ -2867,8 +2867,8 @@ def test_nur_die_kennung_genuegt_die_adresse_steht_im_eigenen_graphen():
 
 def test_mit_adresse_wird_der_graph_gar_nicht_erst_gefragt():
     """Wer die Adresse mitschickt, meint sie auch -- etwa bei einem Knoten,
-    der noch gar nicht im Graphen steht. Genau der Fall aus des Betreibers
-    Liquiditaets-Ring."""
+    der noch gar nicht im Graphen steht. Genau der Fall aus einem
+    Liquiditaets-Ring im Betrieb."""
     a = Verbindungsattrappe()
     zeile = KENNUNG + "@von-hand.onion:9735"
     assert lnd.verbinde_gegenstelle(a, zeile) == "von-hand.onion:9735"
@@ -3419,3 +3419,140 @@ def test_ohne_kennungen_ist_die_liste_leer(tmp_path, monkeypatch):
     _ohne_tls(monkeypatch)
     _schluesselaufnahme(monkeypatch, {})
     assert lnd.geraeteschluessel_kennungen(_mit_admin(tmp_path)) == []
+
+
+# ── Routing-Betrieb: Linie, Hoechstbetrag, Ertrag (30.09.2026) ─────────────
+#
+# Aus dem Betrieb: fuer ein Routing-Netz fehlten Gebuehren je Kanal nach
+# Fuellstand, ein Hoechstbetrag pro Zahlung und eine Ertragsuebersicht je
+# Kanal. Alle Zahlen ausgedacht.
+
+class Pfadattrappe:
+    """Antwortet je nach Pfadanfang; merkt sich jeden Aufruf."""
+
+    def __init__(self, antworten):
+        self.antworten = antworten
+        self.aufrufe = []
+
+    def ruf(self, pfad, macaroon="readonly", daten=None, zeitlimit=None):
+        self.aufrufe.append((pfad, macaroon, daten))
+        for anfang, antwort in self.antworten.items():
+            if pfad.startswith(anfang):
+                return antwort(daten) if callable(antwort) else antwort
+        raise AssertionError("unerwarteter Pfad " + pfad)
+
+
+ICH = "02" + "ab" * 32
+PARTNER = "03" + "cd" * 32
+
+
+def test_die_eigene_linie_eines_kanals_ist_die_seite_ohne_die_gegenstelle():
+    """GetChanInfo liefert beide Richtungen einer Kante. Unsere ist die, die
+    NICHT der Gegenstelle gehoert -- welche Nummer (node1/node2) das ist,
+    haengt an der Sortierung der Schluessel, nicht an uns."""
+    a = Pfadattrappe({"/v1/graph/edge/": {
+        "node1_pub": PARTNER, "node2_pub": ICH,
+        "node1_policy": {"time_lock_delta": 40, "fee_rate_milli_msat": "999",
+                         "max_htlc_msat": "1000"},
+        "node2_policy": {"time_lock_delta": 80, "min_htlc": "1000",
+                         "fee_base_msat": "0", "fee_rate_milli_msat": "120",
+                         "max_htlc_msat": "1650000000", "disabled": False}}})
+    linie = lnd.kanal_linie(a, "970560904142585857", PARTNER)
+    assert linie == {"zeitsperre": 80, "min_htlc_msat": 1000,
+                     "hoechstbetrag_sat": 1_650_000, "satz_ppm": 120,
+                     "basis_msat": 0, "aus": False}
+    assert a.aufrufe == [("/v1/graph/edge/970560904142585857", "readonly", None)]
+
+
+def test_ohne_eigene_linie_gibt_es_keine():
+    a = Pfadattrappe({"/v1/graph/edge/": {"node1_pub": PARTNER, "node2_pub": ICH}})
+    assert lnd.kanal_linie(a, "1", PARTNER) is None
+
+
+def test_der_hoechstbetrag_geht_in_millisatoshi_mit():
+    a = Pfadattrappe({"/v1/chanpolicy": {}})
+    lnd.setze_gebuehren(a, 0, 120, 80, "ab" * 32 + ":1",
+                        hoechstbetrag_msat=1_650_000_000)
+    daten = a.aufrufe[0][2]
+    assert daten["max_htlc_msat"] == "1650000000"
+    assert daten["time_lock_delta"] == 80 and daten["fee_rate_ppm"] == 120
+    # Ohne Angabe bleibt er, wie er ist -- LND liest 0 als "unveraendert".
+    lnd.setze_gebuehren(a, 0, 120, 80, "ab" * 32 + ":1")
+    assert "max_htlc_msat" not in a.aufrufe[1][2]
+
+
+def test_die_kanalliste_sagt_wer_eroeffnet_hat():
+    knoten = _KanalKnoten({"active": True, "capacity": "100000",
+                           "local_balance": "60000", "remote_balance": "40000",
+                           "remote_pubkey": PARTNER, "channel_point": "y:0",
+                           "initiator": True})
+    assert lnd.kanaele(knoten)[0]["eroeffnet_von_dir"] is True
+    knoten.kanal = {**knoten.kanal, "initiator": False}
+    assert lnd.kanaele(knoten)[0]["eroeffnet_von_dir"] is False
+
+
+def test_weiterleitungen_je_kanal_ab_einem_zeitpunkt():
+    seiten = [{"forwarding_events": [
+        {"timestamp_ns": "1790000000000000000", "chan_id_in": "1002",
+         "chan_id_out": "1001", "amt_in": "100025", "amt_out": "100000",
+         "fee_msat": "25500", "peer_alias_in": "Beta", "peer_alias_out": "Alpha"}],
+        "last_offset_index": 1}]
+    a = Pfadattrappe({"/v1/switch": lambda daten: seiten.pop(0) if seiten else {}})
+    liste = lnd.weiterleitungen_seit(a, 1_780_000_000)
+    assert liste == [{"zeit_s": 1_790_000_000, "rein": "1002", "raus": "1001",
+                      "rein_sat": 100_025, "raus_sat": 100_000,
+                      "gebuehr_msat": 25_500, "rein_name": "Beta",
+                      "raus_name": "Alpha"}]
+    assert a.aufrufe[0][2]["start_time"] == "1780000000"
+
+
+def test_kosten_fuers_oeffnen_und_schliessen_kommen_aus_den_etiketten():
+    """LND etikettiert seine Transaktionen: "0:openchannel:shortchanid-<id>"
+    (labels/labels.go, v0.21.3). Darueber gehoert die Gebuehr zum Kanal."""
+    a = Pfadattrappe({"/v1/transactions": {"transactions": [
+        {"tx_hash": "aa", "label": "0:openchannel:shortchanid-1001",
+         "total_fees": "400", "time_stamp": "1790000000", "amount": "-2000400"},
+        {"tx_hash": "bb", "label": "0:closechannel:shortchanid-1003",
+         "total_fees": "300", "time_stamp": "1789000000"},
+        {"tx_hash": "cc", "label": "external", "total_fees": "500"},
+        {"tx_hash": "dd", "label": "0:openchannel:shortchanid-1002",
+         "total_fees": "0"},                 # von der Gegenseite eroeffnet
+        {"tx_hash": "ee", "label": "0:openchannel", "total_fees": "900"},
+    ]}})
+    oeffnen, schliessen = lnd.kanal_kosten(a)
+    assert oeffnen == {"1001": {"sat": 400, "zeit_s": 1_790_000_000}}
+    assert schliessen == {"1003": {"sat": 300, "zeit_s": 1_789_000_000}}
+
+
+def test_geschlossene_kanaele():
+    a = Pfadattrappe({"/v1/channels/closed": {"channels": [
+        {"chan_id": "1003", "remote_pubkey": PARTNER, "capacity": "500000",
+         "close_type": "COOPERATIVE_CLOSE", "open_initiator": "INITIATOR_LOCAL",
+         "close_height": 880000}]}})
+    assert lnd.geschlossene_kanaele(a) == [
+        {"nummer": "1003", "name": "", "kennung": PARTNER, "kapazitaet": 500_000,
+         "art": "COOPERATIVE_CLOSE", "eroeffnet_von_dir": True,
+         "geschlossen_hoehe": 880_000}]
+
+
+def test_umschicht_kosten_zaehlen_beim_aufgefuellten_kanal():
+    """Nur gelungene Zahlungen an sich selbst, und je Teil die Gebuehr SEINES
+    Weges -- bei einer Zahlung in Teilen koennen zwei Kanaele aufgefuellt
+    worden sein."""
+    ok = {"status": "SUCCEEDED", "attempt_time_ns": "1790000000000000000"}
+    a = Zahlungsattrappe([
+        {"status": "SUCCEEDED", "htlcs": [
+            {**ok, "route": {"total_fees_msat": "120000", "hops": [
+                {"chan_id": "1002"}, {"chan_id": "555"}, {"chan_id": "1001"}]}},
+            {**ok, "route": {"total_fees_msat": "30000", "hops": [
+                {"chan_id": "1002"}, {"chan_id": "556"}, {"chan_id": "1004"}]}},
+            {"status": "FAILED", "route": {"total_fees_msat": "99000", "hops": [
+                {"chan_id": "1002"}, {"chan_id": "557"}, {"chan_id": "1001"}]}}]},
+        {"status": "FAILED", "htlcs": [{**ok, "route": {"total_fees_msat": "5000",
+            "hops": [{"chan_id": "1002"}, {"chan_id": "1001"}]}}]},
+        {"status": "SUCCEEDED", "htlcs": [{**ok, "route": {"total_fees_msat": "7000",
+            "hops": [{"chan_id": "1002"}, {"chan_id": "666"}]}}]},   # an Fremde
+    ])
+    assert lnd.umschichtungen(a, 0, {"1001", "1002", "1004"}) == [
+        {"zeit_s": 1_790_000_000, "rein_kanal": "1001", "gebuehr_sat": 120},
+        {"zeit_s": 1_790_000_000, "rein_kanal": "1004", "gebuehr_sat": 30}]

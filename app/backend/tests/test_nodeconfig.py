@@ -500,8 +500,8 @@ def test_die_farbe_muss_eine_farbe_sein():
 
 # ── Das Netz wird nicht der Vorgabe ueberlassen ───────────────────────────
 #
-# Der Betreiber, 02.09.2026: "ich hoffe das wir uns mit dem richtigen btc netz
-# verbinden wollen -- da gibt es wohl mitlerweile auch side netzwerke".
+# Aus dem Betrieb, 02.09.2026: die Frage, ob sich der Knoten mit dem richtigen
+# Bitcoin-Netz verbindet -- es gibt inzwischen auch Nebennetze.
 # Berechtigt: ein Knoten auf testnet4 oder signet sieht in jeder Anzeige
 # genauso aus wie einer auf mainnet. Cores Vorgabe IST mainnet -- aber eine
 # Vorgabe, auf die man sich verlaesst, ist eine Annahme.
@@ -659,10 +659,8 @@ def test_die_untergrenze_landet_auch_in_der_konfiguration():
 
 # ── Wie der Knoten im Lightning-Netz auftritt (04.09.2026) ──────────────────
 #
-# Der Betreiber: "das sollte aber jeder nutzer unter einstellungen immer selber
-# entscheiden koennen ob er das moechte oder nicht ... gibt ja vieleicht
-# politische restrektiven die das nicht wollen ... da solte man die
-# moeglichkeit haben anonym zu bleiben."
+# Aus dem Betrieb: das entscheidet jeder Nutzer selbst unter Einstellungen --
+# wo politische Umstaende dagegen sprechen, muss man anonym bleiben koennen.
 #
 # Bis dahin war der Hybrid-Betrieb fest verdrahtet, mit einem Kommentar, der
 # behauptete, die Onion-Adresse allein mache anonym. LNDs eigene Beschreibung
@@ -784,9 +782,9 @@ def test_die_konfiguration_widerspricht_sich_nicht_selbst():
 # ═══════════════════════════════════════════════ lnd.conf nachziehen ═══
 #
 # Bis zum 09.09.2026 wurde lnd.conf GENAU EINMAL geschrieben. Danach war
-# jede Einstellung wirkungslos: Sichtbarkeit, Alias, Farbe. Der Betreiber fragte
-# "wenn ich spaeter mal sage ich will nur noch tor, funktioniert das dann
-# alles noch?" -- nein, tat es nicht. Der Schalter stand auf "nur Tor" und
+# jede Einstellung wirkungslos: Sichtbarkeit, Alias, Farbe. Aus dem Betrieb
+# kam die Frage, ob spaeter "nur noch Tor" auch wirklich alles umstellt --
+# nein, tat es nicht. Der Schalter stand auf "nur Tor" und
 # der Knoten kuendigte weiter die Wohnadresse an.
 #
 # Hier steht der Erbauer, der aus dem heutigen Zustand die richtige Datei
@@ -955,9 +953,9 @@ def test_ipv6_in_klammern_bekommt_seinen_port():
 
 # ── Die Reihenfolge beim Herunterfahren (11.09.2026) ───────────────────────
 #
-# Der Betreiber: "ich kann den docker stack garnicht beenden .. der lnd container
-# laeuft einfach weiter". Er lief nicht weiter, er raeumte auf -- bis zu drei
-# Minuten lang. Waehrenddessen stand in seinem Protokoll:
+# Aus dem Betrieb: der Stapel liess sich nicht beenden, der LND-Container lief
+# einfach weiter. Er lief nicht weiter, er raeumte auf -- bis zu drei Minuten
+# lang. Waehrenddessen stand im Protokoll:
 #
 #   [ERR] GetInfo: lookup bitcoind on 127.0.0.11:53: no such host
 #
@@ -1006,8 +1004,8 @@ def test_die_dienste_bekommen_zeit_zum_aufraeumen():
 
 # ── Eine Einstellung, die den Container nie erreicht (12.09.2026) ──────────
 #
-# Der Betreiber: "also das andere was ich da vorher drin stehen hatte in der env
-# brauch ich dann nicht mehr?" -- und beim Nachsehen fiel auf, dass die NEUEN
+# Aus dem Betrieb: die Frage, ob die alten Eintraege in der .env noch gebraucht
+# werden -- und beim Nachsehen fiel auf, dass die NEUEN
 # Werte gar nicht angekommen waeren: sie standen in settings.py und in der
 # example.env, aber nicht im environment-Block der Compose.
 #

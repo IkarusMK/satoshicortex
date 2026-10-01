@@ -212,11 +212,11 @@ def test_das_zeitlimit_ist_fuer_tor_bemessen():
 
 # ── Ein Fehlschlag darf sich nicht in Endlosschleife melden ────────────────
 #
-# Der Anlass: der Betreiber schickte am 29.08.2026 einen Protokollausschnitt, in dem
+# Der Anlass: am 29.08.2026 kam aus dem Betrieb ein Protokollausschnitt, in dem
 # zwischen den Fortschrittsmeldungen von bitcoind alle zehn Minuten zweimal
-# dasselbe stand -- einmal fuer Core, einmal fuer LND. Seine Antwort darauf
-# war eindeutig: "es bringt mir nichts fehlschlaege sichtbar zu machen, es
-# darf erst keine geben". Beides gilt: die Ursache gehoert behoben (siehe
+# dasselbe stand -- einmal fuer Core, einmal fuer LND. Die Antwort darauf war
+# eindeutig: Fehlschlaege sichtbar machen genuegt nicht, es darf erst keine
+# geben. Beides gilt: die Ursache gehoert behoben (siehe
 # test_api.test_die_tor_konfiguration_wird_erneuert), und was danach noch
 # schiefgeht, gehoert einmal gesagt und nicht sechsmal pro Stunde.
 

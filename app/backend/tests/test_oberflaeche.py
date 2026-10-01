@@ -1,8 +1,7 @@
 """Die Oberflaeche darf nie nichts zeigen.
 
-Am 03.09.2026 meldete der Betreiber: "hey die webui ist abgeschmiert ich drueck auf
-web site aktualliesieren und das ding bricht ab! ... ich sehe nix mehr" --
-und dazu ein Bild mit schwarzer Flaeche, aber unserem Namen im Reiter. Die
+Am 03.09.2026 kam aus dem Betrieb die Meldung, die Oberflaeche sei nach dem
+Neuladen abgestuerzt und zeige nichts mehr -- und dazu ein Bild mit schwarzer Flaeche, aber unserem Namen im Reiter. Die
 Huelle war also da, der Inhalt nicht.
 
 Der Grund lag in start():
@@ -81,9 +80,8 @@ def test_jede_grosse_sektion_startet_versteckt(html):
 
 # ── Der Kasten fuer Fassungen darf nicht schweigen (03.09.2026) ──────────────
 #
-# Der Betreiber: "was mir aber auch aufgefallen ist das die aktualliesierungs
-# abfrage auch keinen ton mehr von sich gibt .. ob ich den aktuellen stand
-# habe oder das da nachgeguckt wird".
+# Aus dem Betrieb: die Update-Pruefung sagte nichts mehr -- weder ob der Stand
+# aktuell ist noch ob nachgesehen wird.
 #
 # Der Kasten wird ausschliesslich aus /api/status gefuellt. Seit 0.30.1 liegt
 # dieser Aufruf auf der Einstellungsseite in einem eigenen try, damit ein
@@ -148,8 +146,8 @@ def test_die_gruppen_der_seitenleiste_sind_beschriftet(html):
 # ── Uebersichtlichkeit: Hierarchie in der Kanaele-Ansicht ───────────────────
 
 def test_die_lightning_reiter_haben_klare_zustaendigkeiten(html):
-    """Aus dem Betrieb, 10.09.2026: "das wir momentan unter wallet sehen sind alles
-    wallet einstellungen!!! und nicht das wallet".
+    """Aus dem Betrieb, 10.09.2026: unter "Wallet" standen nur Einstellungen der
+    Wallet, nicht ihr Inhalt.
 
     Er hat recht, und RTL, ThunderHub und Zeus machen es alle gleich: das
     GELD an einer Stelle, die Einrichtung woanders. Also vier Reiter mit je
@@ -168,11 +166,14 @@ def test_die_lightning_reiter_haben_klare_zustaendigkeiten(html):
     for fremd in ('id="w-schritt-start"', 'id="w-sicherung"', 'id="w-tilgen"'):
         assert fremd not in geld, fremd
 
-    # Kanaele = die Verbindungen, samt dem, was sie kosten.
+    # Kanaele = die Verbindungen, samt dem, was sie kosten und einbringen.
     kanaele = abschnitt("ln-kanaele")
-    for kasten in ('id="ln-kanalliste"', 'id="ln-weiter"', 'id="w-gebuehren"'):
+    for kasten in ('id="ln-kanalliste"', 'id="lk-ertrag"', 'id="w-gebuehren"'):
         assert kasten in kanaele, kasten
     assert 'id="ln-guthaben"' not in kanaele
+    # "Dein Knoten im Netz" ist Identitaet, kein Kanal (30.09.2026).
+    assert 'id="ln-ich"' in abschnitt("ln-knoten")
+    assert 'id="ln-ich"' not in kanaele
 
     # Einrichtung = alles, was man EINMAL tut.
     einr = abschnitt("ln-einrichtung")
@@ -183,23 +184,25 @@ def test_die_lightning_reiter_haben_klare_zustaendigkeiten(html):
 
 def test_die_kanaele_ansicht_hat_eine_rangfolge(html):
     """Vorher fuenf gleich schwere Kaesten, vier davon gleichzeitig sichtbar,
-    sobald LND laeuft. Nichts daran sagte, was wichtig ist."""
+    sobald LND laeuft. Nichts daran sagte, was wichtig ist.
+
+    Seit dem 30.09.2026 (aus dem Betrieb: "die ganze kanal seiten uebersicht
+    auf Vordermann bringen"): oben der Ueberblick und die Kanaele, darunter
+    Bereiche mit Ueberschrift -- Ertrag, Steuern, Oeffnen & Schliessen,
+    Beobachten, Schutz."""
     anfang = html.index('<section data-ansicht="ln-kanaele"')
     ende = html.index("</section>", anfang)
     teil = html[anfang:ende]
-    # Die beiden Nachschlage-Kaesten stehen nebeneinander, nicht untereinander.
-    assert 'class="raster"' in teil
     # Statt Kaesten zu ZAEHLEN die Reihenfolge pruefen. Das ist es, worum es
     # hier geht -- und es bleibt richtig, wenn einer dazukommt, statt bei
     # jedem neuen Kasten eine Zahl nachziehen zu muessen.
-    ordnung = ["ln-kanalliste",     # was da ist, fuehrt
-               "ln-oeffnen",        # was man damit anfaengt
-               "ln-schliessen",
-               "ln-schichten",
-               "ln-wachturm",
-               'class="raster"',    # die Nachschlage-Kaesten
-               "ln-durchgang",      # was durchging -- und was nicht
-               "w-gebuehren"]       # und die Entscheidung, die daraus folgt
+    ordnung = ["lk-ueberblick",          # die Zahlen, auf die es ankommt
+               "ln-kanalliste",          # was da ist, fuehrt
+               "lk-bereich-ertrag", "lk-ertrag",
+               "lk-bereich-steuern", "w-gebuehren", "ln-schichten",
+               "lk-bereich-oeffnen", "ln-oeffnen", "ln-schliessen",
+               "lk-bereich-beobachten", "ln-durchgang", "wg_titel",
+               "lk-bereich-schutz", "ln-wachturm"]
     stellen = [teil.index(name) for name in ordnung]
     assert stellen == sorted(stellen), (
         "die Kanalansicht hat eine Rangfolge, und die ist verrutscht: "
@@ -236,6 +239,9 @@ ERLAUBTE_PAARE = {
     "adresse", "dienst", "externe_adresse", "gegenstelle", "netz", "schritt",
     # dataset.gebiet an einem Umriss, die Liste "gebiete" daneben.
     "gebiet",
+    # Ertrag (30.09.2026): d.summe ist die Summe im Zeitraum, m.monat ein
+    # Eintrag der Liste "monate".
+    "summe", "monat",
     # Was der Browser selbst mitbringt: .value gibt es, .values auch.
     "value", "item", "key", "index", "length", "name", "type", "id",
 }
@@ -273,13 +279,12 @@ def test_die_kette_gilt_als_fertig_wenn_sie_es_ist(js):
 
 # ── Zwei Uhren in einer Ansicht (03.09.2026) ────────────────────────────────
 #
-# Der Betreiber, mit Bildschirmfoto: "was ist denn jetzt hier los ... ist das wieder
-# kaputt???? das bitcoin protokoll hoert bei 20:08 auf". Bei ihm war es 22:10.
-# Die Zeile war EINE Minute alt: Bitcoin Core schreibt UTC (mit "Z"), Tor und
+# Aus dem Betrieb, mit Bildschirmfoto: das Bitcoin-Protokoll schien zwei Stunden
+# zuvor aufzuhoeren. Die Zeile war EINE Minute alt: Bitcoin Core schreibt UTC (mit "Z"), Tor und
 # diese Anwendung schreiben Ortszeit. In derselben Protokollansicht standen
 # damit zwei Uhren, und keine war beschriftet.
 #
-# Nachgerechnet aus seinem eigenen Protokoll: 58 Bloecke in 218 Sekunden.
+# Nachgerechnet aus dem Protokoll dieses Knotens: 58 Bloecke in 218 Sekunden.
 # Der Knoten lief die ganze Zeit.
 
 def test_protokollzeiten_werden_auf_eine_uhr_gebracht(js):
@@ -313,9 +318,8 @@ def test_null_bytes_tragen_eine_ehrliche_einheit(js):
 
 # ── Die Weltkarte (04.09.2026) ──────────────────────────────────────────────
 #
-# Der Betreiber, mit Bildschirmfoto: "diese punkte auf der karte ne ... viel zu gross
-# oder unnoetig ... und die ganze leiste im bild verschluckt quasi die
-# suedliche himmelsphaere der weltkarte."
+# Aus dem Betrieb, mit Bildschirmfoto: die Punkte auf der Karte viel zu gross
+# oder unnoetig, und die Leiste verdeckte die halbe Suedhalbkugel.
 #
 # Zur LAGE der Punkte: die stimmt. Gegengeprueft an Andorra, Singapur,
 # Barbados, Hongkong, Malta und Island -- Abweichung hoechstens 0,2 Grad. Es
@@ -417,11 +421,10 @@ def test_mehrzeilige_felder_sehen_aus_wie_einzeilige(css):
 
 # ── Erreichbarkeit: was man zusagt, muss man nachhalten koennen ─────────────
 #
-# Aus dem Betrieb, 05.09.2026, nachdem er die Swap-Bindungen bei LightningNetwork+
-# gesehen hatte ("three months or more is recommended, and 12 months is
-# common"): "dann muss unser system so sauber und stabil laufen das wir
-# wirklich 60 monate am stueck online bleiben und nicht zwischen durch
-# staendig abbrueche haben."
+# Aus dem Betrieb, 05.09.2026, nach einem Blick auf die Swap-Bindungen bei
+# LightningNetwork+ ("three months or more is recommended, and 12 months is
+# common"): dafuer muss das System so stabil laufen, dass es wirklich 60
+# Monate am Stueck online bleibt, ohne Abbrueche zwischendurch.
 #
 # LND fuehrt die Zahl je Kanal mit -- "lifetime" und "uptime". Wir haben
 # beides von Anfang an gelesen und nie gezeigt.
@@ -514,7 +517,7 @@ def test_ein_eingeschalteter_schalter_gibt_nie_stillschweigend_nichts_frei(js):
 
 
 def test_der_schnellstart_nennt_den_port_der_wirklich_gilt():
-    """Gefunden am 05.09.2026, als der Betreiber seine Compose zeigte.
+    """Gefunden am 05.09.2026, beim Blick auf eine Compose aus dem Betrieb.
 
     Der Kopf der Compose, die Anleitung und die README sagten alle drei
     "oeffne 4080". Die Vorgabe ist aber bewusst 3333 -- 4080 ist der
@@ -543,9 +546,8 @@ def test_der_schnellstart_nennt_den_port_der_wirklich_gilt():
 # ── Ein Land aus der Naehe (05.09.2026) ────────────────────────────────────
 
 def test_die_landansicht_ist_eine_auflage_und_kein_umbau(html, js):
-    """Die Bedingung des Betreibers: "das darf nur unter dem Reiter Welt als Funktion
-    zur Verfuegung stehen und darf sonst die Ansicht, die wir bis jetzt
-    haben, nicht veraendern."
+    """Die Bedingung aus dem Betrieb: die Funktion gehoert nur unter den Reiter
+    Welt und darf die bisherige Ansicht nicht veraendern.
 
     Also: der Kasten liegt INNERHALB der Weltansicht, und der Klick auf die
     Karte tut nur dort etwas.
@@ -573,7 +575,7 @@ def test_ein_reiterwechsel_schliesst_die_landansicht(js):
 
 
 def test_zu_jedem_land_der_weltkarte_gibt_es_eine_regionskarte():
-    """Der Betreiber: "das gilt fuer jedes Land der Welt!"
+    """Aus dem Betrieb: das gilt fuer jedes Land der Welt.
 
     Geprueft wird gegen die Weltkarte selbst: jedes Land, das dort anklickbar
     ist, muss auch eine Regionskarte haben -- sonst fuehrt ein Klick ins
@@ -737,9 +739,8 @@ def test_nichts_liegt_klickdicht_ueber_der_karte(css):
 # ── Die Verbindungslinie folgt ins Land (06.09.2026) ───────────────────────
 
 def test_die_linie_kommt_aus_der_richtung_des_eigenen_knotens(js):
-    """Der Betreiber: "wenn mein Verbindungsstrich auf der Weltkarte in ein Land
-    geht und ich dann diesem Strich folge und auf das Land klicke -- zeigt
-    der Strich dann auf die Region?"
+    """Aus dem Betrieb: wer einem Verbindungsstrich in ein Land folgt und es
+    anklickt, soll den Strich in der Region enden sehen.
 
     Die Richtung stammt aus der Weltkarte, nicht aus einer zweiten Quelle:
     der Vektor vom eigenen Knoten zu diesem Land. Nur so kommt die Linie an
@@ -878,8 +879,8 @@ def test_der_feed_sagt_wenn_tor_fehlt(html, js):
 
 
 def test_nachrichten_haben_einen_eigenen_reiter(html):
-    """Aus dem Betrieb, 06.09.2026: 'wenn dann bekommt der News Feed links in der
-    Menueleiste einen eigenen Reiter'. Und ausdruecklich NICHT auf die
+    """Aus dem Betrieb, 06.09.2026: der Nachrichten-Feed bekommt links in der
+    Menueleiste einen eigenen Reiter. Und ausdruecklich NICHT auf die
     Uebersicht: dort steht der Betriebszustand."""
     assert 'data-ansicht="news"' in html
     kopf = html[:html.index('<main')]
@@ -998,8 +999,8 @@ def test_das_javascript_ist_syntaktisch_heil():
 
 
 # ── Das Kursbild ─────────────────────────────────────────────────────────────
-# Zweimal nachgebessert, beide Male weil der Betreiber es im Bild gesehen hat und
-# nicht weil ein Test angeschlagen haette. Diese hier halten fest, was daraus
+# Zweimal nachgebessert, beide Male weil es im Betrieb im Bild auffiel und nicht
+# weil ein Test angeschlagen haette. Diese hier halten fest, was daraus
 # folgte.
 
 def _kurs_teil(js):
@@ -1062,7 +1063,7 @@ def test_das_feerate_diagramm_misst_seinen_kasten(js):
 
 
 def test_das_feerate_diagramm_beschriftet_beide_achsen(js):
-    """Des Betreibers Beanstandung am Kursbild galt genauso hier: Zahlen ohne
+    """Die Beanstandung aus dem Betrieb am Kursbild galt genauso hier: Zahlen ohne
     Einheit auf der einen Achse, gar nichts auf der anderen."""
     teil = js[js.index("function zeichneDiagramm"):
               js.index("function diaNeuZeichnenBald")]
@@ -1072,8 +1073,8 @@ def test_das_feerate_diagramm_beschriftet_beide_achsen(js):
 
 
 def test_das_kursbild_hat_beide_achsen(js):
-    """Der Betreiber: 'es fehlt komplett die Achsenbezeichnung ... der X und Y
-    Achse'. Ein Bild ohne Massstab ist eine Form."""
+    """Aus dem Betrieb: es fehlte die Beschriftung beider Achsen. Ein Bild ohne
+    Massstab ist eine Form."""
     teil = _kurs_teil(js)
     assert "kursStufe" in teil, "keine runden Stufen fuer die Preisachse"
     assert "kursZeitmarke" in teil, "keine Zeitmarken fuer die X-Achse"
@@ -1082,8 +1083,8 @@ def test_das_kursbild_hat_beide_achsen(js):
 
 
 def test_das_kursbild_laesst_sich_ablesen(js):
-    """Der Betreiber: 'ich will dann wie in einem richtigen chart auf nen punkt
-    gehen koennen mit uhrzeit tag oder so und dann kurs'."""
+    """Aus dem Betrieb: wie in einem richtigen Chart auf einen Punkt zeigen und
+    Tag, Uhrzeit und Kurs ablesen."""
     teil = _kurs_teil(js)
     for noetig in ("pointermove", "pointerleave", "kursZeigeBei",
                    "kursIndexBei", "kurs-blase"):
@@ -1114,7 +1115,7 @@ def test_das_kursbild_folgt_seiner_eigenen_groesse(js):
 def test_keine_tabelle_kann_ihre_zellen_abschneiden(css):
     """Jede Tabelle braucht eine der beiden Vorkehrungen.
 
-    Am 06.09.2026 schickte der Betreiber ein Bild der Laenderansicht Suedkorea: aus
+    Am 06.09.2026 kam aus dem Betrieb ein Bild der Laenderansicht Suedkorea: aus
     "339" war "33" geworden. Nachgemessen -- Tabelle 348 Punkte breit, Zellen
     374, also 26 Punkte Ueberstand. Ursache war der uebliche Kniff
     `td:first-child { width: 100% }` zusammen mit nicht umbrechenden
@@ -1241,9 +1242,9 @@ def test_kleine_groessen_werden_nicht_zu_null_gerundet(js):
 
 # ═════════════════════ die Sichtbarkeit bekommt keine Vorgabe ══════════
 #
-# Der Betreiber sah am 09.09.2026 auf der Knoten-Seite ZWEI angekuendigte Adressen:
-# seine Onion und seine oeffentliche IP. Er hatte nie eine Betriebsart
-# gewaehlt -- im Assistenten war "hybrid" vorausgewaehlt, und im Zustand
+# Im Betrieb standen am 09.09.2026 auf der Knoten-Seite ZWEI angekuendigte
+# Adressen: die Onion und die oeffentliche IP. Gewaehlt war nie eine
+# Betriebsart -- im Assistenten war "hybrid" vorausgewaehlt, und im Zustand
 # stand dasselbe. Wer durchklickt, ohne zu lesen, veroeffentlicht damit
 # seinen Anschluss im Lightning-Graphen, ohne je entschieden zu haben.
 #
@@ -1289,10 +1290,9 @@ def test_eine_angekuendigte_ip_wird_als_solche_benannt(js):
 
 # ═══════════════════ der Wallet-Ablauf sagt, wo man steht ══════════════
 #
-# Aus dem Betrieb, 09.09.2026, mitten im Ablauf: "ok ich habe hier nur den button
-# woerter erzeugen" -- den Schalter darueber hatte er nicht gesehen. Und
-# spaeter: "es sollte dann wallet erstellen heissen und nicht woerter
-# erstellen". Der eigentliche Mangel war beides Mal derselbe: der Ablauf hat
+# Aus dem Betrieb, 09.09.2026, mitten im Ablauf: zu sehen war nur der Knopf
+# "Woerter erzeugen", der Schalter darueber ging unter. Und spaeter: er sollte
+# "Wallet erstellen" heissen, nicht "Woerter erzeugen". Der eigentliche Mangel war beides Mal derselbe: der Ablauf hat
 # drei Schritte und sagte nie, der wievielte gerade dran ist und ab wann es
 # endgueltig wird.
 
@@ -1347,9 +1347,8 @@ def test_der_entsperrweg_steht_beim_passwort(html):
 
 
 def test_es_gibt_drei_entsperrwege_und_jeder_sagt_was_er_kostet(html, js):
-    """Aus dem Betrieb, 10.09.2026: "das soll sich jeder nutzer aussuchen koennen
-    ob sich das wallet selbst entsperrt ob ich den tresor will .. oder
-    nicht." Drei Wege, drei eigene Folgesaetze -- ein gemeinsamer waere
+    """Aus dem Betrieb, 10.09.2026: jeder waehlt selbst, ob sich die Wallet von
+    allein entsperrt. Drei Wege, drei eigene Folgesaetze -- ein gemeinsamer waere
     wieder ein Haekchen mit zwei Antworten."""
     for weg in ("aus", "merken", "datei"):
         assert f'value="{weg}"' in html, weg
@@ -1363,9 +1362,9 @@ def test_es_gibt_drei_entsperrwege_und_jeder_sagt_was_er_kostet(html, js):
 
 
 def test_es_gibt_genau_ein_geheimnis_zum_entsperren(js):
-    """Der Tresor stellte ein zweites daneben, das dasselbe tat. Aus dem Betrieb, am
-    10.09.2026: "ich tausche ein passwort gegen das andere obwohl beide die
-    selbe funktion unterm strich haben"."""
+    """Der Tresor stellte ein zweites daneben, das dasselbe tat. Aus dem Betrieb,
+    am 10.09.2026: ein Passwort gegen ein anderes getauscht, das unterm Strich
+    dasselbe tut."""
     assert "async function entsperrwegLaden(" in js
     stelle = js.index("async function walletEntsperren(")
     block = js[stelle:js.index("\n}\n", stelle)]
@@ -1400,7 +1399,7 @@ def test_der_fehler_zur_wortprobe_steht_bei_der_wortprobe(html, js):
             < probe.index('id="w-probe-fehler"')
             < probe.index('id="w-passwort-zeile"')), (
         "die Meldung ueber die WOERTER darf nicht unter dem Passwortfeld "
-        "stehen -- genau so hat der Betreiber sie auf sein Passwort bezogen")
+        "stehen -- genau so wurde sie im Betrieb auf das Passwort bezogen")
     assert 'd.meldung === "gegenprobe_falsch"' in js
 
 
@@ -1436,8 +1435,8 @@ def test_die_tunzeile_fuehrt_auch_hin(js):
 
 
 def test_der_lightning_hinweis_kennt_den_wallet_zustand(js):
-    """Er kannte bis zum 09.09.2026 NUR die Kette. Der Betreiber hatte seine
-    Wallet laengst angelegt und las weiter "der naechste Schritt ist die
+    """Er kannte bis zum 09.09.2026 NUR die Kette. Im Betrieb war die Wallet
+    laengst angelegt, und hier stand weiter "der naechste Schritt ist die
     Wallet" -- ein Satz, der schlicht nicht mehr stimmte."""
     # Seit dem 26.09.2026 steht die Wahl in lnHinweis(), wo sie sich
     # ausfuehren laesst -- test_der_hinweis_behauptet_nur_was_stimmt prueft
@@ -1483,9 +1482,8 @@ def test_das_formular_erscheint_erst_bei_gesperrter_wallet(js):
 # ── Ein zugeklappter Abschnitt ist trotzdem ein Abschnitt ──────────────────
 #
 # Aus dem Betrieb, 10.09.2026, nach dem ersten Blick auf das fertige Loeschen:
-# "wallet loeschen erstmal in einem anderen text disgin find ich nicht gut!
-# ... und das dass direkt oben als erstes steht find ich auch nicht gut das
-# gehoert ans untere ende".
+# eine Zeile in anderer Gestaltung stoert, und das Loeschen gehoert ans untere
+# Ende, nicht ganz nach oben.
 #
 # Beides stimmt, und beides hat dieselbe Ursache: <details class="panel">
 # wurde wie ein Kasten behandelt, aber sein <summary> nicht wie eine
@@ -1554,8 +1552,8 @@ def test_das_loeschen_steht_am_ende_der_einrichtung(html):
 # Hier nur, was die Rechnung an die Oberflaeche bindet.
 
 def test_der_rechner_hat_seinen_eigenen_reiter(html):
-    """Aus dem Betrieb, 10.09.2026: "der umrechner kann ja auch links nen eigenden
-    reiter bekommen." """
+    """Aus dem Betrieb, 10.09.2026: der Umrechner bekommt links einen eigenen
+    Reiter."""
     assert 'data-ansicht="rechner" data-i18n="nav_rechner"' in html
     assert '<section data-ansicht="rechner"' in html
     for kennung in ("rn-sat", "rn-btc", "rn-fiat", "rn-je-btc", "rn-je-fiat"):
@@ -1594,11 +1592,10 @@ def test_kein_ergebnis_und_das_ergebnis_null_sind_zweierlei(js):
     assert block.count("return null;") >= 3
 
 
-# ── "Da oben steht nix" ────────────────────────────────────────────────────
+# ── Ein leerer Adresskasten ───────────────────────────────────────────────
 #
-# Aus dem Betrieb, 10.09.2026, mit einem Bild vom leeren Kasten: "unter knoten
-# bekomme ich aber keine verbindungs adresse angezeigt oder dauert das nur
-# ewig?"
+# Aus dem Betrieb, 10.09.2026, mit einem Bild vom leeren Kasten: unter "Knoten"
+# stand keine Verbindungsadresse, und es war unklar, ob das nur dauert.
 #
 # Die Anwendung WEISS die Antwort. Bei "gar nicht ankuendigen" steht dort nie
 # etwas, und das ist kein Fehler -- er haette ewig gewartet. Bei "nur ueber
@@ -1643,8 +1640,8 @@ def test_die_betriebsart_kommt_aus_der_antwort_und_nicht_aus_lnd(js):
 
 # ── Werte, die man weitergeben koennen muss ────────────────────────────────
 #
-# Aus dem Betrieb, 10.09.2026: "unter Kennung: solte die volle kennung stehen damit
-# sie mal kopieren kann und genau das selbe gilt fuer angekuendigt".
+# Aus dem Betrieb, 10.09.2026: unter Kennung gehoert die volle Kennung, damit man
+# sie kopieren kann -- und dasselbe gilt fuer "angekuendigt".
 #
 # kurz() war dort von Anfang an falsch am Platz. Es macht 66 Zeichen lesbar --
 # und genau das ist der Punkt: eine gekuerzte Kennung ist nur noch zum ANSEHEN
@@ -1706,9 +1703,8 @@ def test_der_kasten_sagt_zuerst_was_heute_gilt(js):
 
 
 def test_gefragt_wird_nur_was_wirklich_gebraucht_wird(js):
-    """DER BEFUND VOM 10.09.2026. Der Betreiber: "habe aber gerade den Haken
-    gesetzt bei fuer die Laufzeit merken aber das wird noch nicht
-    uebernommen".
+    """DER BEFUND VOM 10.09.2026. Aus dem Betrieb: der Haken "fuer die Laufzeit
+    merken" wurde nicht uebernommen.
 
     Die Oberflaeche verlangte ein Passwort und eine gesperrte Wallet, um auf
     einen Weg zu wechseln, der gar nichts ablegt. Getippt werden muss es nur
@@ -1739,8 +1735,8 @@ def test_die_eingaben_bleiben_nicht_im_formular_stehen(js):
 
 # ── Die PIN an der Oberflaeche ─────────────────────────────────────────────
 #
-# Aus dem Betrieb, 08.09.2026: "eine art: PIN. fuer Zahlungen ansich also knoten
-# oeffnen oder schliessen geld transferieren".
+# Aus dem Betrieb, 08.09.2026: eine eigene PIN fuer alles, was Geld bewegt --
+# Kanaele oeffnen und schliessen, Zahlungen, Ueberweisungen.
 #
 # Die Endpunkte standen seit dem 10.09.2026, die Oberflaeche fehlte -- ein
 # Schloss, das niemand einbauen kann, ist keines.
@@ -1854,8 +1850,8 @@ def test_verlangt_der_server_die_pin_erscheint_das_feld(js):
 
 # ── Haengt sie, oder wartet sie nur? (24.09.2026) ──────────────────────────
 #
-# Aus dem Betrieb: "das er mir jetzt bei jeder transaktion im wallet direkt
-# anzeigt 'gebueren erhoehen!'".
+# Aus dem Betrieb: bei jeder Transaktion in der Wallet stand gleich "Gebuehr
+# erhoehen".
 
 def test_der_knopf_steht_nur_unter_einer_haengenden_ausgabe(js):
     """Die Liste ruft den Knopf nicht mehr selbst auf -- sie fragt die
@@ -1946,8 +1942,8 @@ def test_jeder_grund_von_lnd_hat_einen_satz(js):
 
 # ── Die Kettenzeile im Lightning-Kasten (24.09.2026) ───────────────────────
 #
-# Aus dem Betrieb: "bei lightning rechts im kasten steht immer noch kann
-# eingerichtet werden .. stimmt ja nicht ist ja eingerichtet und laeuft sogar".
+# Aus dem Betrieb: rechts im Kasten stand weiter "Lightning kann eingerichtet
+# werden", obwohl es eingerichtet war und lief.
 
 def _kettentext_ausfuehren(js, faelle):
     import json
@@ -2005,8 +2001,8 @@ def test_beide_kaesten_nehmen_dieselbe_kettenzeile(js):
 
 # ── Kanaele im Aufbau und im Abbau (24.09.2026) ────────────────────────────
 #
-# Aus dem Betrieb: "ich habe ja jetzt einen kanal geoeffnet zu den anderen
-# partner B ... nur warum seh ich das nur in wallet und nicht unter kanal ?"
+# Aus dem Betrieb: ein frisch geoeffneter Kanal stand nur in der Wallet, nicht
+# unter Kanaele.
 
 def test_die_kanalansicht_zeigt_auch_die_im_aufbau(js):
     stelle = js.index("async function ladeLightningKanaele(")
@@ -2040,8 +2036,8 @@ def test_jeder_stand_aus_lnd_hat_seine_darstellung(js):
 
 # ── Senden an der Oberflaeche ──────────────────────────────────────────────
 #
-# Die Bedingung des Betreibers vom 30.08.2026: "ich werde nix dahin ueberweisen solange
-# ich es nicht zurueck schicken kann".
+# Die Bedingung aus dem Betrieb vom 30.08.2026: eingezahlt wird erst, wenn man
+# das Geld auch zurueckschicken kann.
 #
 # Der unwiderrufliche Handgriff dieser Anwendung. Die Tests hier pruefen
 # weniger, dass er geht, als dass er nicht AUS VERSEHEN geht.
@@ -2119,8 +2115,7 @@ def test_nach_dem_senden_stehen_die_felder_leer(js):
 
 # ── Uebersetzbare Attribute (10.09.2026) ───────────────────────────────────
 #
-# Der Betreiber: "bemueh dich in dieser zeit bitte um eine saubere uebersetzung in
-# allen kategorien und moeglichen menuefenstern".
+# Aus dem Betrieb: eine saubere Uebersetzung in allen Kategorien und Menues.
 #
 # Dabei kam heraus: aria-label stand in beiden Sprachen fest verdrahtet da.
 # Ein Vorleser las einem englischen Nutzer "Abschnitte" vor und einem
@@ -2174,7 +2169,7 @@ def test_kein_sichtbarer_text_ohne_uebersetzung(html):
 # ── Der Knopf, der eine Minute lang schwieg (11.09.2026) ───────────────────
 
 def test_nach_dem_sperren_wird_gewartet_und_nachgesehen(js):
-    """Der Betreiber: "da drueck ich drauf passiert nix". Der einzige Takt dieser
+    """Aus dem Betrieb: gedrueckt, und nichts passierte. Der einzige Takt dieser
     Oberflaeche frischt die Uebersicht auf, nicht die Wallet-Ansicht -- der
     Kasten blieb also stehen, wie er war, und das Loeschformular kam nie."""
     stelle = js.index("async function walletSperren(")
@@ -2192,8 +2187,8 @@ def test_nach_dem_sperren_wird_gewartet_und_nachgesehen(js):
 
 
 def test_die_rueckmeldung_steht_beim_knopf_und_ist_sichtbar(html, js):
-    """Aus dem Betrieb, 11.09.2026, zum zweiten Mal: "also hier passiert nix wenn
-    ich auf wallet sperren druecke".
+    """Aus dem Betrieb, 11.09.2026, zum zweiten Mal: "Wallet sperren" gedrueckt,
+    und nichts passierte.
 
     Sie stand in #tg-meldung -- der LETZTEN Zeile des Kastens, hinter dem
     (versteckten) Loeschformular, als graue Kleinschrift. Wer den Knopf
@@ -2227,7 +2222,7 @@ def test_das_warten_hat_ein_ende_und_sagt_es(js):
 
 # ── Der Klick, der ein Ereignis statt eines Selektors bekam (11.09.2026) ────
 #
-# Der Betreiber: "also hier passiert nix wenn ich auf wallet sperren druecke".
+# Aus dem Betrieb: "Wallet sperren" gedrueckt, und nichts passierte.
 #
 # Und er hatte wortwoertlich recht: es passierte NICHTS. Der Zuhoerer hing
 # direkt an der Funktion --
@@ -2278,8 +2273,8 @@ def test_kein_zuhoerer_bekommt_versehentlich_das_ereignis(js):
 
 # ── Die Seed-Passphrase, die niemand gesetzt hat (11.09.2026) ──────────────
 #
-# Der Betreiber: "er sagt er kann mit der seed kein wallet wieder herstellen die
-# pruefsummer stummt nicht .. bin mir aber zu 100% sicher das dass stimmt!"
+# Aus dem Betrieb: LND lehnte die Wiederherstellung ab, die Pruefsumme stimme
+# nicht -- obwohl die Woerter sicher stimmten.
 #
 # Das Feld ist ein type="password" in einem zugeklappten Abschnitt, den fast
 # niemand aufmacht -- und genau so etwas fuellen Browser und
@@ -2317,13 +2312,13 @@ def test_die_meldung_zum_abgelehnten_seed_raet_nicht_mehr(js):
 
 # ── Die Wortliste (11.09.2026) ─────────────────────────────────────────────
 #
-# Der Betreiber brauchte eine Stunde und einen Blick ins LND-Protokoll fuer diese
-# Zeile:
+# Im Betrieb brauchte es eine Stunde und einen Blick ins LND-Protokoll fuer
+# eine Zeile dieser Art (das Wort hier ist ein ausgedachtes Beispiel):
 #
-#     word mopth isn't a part of default word list (index=7)
+#     word cabbege isn't a part of default word list (index=3)
 #
-# Gemeint war "month" -- das EINZIGE Wort der Liste, das einen Buchstaben
-# davon entfernt liegt. Er hatte recht: sein Zettel stimmte, das p war ein n.
+# Gemeint ist "cabbage" -- das EINZIGE Wort der Liste, das einen Buchstaben
+# davon entfernt liegt. Der Zettel stimmte, vertippt war ein Buchstabe.
 #
 # LND rechnet die Pruefsumme erst, wenn alle vierundzwanzig Woerter bekannt
 # sind; ein vertipptes scheitert davor. Genau diese Frage stellt die
@@ -2346,7 +2341,7 @@ def test_die_wortliste_ist_vollstaendig_und_echt(bip39):
     assert woerter == sorted(woerter)
     assert all(w.isascii() and w.islower() and w.isalpha() for w in woerter)
     assert woerter[0] == "abandon" and woerter[-1] == "zoo"
-    assert "month" in woerter and "mopth" not in woerter
+    assert "cabbage" in woerter and "cabbege" not in woerter
     # Und die Herkunft gehoert dokumentiert, samt Pruefsumme.
     assert "2f5eed53a4727b4bf8880d8f3f199efc90e58503646d9ff8eff3a2ed3b24dbda" \
         in bip39
@@ -2362,8 +2357,8 @@ def test_die_felder_pruefen_gegen_die_liste(html, js):
     assert 'id="bip39-liste"' in html
     assert 'id="wh-wortfehler"' in html
     assert 'feld.setAttribute("list", "bip39-liste")' in js
-    # Geprueft wird beim VERLASSEN des Feldes -- waehrend man "month" tippt,
-    # ist "mont" nun einmal kein Wort der Liste.
+    # Geprueft wird beim VERLASSEN des Feldes -- waehrend man "cabbage" tippt,
+    # ist "cabb" nun einmal kein Wort der Liste.
     assert 'feld.addEventListener("blur"' in js
 
 
@@ -2389,8 +2384,8 @@ def test_ein_eindeutiger_vorschlag_wird_genannt(js):
 
 
 def test_ohne_knoten_bleibt_der_adresskasten_nicht_stumm(js, html):
-    """Aus dem Betrieb, 11.09.2026: "aber es wird mir noch keine verbindungs
-    adresse angezeigt". Fiel getinfo weg, wurde zeichneEigeneAdresse gar
+    """Aus dem Betrieb, 11.09.2026: noch immer keine Verbindungsadresse. Fiel
+    getinfo weg, wurde zeichneEigeneAdresse gar
     nicht erst gerufen -- der Kasten blieb leer, ohne ein Wort dazu. Eine
     leere Flaeche ohne Grund ist die schlechteste aller Auskuenfte."""
     stelle = js.index("async function ladeLightningKanaele(")
@@ -2408,8 +2403,8 @@ def test_ohne_knoten_bleibt_der_adresskasten_nicht_stumm(js, html):
 
 
 def test_der_kennungswechsel_steht_beim_knoten(html, js):
-    """Aus dem Betrieb, 11.09.2026: "keine ahnung habe mir die kennung nicht
-    vorher angesehen". Dass er sie sich von Hand notieren sollte, war unser
+    """Aus dem Betrieb, 11.09.2026: die Kennung war vorher nicht notiert
+    worden. Dass man sie sich von Hand notieren sollte, war unser
     Versaeumnis -- die Anwendung kennt sie ohnehin."""
     anfang = html.index('<section data-ansicht="ln-knoten"')
     teil = html[anfang:html.index("</section>", anfang)]
@@ -2433,9 +2428,8 @@ def test_der_hinweis_nennt_beide_kennungen(js):
 
 # ── Teuer oder guenstig? (11.09.2026) ──────────────────────────────────────
 #
-# Der Betreiber: "waere das nicht gut wenn er uns sagen wuerde ob das momentan
-# teuer oder guenstig ist im durchschnitt .. ?? das mann ne orientierung
-# hat".
+# Aus dem Betrieb: gewuenscht war eine Orientierung, ob es gerade teuer oder
+# guenstig ist, gemessen am Durchschnitt.
 #
 # Eine Einordnung GAB es -- sie mass nur das Falsche: die Gebuehr am eigenen
 # On-Chain-Guthaben. Wer noch keins hat, sah gar nichts. Also fiel die
@@ -2471,12 +2465,12 @@ def test_die_einordnung_nennt_die_spanne(js):
 
 # ── Was fuer einen Kanal einzuzahlen ist ───────────────────────────────────
 #
-# Der Betreiber: "ok dein knoten soll die menge an sat haben dann musst du aber das
-# plus exit und gebueren an sat einzahlen weisst du was ich meine?"
+# Aus dem Betrieb: wer einen Kanal anlegt, soll gleich lesen, was er einzahlen
+# muss -- den Betrag plus Reserve fuer den Ausstieg und die Gebuehren.
 
 def test_der_kanalrechner_steht_im_rechner_reiter(html, js):
-    """Der Betreiber: "wir haben ja schon ein rechner reiter kann das da nicht mit
-    rein?" -- und dort gehoert er hin, weil dort der KURS liegt. "160.339
+    """Aus dem Betrieb: es gibt doch schon den Rechner -- und dort gehoert er
+    hin, weil dort der KURS liegt. "160.339
     sat" sagt einem Menschen nichts, der Betrag in Euro sagt alles."""
     # <section, nicht der Navigationsknopf -- der traegt dasselbe Merkmal.
     anfang = html.index('<section data-ansicht="rechner"')
@@ -2525,16 +2519,15 @@ def test_ohne_ruecklage_wird_keine_null_gezeigt(js):
 
 
 def test_der_rechner_trennt_einzahlen_von_nutzbar(js):
-    """Die beiden Zahlen, um die es der Betreiber ging: was rein muss, und was
+    """Die beiden Zahlen, um die es im Betrieb ging: was rein muss, und was
     danach im Kanal wirklich zur Verfuegung steht."""
     assert "kkp_einzahlen" in js and "kkp_nutzbar" in js
 
 
 # ── Nach dem Wiederanmelden war die Weltkarte weg (12.09.2026) ─────────────
 #
-# Der Betreiber: "wenn sich die app sitzung abmeldet und ich mich wieder einlogge
-# dann laedt die welt karte nicht automatisch ich muss dann erst nach dem
-# anmelden die browser seite refreshen".
+# Aus dem Betrieb: nach Ablauf der Sitzung und neuer Anmeldung lud die Weltkarte
+# nicht von selbst -- erst nach einem Neuladen der Seite.
 #
 # Die Ursache war eine Unwucht: das AUSBLENDEN steht in zeigeTor() und laeuft
 # bei jeder abgelaufenen Sitzung, das EINBLENDEN stand in einem Block, der nur
@@ -2632,7 +2625,8 @@ def test_der_kanal_wird_nur_freigegeben_wenn_das_guthaben_reicht(js):
 
 # ── Umschichten (12.09.2026) ───────────────────────────────────────────────
 #
-# Der Betreiber: "kann ich dann mehre kanäle balancen??"
+# Aus dem Betrieb: die Frage, ob sich mehrere Kanaele gegeneinander
+# ausgleichen lassen.
 
 def test_umschichten_erscheint_erst_ab_zwei_kanaelen(js):
     """Mit einem Kanal gibt es nichts umzuschichten. Ein Kasten, der nie
@@ -2803,7 +2797,7 @@ def test_die_upload_meldung_nennt_das_fenster_und_die_restzeit(js):
 
 # ── Die Uebersicht (16.09.2026) ────────────────────────────────────────────
 #
-# Der Betreiber: "lass uns mal noch was machen mit der leeren uebersichts seite".
+# Aus dem Betrieb: die leere Uebersicht soll eine echte werden.
 # Waehrend des Erstabgleichs war sie in Ordnung; danach stand dort nur, was
 # der Knoten TUT, und nichts davon, was man wissen will.
 
@@ -2887,8 +2881,8 @@ def test_ein_unbekannter_knoten_ist_kein_ausschluss(js):
 
 
 def test_das_gegenstellenfeld_verlangt_keine_adresse(html, js):
-    """Aus dem Betrieb, 19.09.2026: "warum kann ich mir eigentlich keinen knoten
-    mit public key ansehen ... will der immer ne komplette verbindung".
+    """Aus dem Betrieb, 19.09.2026: warum laesst sich ein Knoten nicht allein
+    mit seinem Schluessel ansehen, sondern nur mit vollstaendiger Adresse?
 
     Er tat es laengst -- die nackte Kennung funktionierte. Nur stand im
     Platzhalter "02abc…@host:9735", also die volle Form, waehrend der
@@ -3086,9 +3080,9 @@ def test_der_fassungskasten_nennt_auch_die_eigene_fassung(js):
 # ── Die Gebuehrenverteilung: gezeigt, nicht erklaert ───────────────────────
 #
 # Der Befund vom 21.09.2026 aus dem Betrieb, mit Bild: derselbe fuenfzeilige
-# Absatz stand NEUNMAL untereinander im Gebuehrenkasten. Dazu der Betreiber:
-# "was das den bitte fuer ein riesen text ?? was soll sowas immer ... kann
-# mann nicht einfach machen: 50% 0-100 die anderen 50% 100-600".
+# Absatz stand NEUNMAL untereinander im Gebuehrenkasten. Dazu aus dem Betrieb:
+# viel zu viel Text -- lieber einfach die Anteile, etwa 50 % 0-100, 50 %
+# 100-600.
 #
 # Zwei Fehler in einem Bild. Der zweite ist der eigentliche.
 
@@ -3145,7 +3139,7 @@ def test_ohne_stufen_steht_dort_die_spanne(js):
 # ── Die Blockzeit in der Uebersicht ────────────────────────────────────────
 
 def test_die_uebersicht_hat_eine_blockzeit(html, js):
-    """Der Betreiber, 21.09.2026: "sone arte block zeit in der uebersicht"."""
+    """Aus dem Betrieb, 21.09.2026: eine Blockzeit in der Uebersicht."""
     abschnitt = html[html.index('<section data-ansicht="uebersicht">'):]
     abschnitt = abschnitt[:abschnitt.index("</section>")]
     assert 'id="d-blockzeit"' in abschnitt
@@ -3390,9 +3384,8 @@ def test_der_sammeltext_behauptet_kein_speichern(js):
 
 # ── Externe Wallets ─────────────────────────────────────────────────────────
 #
-# Aus dem Betrieb, 26.09.2026: "dann solte es links einen neuen reiter geben
-# externe wallet oder so wo mann dann die sachen findet! und es wird dann nur
-# tor und vpn angeboten".
+# Aus dem Betrieb, 26.09.2026: links ein eigener Reiter fuer externe Wallets,
+# wo man alles dazu findet -- und angeboten werden nur Tor und VPN.
 
 def _abschnitt(html, name):
     anfang = html.index(f'<section data-ansicht="{name}"')
@@ -3461,10 +3454,9 @@ def test_der_schluessel_wird_nur_als_text_gesetzt(js):
 
 # ── Das Gebuehrenfeld zeigt, was gilt (26.09.2026) ─────────────────────────
 #
-# Aus dem Betrieb: "meine gesetzten gebueren nach jedem neu start oder
-# refresh weg sind und nicht mehr angezeigt werden was ich da vom netzwerk
-# verlange .. entweder bleibt das dann als weisse vorlage oder es wird mir
-# im info text angezeigt". Gesetzt waren sie -- das Feld zeigte nach jedem
+# Aus dem Betrieb: nach jedem Neustart oder Neuladen schienen die gesetzten
+# Gebuehren weg -- sie sollen im Feld stehen bleiben oder wenigstens im
+# Hinweistext stehen. Gesetzt waren sie -- das Feld zeigte nach jedem
 # Laden nur wieder seine feste Vorgabe, 100 ppm und 0.
 
 def _gebuehrenlage_ausfuehren(js, faelle):
@@ -3916,8 +3908,8 @@ def test_jede_verbindung_hat_ansehen_und_kopieren(js):
 
 # ── Was durch deinen Knoten ging (29.09.2026) ──────────────────────────────
 #
-# Aus dem Betrieb: "UNKNOWN_INVOICE 2x · Kanal 0 ... was soll man mit diesen
-# infos". Jeder Grund, den LND kennt, bekommt einen Klartext; Warnfarbe nur,
+# Aus dem Betrieb: mit "UNKNOWN_INVOICE 2x · Kanal 0" konnte niemand etwas
+# anfangen. Jeder Grund, den LND kennt, bekommt einen Klartext; Warnfarbe nur,
 # wo man etwas tun kann; eine Probe ist kein Fehler.
 
 # Aus router.proto (FailureDetail) und lightning.proto (Failure.FailureCode),
@@ -4007,8 +3999,8 @@ def test_die_karte_trennt_richtungen_und_zeigt_proben(js):
 
 
 def test_ablehnungen_und_ereignisse_stehen_in_tabellen(js):
-    """Aus dem Betrieb, 29.09.2026: "ich hoffe das wird nicht zu unuebersichtlich
-    sonst haette man da ne art tabelle draus machen muessen". Zeit, Richtung,
+    """Aus dem Betrieb, 29.09.2026: das darf nicht unuebersichtlich werden --
+    sonst gehoert eine Tabelle daraus. Zeit, Richtung,
     Ergebnis, Betrag, Gebuehr und Weg hintereinander in einer Zeile lasen
     sich schwer -- also Spalten, wie bei den Wegen, die der Knoten gelernt
     hat."""
@@ -4025,7 +4017,7 @@ def test_ablehnungen_und_ereignisse_stehen_in_tabellen(js):
 
 
 def test_die_ereignisliste_hat_eine_eigene_ueberschrift(js):
-    """Aus dem Betrieb, 29.09.2026: "die erste zeile sieht komisch aus".
+    """Aus dem Betrieb, 29.09.2026: die erste Zeile sah seltsam aus.
     Nach einer einzigen Ablehnung lief die Ereignisliste direkt weiter und
     las sich wie eine zweite Kopfzeile derselben Tabelle."""
     import re
@@ -4038,9 +4030,9 @@ def test_die_ereignisliste_hat_eine_eigene_ueberschrift(js):
 
 # ── Die Wallet: on-chain und Lightning auseinander (29.09.2026) ────────────
 #
-# Aus dem Betrieb: "das mann das mal auseinander halten kann vernuenftig was
-# ist on chain was ist LND rechnung" -- und "hier in dem grossen feld ..
-# koennte man ja direkt einzahl auszahlen machen".
+# Aus dem Betrieb: on-chain und Lightning-Rechnung muessen sich klar
+# auseinanderhalten lassen -- und im grossen Feld gehoeren Einzahlen und
+# Auszahlen direkt hin.
 
 _GUTHABEN_DOM = """
 const t = (k, w) => k;
@@ -4152,8 +4144,8 @@ def test_die_knoepfe_im_guthaben_springen_zu_kaesten_der_wallet(js, html):
 
 
 def test_die_bewegungen_stehen_direkt_unter_dem_guthaben(html):
-    """Aus dem Betrieb, 29.09.2026: "unsere transaktions historie bleibt
-    trotzdem oben unter guthaben". Darunter die beiden Bereiche, jeder mit
+    """Aus dem Betrieb, 29.09.2026: die Liste der Bewegungen bleibt oben, direkt
+    unter dem Guthaben. Darunter die beiden Bereiche, jeder mit
     seinen Kaesten."""
     reihenfolge = ["ln-guthaben", "w-bewegungen", "w-bereich-kette",
                    "w-einzahlen", "w-senden", "w-bereich-blitz",
@@ -4204,3 +4196,177 @@ def test_listen_mit_kopierknoepfen_werden_nur_bei_aenderung_neu_gebaut(js):
     electrum = _ohne_js_kommentare(_block(js, "function zeichneElectrum("))
     assert "stand !== EL_WEGE_STAND" in electrum
     assert "EL_WEGE_STAND = stand;" in electrum
+
+
+# ── Die Kanaele-Seite, neu geordnet (30.09.2026) ───────────────────────────
+#
+# Aus dem Betrieb: die Kanaele-Seite sollte uebersichtlich werden. Eine Zeile
+# je Kanal,
+# aufklappbar mit allen Handgriffen zu genau diesem Kanal.
+
+_ELEMENT_DOM = """
+const LANG = "de";
+const t = (k, w) => k;
+const zahl = (x) => String(x);
+const sats = (x) => String(x) + " sat";
+const kurz = (x) => String(x).slice(0, 8);
+const nachkomma = (x) => String(x);
+const dauerGrob = () => "lange";
+const hinweis = (x) => ({ hinweis: x });
+const zeile = (k, v, klasse) => ({ zeile: [k, v, klasse || ""] });
+let LN_LAGE = { hoehe: 900000 };
+const KANAL_OFFEN = new Set();
+let ERTRAG_JE = {};
+const ELEMENTE = {};
+function klassen() {
+  const s = new Set();
+  return { add: (c) => s.add(c), remove: (c) => s.delete(c),
+           contains: (c) => s.has(c), toggle: (c, an) => (an === undefined
+             ? (s.has(c) ? s.delete(c) : s.add(c)) : (an ? s.add(c) : s.delete(c))),
+           liste: () => [...s] };
+}
+const document = { createElement: (tag) => ({
+  tag, className: "", textContent: "", dataset: {}, style: {}, kinder: [],
+  attrs: {}, classList: klassen(), disabled: false, type: "", value: "",
+  setAttribute(k, v) { this.attrs[k] = v; },
+  append(...k) { this.kinder.push(...k); },
+  addEventListener() {}, querySelector() { return null; }, replaceWith() {} }) };
+function $(sel) {
+  if (!ELEMENTE[sel]) ELEMENTE[sel] = { value: "", classList: klassen() };
+  return ELEMENTE[sel];
+}
+const text = (e) => [e.textContent || "", ...(e.kinder || []).map(text)]
+  .join(" ").trim();
+"""
+
+_KANAL_FUNKTIONEN = ["kanalZeile", "kzWert", "kanalDetail", "kzGruppe", "kzStand",
+                     "kanalAlterTage", "kzSteuerung", "kzWahl", "kzFeld",
+                     "kzErtrag", "kzHandgriffe", "kompakt", "vorzeichen",
+                     "marke", "erreichbarkeit"]
+
+_KANAL = """({ nummer: String((899856n << 40n) | 1n), gegenstelle: "Kestrel",
+  kennung: "02abcdef", punkt: "ab:1", aktiv: true, privat: false,
+  kapazitaet: 4000000, hier: 3500000, reserve: 40000, verfuegbar: 3460000,
+  drueben: 498000, anteil_hier: 0.875, hinaus_hoechstens: 3960000,
+  laufzeit_s: 86400 * 40, erreichbar_s: 86400 * 40, eroeffnet_von_dir: true,
+  satz_ppm: 55, basis_msat: 0, hoechstbetrag_sat: 1700000,
+  steuerung: { gebuehr: "automatik", stufe: 1, wuerde_ppm: 55,
+               hoechstbetrag: "fuellstand", wuerde_hoechstbetrag_sat: 1730000 } })"""
+
+
+def test_eine_kanalzeile_zu_zeigt_alle_kennzahlen_mit_ihren_namen(js):
+    ergebnis = _ausfuehren_async(js, _KANAL_FUNKTIONEN, _ELEMENT_DOM, f"""(async () => {{
+  const z = kanalZeile({_KANAL});
+  const kopf = z.kinder[0];
+  return {{ klasse: z.className, offen: kopf.attrs["aria-expanded"],
+           zellen: kopf.kinder.length, auf: z.kinder.length,
+           titel: kopf.kinder.filter((k) => k.dataset.titel).map((k) => k.dataset.titel),
+           gebuehr: text(kopf.kinder[3]), hoechst: text(kopf.kinder[4]) }};
+}})()""")
+    assert ergebnis == {
+        "klasse": "kz", "offen": "false", "zellen": 8, "auf": 1,
+        "titel": ["kz_sp_kapazitaet", "kz_sp_gebuehr", "kz_sp_hoechst",
+                  "kz_sp_erreichbar", "kz_sp_ertrag"],
+        # Intl setzt zwischen Zahl und "Mio." ein festes Leerzeichen.
+        "gebuehr": "55 ppm kz_auto · kz_stufe", "hoechst": "1,7\xa0Mio. kz_fuellstand"}
+
+
+def test_eine_kanalzeile_auf_hat_alle_handgriffe_zu_diesem_kanal(js):
+    ergebnis = _ausfuehren_async(js, _KANAL_FUNKTIONEN, _ELEMENT_DOM, f"""(async () => {{
+  const kanal = {_KANAL};
+  KANAL_OFFEN.add(kanal.nummer);
+  const z = kanalZeile(kanal);
+  const detail = z.kinder[1];
+  const handgriffe = detail.kinder[3].kinder;
+  const still = kanalZeile({{ ...kanal, aktiv: false }}).kinder[1].kinder[3].kinder[0];
+  return {{ klasse: z.className, offen: z.kinder[0].attrs["aria-expanded"],
+           teile: detail.kinder.map((g) => g.className),
+           knoepfe: handgriffe.map((b) => b.textContent),
+           still_umschichten: still.disabled }};
+}})()""")
+    assert ergebnis == {
+        "klasse": "kz offen", "offen": "true",
+        "teile": ["kz-gruppe", "kz-gruppe", "kz-gruppe", "kz-handgriffe"],
+        "knoepfe": ["kz_umschichten", "kz_ansehen", "kz_schliessen"],
+        "still_umschichten": True}
+
+
+def test_das_alter_eines_kanals_kommt_aus_seiner_nummer(js):
+    """LNDs "lifetime" zaehlt nur seit dem letzten Start von LND."""
+    assert _ausfuehren_async(js, ["kanalAlterTage"], "let LN_LAGE = { hoehe: 900000 };",
+                             """(async () => [
+  kanalAlterTage({ nummer: String((899856n << 40n) | 5n) }),
+  kanalAlterTage({ nummer: "unlesbar" }),
+  kanalAlterTage({ nummer: String((900100n << 40n) | 5n) })])()""") == [1, None, None]
+
+
+def test_jede_tabelle_wird_auf_dem_handy_gestapelt(js):
+    """Aus dem Betrieb, 30.09.2026: die Handy-Ansicht der Kanalzeilen soll es
+    fuer alle Ansichten geben. Jede Stelle, die eine Tabelle baut, gibt ihren
+    Zellen die Spaltennamen mit."""
+    for name in ("function htlcTabelle(", "function zeichneBloecke(",
+                 "async function ladeWegwissen(", "function zeichneBlockdetail(",
+                 "function oeffneKachelBlock(", "function zeichneLand("):
+        assert "tabelleStapelbar(" in _ohne_js_kommentare(_block(js, name)), name
+    ergebnis = _ausfuehren_async(js, ["tabelleStapelbar"], """
+const zelle = (tagName, text) => ({ tagName, textContent: text, dataset: {} });
+""", """(async () => {
+  const kopf = { children: [zelle("TH", "Kanal"), zelle("TH", " Netto ")] };
+  const reihe = { children: [zelle("TD", "Lakeside"), zelle("TD", "+12")] };
+  const klassen = [];
+  const tabelle = { classList: { add: (k) => klassen.push(k) },
+                    querySelector: () => kopf,
+                    querySelectorAll: () => [kopf, reihe] };
+  tabelleStapelbar(tabelle);
+  const ohne = { classList: { add: () => { throw new Error("gestapelt"); } },
+                 querySelector: () => ({ children: [zelle("TD", "x")] }),
+                 querySelectorAll: () => [] };
+  tabelleStapelbar(ohne);
+  return [klassen, reihe.children.map((z) => z.dataset.titel)];
+})()""")
+    assert ergebnis == [["stapel"], ["Kanal", "Netto"]]
+
+
+def test_die_knoepfe_im_ueberblick_springen_zu_kaesten_der_kanaele(js, html):
+    import re
+    anfang = html.index('<section data-ansicht="ln-kanaele"')
+    kanaele = html[anfang:html.index("</section>", anfang)]
+    ziele = re.findall(r'\[t\("lu_[a-z_]+"\), "(#[a-z-]+)"\]',
+                       _ohne_js_kommentare(_block(js, "function zeichneKanalUeberblick(")))
+    assert ziele == ["#ln-oeffnen", "#ln-schichten", "#w-gebuehren", "#lk-ertrag"]
+    for ziel in ziele:
+        assert f'id="{ziel[1:]}"' in kanaele, ziel
+    start = _ohne_js_kommentare(_block(js, "async function start("))
+    assert '$("#lk-ueberblick-inhalt").addEventListener("click"' in start
+    assert '$("#le-zeitraum").addEventListener("click"' in start
+
+
+def test_die_gebuehren_automatik_fragt_nach_dem_abstand(html, js):
+    """Aus dem Betrieb: einmal am Tag oder alle drei Tage."""
+    assert '<option value="1" data-i18n="gb_abstand_1">' in html
+    assert '<option value="3" data-i18n="gb_abstand_3">' in html
+    umschalten = _ohne_js_kommentare(_block(js, "async function gebuehrenautomatikUmschalten("))
+    assert 'abstand_tage: Number($("#gb-abstand").value)' in umschalten
+    # Eingeschaltet, aber ohne Messreihe: gesagt, nicht verschwiegen.
+    assert '(antwort || {}).grund === "misst_fuellstand"' in umschalten
+    assert 't("gb_a_misst")' in umschalten
+
+
+def test_eine_kanalzeile_sagt_wenn_sie_noch_misst(js):
+    """Ohne Messreihe ist "Automatik: ..." nur eine Vorschau aus dem
+    Augenblick -- gesetzt wird danach nicht, und die Zeile sagt das."""
+    ergebnis = _ausfuehren_async(js, _KANAL_FUNKTIONEN, _ELEMENT_DOM, f"""(async () => {{
+  const kanal = {_KANAL};
+  const stand = (k) => {{
+    const g = kzSteuerung(k);
+    return text(g.kinder[g.kinder.length - 1].kinder[1]);
+  }};
+  const misst = {{ ...kanal, steuerung: {{ ...kanal.steuerung, misst_noch: true }} }};
+  const fest = {{ ...kanal, steuerung: {{ ...kanal.steuerung, misst_noch: true,
+                                          gebuehr: "fest", hoechstbetrag: "fest" }} }};
+  return [stand(misst), stand(kanal), stand(fest)];
+}})()""")
+    assert "kz_misst_noch" in ergebnis[0]
+    assert "kz_misst_noch" not in ergebnis[1]
+    # Ein fester Kanal wartet auf nichts -- die Automatik fasst ihn nicht an.
+    assert "kz_misst_noch" not in ergebnis[2]

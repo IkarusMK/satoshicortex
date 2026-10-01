@@ -1,8 +1,7 @@
 """Die Anwendung soll sagen, was sie tut.
 
-Aus dem Betrieb, 05.09.2026: "was mir auch aufgefallen ist, dass unter Protokoll und
-dann Satoshi -- also unsere App -- nie wirklich was steht ausser diesen
-Standard vier Zeilen. Aber sonst gibt unsere App kein Protokoll wieder??"
+Aus dem Betrieb, 05.09.2026: unter Protokoll stand fuer die Anwendung selbst
+nie mehr als die vier Startzeilen -- sonst gab sie nichts preis.
 
 Nachgesehen: er hat recht, und es war keine Stoerung. Die Anwendung schrieb
 ausschliesslich bei EREIGNISSEN -- Konfiguration geaendert, Sicherung

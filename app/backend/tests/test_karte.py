@@ -44,16 +44,16 @@ class Tabelle:
 
 ADRESSBUCH = {
     "ipv4": [{"address": "1.0.0.1", "network": "ipv4"},
-             {"address": "84.134.0.1", "network": "ipv4"},
-             {"address": "84.134.0.2", "network": "ipv4"},
+             {"address": "198.51.100.1", "network": "ipv4"},
+             {"address": "198.51.100.2", "network": "ipv4"},
              {"address": "9.9.9.9", "network": "ipv4"}],       # ohne Land
     "ipv6": [{"address": "2a02:8071::1", "network": "ipv6"}],
 }
 
 ORTE = Tabelle({
-    "1.0.0.1": "AU", "84.134.0.1": "DE", "84.134.0.2": "DE",
+    "1.0.0.1": "AU", "198.51.100.1": "DE", "198.51.100.2": "DE",
     "2a02:8071::1": "DE", "203.0.113.7": "JP",
-    "84.134.0.9": "DE", "198.51.100.4": "CH",
+    "198.51.100.9": "DE", "198.51.100.4": "CH",
 })
 
 
@@ -73,11 +73,11 @@ def _knoten(**mehr):
         # die Suche muss darueber hinweggehen statt aufzugeben.
         "getnetworkinfo": {"localaddresses": [
             {"address": "abcdef.onion", "port": 8333, "score": 12},
-            {"address": "84.134.0.9", "port": 8333, "score": 7},
+            {"address": "198.51.100.9", "port": 8333, "score": 7},
             {"address": "1.0.0.1", "port": 8333, "score": 2},
         ]},
         "getpeerinfo": [
-            {"addr": "84.134.0.1:8333", "inbound": False, "network": "ipv4"},
+            {"addr": "198.51.100.1:8333", "inbound": False, "network": "ipv4"},
             {"addr": "[2a02:8071::1]:8333", "inbound": False, "network": "ipv6"},
             {"addr": "203.0.113.7:8333", "inbound": True, "network": "ipv4"},
             {"addr": "abc.onion:8333", "inbound": True, "network": "onion"},
@@ -169,7 +169,7 @@ def test_ipv6_adressen_werden_richtig_vom_port_getrennt():
     """"[2a02::1]:8333" naiv am letzten Doppelpunkt zu trennen liefert
     "[2a02::1]" -- mit Klammern, und damit keine gueltige Adresse."""
     assert karte._nur_adresse("[2a02:8071::1]:8333") == "2a02:8071::1"
-    assert karte._nur_adresse("84.134.0.1:8333") == "84.134.0.1"
+    assert karte._nur_adresse("198.51.100.1:8333") == "198.51.100.1"
     # Ohne Klammern und ohne Port: nichts abschneiden, sonst fehlt eine Gruppe.
     assert karte._nur_adresse("2a02:8071::1") == "2a02:8071::1"
     assert karte._nur_adresse("") == ""
@@ -251,7 +251,7 @@ def test_ohne_eigene_adresse_zaehlen_die_gegenstellen():
     k = _knoten(**{
         "getnetworkinfo": {"localaddresses": []},
         "getpeerinfo": [
-            {"addr": "84.134.0.1:8333", "inbound": False,
+            {"addr": "198.51.100.1:8333", "inbound": False,
              "addrlocal": "198.51.100.4:8333"},
             {"addr": "203.0.113.7:8333", "inbound": True,
              "addrlocal": "198.51.100.4:8333"},
@@ -285,7 +285,7 @@ def test_die_eigene_adresse_verlaesst_den_knoten_nicht():
     geschuetzten, und auch nicht als Nebenprodukt."""
     d = karte.sammle(_knoten(), ORTE)
     text = repr(d)
-    for geheim in ("84.134.0.9", "abcdef.onion"):
+    for geheim in ("198.51.100.9", "abcdef.onion"):
         assert geheim not in text
     # Auch die Zaehlung der Fremdmeldungen bleibt drinnen.
     assert "gesehen_als" not in d["peers"]

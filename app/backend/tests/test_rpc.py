@@ -115,8 +115,8 @@ def test_netzinfo_darf_fehlen():
 def test_ohne_jede_netzauskunft_wird_keine_null_erfunden():
     """Fallen BEIDE aus, ist die Zahl unbekannt -- nicht null. Als 0 stand
     dort "0 von mir aufgebaut · 0 von aussen angenommen", und das las sich
-    wie ein Messwert. Aus dem Betrieb, 02.09.2026: "ich habe quasi keine
-    Verbindung mehr zu irgendwas"."""
+    wie ein Messwert. Aus dem Betrieb, 02.09.2026: scheinbar gar keine
+    Verbindung mehr."""
     knoten = FakeKnoten({
         "getblockchaininfo": {
             "chain": "main", "blocks": 5, "headers": 5,

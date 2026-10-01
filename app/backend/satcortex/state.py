@@ -73,9 +73,9 @@ class Einrichtung:
     # kennt ihn. Er steht hier, damit die Anwendung nach einer
     # Wiederherstellung selbst sagen kann, ob es derselbe Knoten ist.
     #
-    # Aus dem Betrieb, 11.09.2026, nach der Probe: "keine ahnung habe mir die
-    # kennung nicht vorher angesehen". Dass er sie sich von Hand notieren
-    # sollte, war unser Versaeumnis -- die Anwendung kennt sie ohnehin.
+    # Aus dem Betrieb, 11.09.2026, nach der Probe: die Kennung war vorher nicht
+    # notiert worden. Dass man sie sich von Hand notieren sollte, war unser
+    # Versaeumnis -- die Anwendung kennt sie ohnehin.
     knotenausweis: Dict = field(default_factory=dict)
     # Ob die Gebuehren dem Netz folgen sollen, und was dabei zuletzt gesetzt
     # wurde. AUS, solange hier nichts steht -- eine Automatik, die ungefragt

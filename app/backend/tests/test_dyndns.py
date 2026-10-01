@@ -1,8 +1,8 @@
 """Die eigene Adresse aktuell halten.
 
 Hintergrund: Bitcoin Core loest -externalip nur beim Start auf. Am 26.08.2026
-kuendigte der Knoten 79.223.252.78 an, waehrend der Name laengst auf
-84.134.34.64 zeigte -- also eine Adresse, die inzwischen jemand anderem
+kuendigte der Knoten 198.51.100.78 an, waehrend der Name laengst auf
+198.51.100.64 zeigte -- also eine Adresse, die inzwischen jemand anderem
 gehoert.
 """
 from satcortex import dyndns
@@ -31,22 +31,22 @@ def test_doppelte_verschwinden():
                             aufloeser=auf.get) == ["203.0.113.7"]
 
 
-CONF = "listen=1\ndiscover=1\nexternalip=79.223.252.78\nmaxconnections=80\n"
+CONF = "listen=1\ndiscover=1\nexternalip=198.51.100.78\nmaxconnections=80\n"
 
 
 def test_wechsel_wird_erkannt():
-    assert dyndns.hat_sich_geaendert(CONF, ["84.134.34.64"]) is True
+    assert dyndns.hat_sich_geaendert(CONF, ["198.51.100.64"]) is True
 
 
 def test_unveraenderte_adresse_loest_keinen_neustart_aus():
     """Sonst startete bitcoind alle zehn Minuten neu -- mitten im Abgleich."""
-    assert dyndns.hat_sich_geaendert(CONF, ["79.223.252.78"]) is False
+    assert dyndns.hat_sich_geaendert(CONF, ["198.51.100.78"]) is False
 
 
 def test_reihenfolge_allein_ist_keine_aenderung():
     """Ein DNS-Server darf seine Antworten sortieren, wie er will."""
     zwei = CONF + "externalip=2001:db8::1\n"
-    assert dyndns.hat_sich_geaendert(zwei, ["2001:db8::1", "79.223.252.78"]) is False
+    assert dyndns.hat_sich_geaendert(zwei, ["2001:db8::1", "198.51.100.78"]) is False
 
 
 # ── Je Familie getrennt fragen ─────────────────────────────────────────────
@@ -112,11 +112,11 @@ def test_ein_verlorenes_paket_ist_kein_ausfall(monkeypatch):
 
 
 def test_eine_ipv4_in_ipv6_schreibweise_taugt_nicht_als_externalip():
-    """Bei der Probe kam auf die AAAA-Frage "::ffff:84.134.34.64" zurueck.
-    Ungeprueft waere daraus "externalip=::ffff:84.134.34.64" geworden -- eine
+    """Bei der Probe kam auf die AAAA-Frage "::ffff:198.51.100.64" zurueck.
+    Ungeprueft waere daraus "externalip=::ffff:198.51.100.64" geworden -- eine
     Adresse, unter der den Knoten niemand erreicht, angekuendigt als waere sie
     echt."""
-    assert dyndns._brauchbar("::ffff:84.134.34.64") is False
+    assert dyndns._brauchbar("::ffff:198.51.100.64") is False
     assert dyndns._brauchbar(OEFFENTLICH) is True
 
 

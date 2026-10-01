@@ -1,8 +1,8 @@
 """Die Kurstafel.
 
 Dieses Modul hatte bis zum 08.09.2026 KEINEN einzigen Test -- und genau hier
-stand die Zahl, an der ein Nutzer abliest, was sein Geld wert ist. Der Betreiber
-sah in der Oberflaeche "EUR 78.417", waehrend das Diagramm daneben 67-68k
+stand die Zahl, an der ein Nutzer abliest, was sein Geld wert ist. Im Betrieb
+stand in der Oberflaeche "EUR 78.417", waehrend das Diagramm daneben 67-68k
 zeichnete und die Meldung darunter von "$78,000" sprach.
 
 Der Dollarkurs mit einem Euro-Zeichen davor. Nicht seit heute: seit es die
@@ -182,8 +182,8 @@ def test_alter_gebrauch_faellt_wieder_heraus(monkeypatch):
 # ------------------------------------------------ die Auswerter der Boersen ---
 #
 # Diese Funktionen lesen fremde Antworten. Sie waren bis zum 08.09.2026
-# ungeprueft -- und aus einer von ihnen kam die Zahl, die der Betreiber unter dem
-# falschen Waehrungszeichen sah. Die Antwortformen unten sind die echten.
+# ungeprueft -- und aus einer von ihnen kam die Zahl, die im Betrieb unter dem
+# falschen Waehrungszeichen stand. Die Antwortformen unten sind die echten.
 
 BITSTAMP_TICKER = {
     "timestamp": "1757340000", "open": "68410.00", "high": "68900.00",

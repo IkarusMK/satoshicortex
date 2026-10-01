@@ -55,8 +55,8 @@ def test_jede_zugeordnete_sprache_hat_auch_quellen():
 # ------------------------------------------------------- Sprache und Land ---
 
 def test_algerien_bekommt_franzoesisch():
-    """Des Betreibers Pruefstein: 'wenn ich in Algerien sitze, bringt mir
-    Blocktrainer nichts'."""
+    """Der Pruefstein aus dem Betrieb: wer in Algerien sitzt, dem nuetzt ein
+    deutschsprachiger Kanal nichts."""
     assert N.sprache_fuer("DZ") == "fr"
     erste = N.fuer_land("DZ")[0]
     assert erste.sprache == "fr"
@@ -701,7 +701,7 @@ def test_kurs_endpunkt_ohne_anmeldung_verweigert(tmp_path, monkeypatch):
 
 # ------------------------------------------- Neue Quellen erreichen Nutzer ---
 #
-# Am 06.09.2026 hat der Betreiber ein Bild seiner Quellenliste geschickt: vier in
+# Am 06.09.2026 kam aus dem Betrieb ein Bild der Quellenliste: vier in
 # 0.44.2 hinzugefuegte Quellen standen auf "aus". Der Grund war das Modell --
 # gemerkt wurden die EINGESCHALTETEN, und was es beim Speichern nicht gab,
 # stand in keiner Liste. Diese Tests halten die Umkehrung fest.
@@ -712,7 +712,7 @@ EINE_AUSWAHL = ["optech", "bitcoincom", "cointelegraph", "theblock",
 
 
 def test_eine_neue_quelle_erreicht_bestehende_nutzer():
-    """Der Fehler, den der Betreiber im Bild gesehen hat."""
+    """Der Fehler, der im Betrieb im Bild zu sehen war."""
     z = Zustand({"aktiv": True, "quellen": EINE_AUSWAHL})
     an = {q.kennung for q in N.Feed(Ablage(), lambda: "p", z).quellen("DE")}
     neue = [q for q in N.QUELLEN if q.seit]

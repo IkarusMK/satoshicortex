@@ -1,11 +1,9 @@
 """Ein Land, nach Bundeslaendern aufgeschluesselt.
 
-Aus dem Betrieb, 05.09.2026: "dass man in der Weltkarte auf die einzelnen Laender
-klicken kann und die dann gross werden und uns da in den einzelnen
-Bundeslaendern zeigen, wo die Knoten sind, mit denen wir in Verbindung sind
-... das gilt fuer jedes Land der Welt!" -- und dazu die Grenze, die die
-Genauigkeit rettet: "wo genau in Bayern ist auch egal, es sollte halt nur
-Bayern sein."
+Aus dem Betrieb, 05.09.2026: ein Land auf der Weltkarte anklicken, es gross
+sehen und darin die Gebiete, in denen die verbundenen Knoten stehen -- fuer
+jedes Land der Welt. Dazu die Grenze, die die Genauigkeit rettet: das Gebiet
+soll stimmen, der genaue Ort interessiert nicht.
 """
 import json
 import pathlib

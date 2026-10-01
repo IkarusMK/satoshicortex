@@ -33,9 +33,9 @@ PROBE = """0.0.0.0,0.255.255.255,ZZ,ZZ,,,0,0
 2.0.0.0,2.255.255.255,EU,FR,Bretagne,Rennes,48.1147,-1.6794
 3.0.0.0,9.255.255.255,ZZ,ZZ,,,0,0
 10.0.0.0,10.255.255.255,ZZ,ZZ,,,0,0
-11.0.0.0,84.133.255.255,ZZ,ZZ,,,0,0
-84.134.0.0,84.134.255.255,EU,DE,Bavaria,Munich,48.1374,11.5755
-84.135.0.0,255.255.255.255,ZZ,ZZ,,,0,0
+11.0.0.0,198.51.99.255,ZZ,ZZ,,,0,0
+198.51.100.0,198.51.100.255,EU,DE,Bavaria,Munich,48.1374,11.5755
+198.51.101.0,255.255.255.255,ZZ,ZZ,,,0,0
 ::,2001:485f:ffff:ffff:ffff:ffff:ffff:ffff,ZZ,ZZ,,,0,0
 2001:4860::,2001:4860:ffff:ffff:ffff:ffff:ffff:ffff,NA,US,California,Mountain View,37.4056,-122.079
 2001:4861::,2a02:7fff:ffff:ffff:ffff:ffff:ffff:ffff,ZZ,ZZ,,,0,0
@@ -78,7 +78,7 @@ def tabelle(tmp_path):
 def test_adressen_finden_ihr_land(tabelle):
     assert tabelle.land("1.0.0.7") == "AU"
     assert tabelle.land("2.3.4.5") == "FR"
-    assert tabelle.land("84.134.34.64") == "DE"
+    assert tabelle.land("198.51.100.64") == "DE"
     assert tabelle.land("2001:4860:4860::8888") == "US"
     assert tabelle.land("2a02:8071:1234::1") == "DE"
 
@@ -106,7 +106,7 @@ def test_onion_hat_keinen_ort_und_das_ist_der_zweck(tabelle):
 def test_ipv4_in_ipv6_schreibweise(tabelle):
     """Manche Knoten melden so. Ohne Sonderbehandlung fiele die Adresse in die
     IPv6-Tabelle und damit stumm heraus."""
-    assert tabelle.land("::ffff:84.134.34.64") == "DE"
+    assert tabelle.land("::ffff:198.51.100.64") == "DE"
 
 
 def test_unbekanntes_bleibt_unbekannt(tabelle):
@@ -130,7 +130,7 @@ def test_eine_lueckenhafte_liste_wird_abgelehnt(tmp_path):
 
 def test_gebiete_kommen_mit(tabelle):
     """Der eigentliche Zweck: nicht nur das Land, sondern das Bundesland."""
-    assert tabelle.ort("84.134.34.64") == ("DE", 1)      # Bayern
+    assert tabelle.ort("198.51.100.64") == ("DE", 1)      # Bayern
     assert tabelle.ort("2a02:8071:1234::1") == ("DE", 2)  # Berlin
     assert tabelle.ort("2001:4860:4860::8888") == ("US", 3)
 
@@ -144,7 +144,7 @@ def test_ein_unbekannter_name_faellt_auf_das_land_zurueck(tabelle):
 
 def test_land_und_gebiet_kommen_aus_derselben_zeile(tabelle):
     """land() ist nur die kurze Frage an dieselbe Suche."""
-    for adresse in ("84.134.34.64", "2.3.4.5", "10.1.2.3", "quatsch"):
+    for adresse in ("198.51.100.64", "2.3.4.5", "10.1.2.3", "quatsch"):
         assert tabelle.land(adresse) == tabelle.ort(adresse)[0]
 
 

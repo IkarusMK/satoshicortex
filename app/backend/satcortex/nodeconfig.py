@@ -64,10 +64,9 @@ TOR_AUS = "# Tor ist abgeschaltet (in der Weboberflaeche einschaltbar)."
 
 # ── Wie der Knoten im Lightning-Netz auftritt ──────────────────────────────
 #
-# Aus dem Betrieb, 04.09.2026: "das sollte aber jeder Nutzer unter Einstellungen
-# immer selber entscheiden koennen ... gibt ja vielleicht politische
-# Restriktionen, die das nicht wollen -- da sollte man die Moeglichkeit haben,
-# anonym zu bleiben."
+# Aus dem Betrieb, 04.09.2026: das entscheidet jeder Nutzer selbst unter
+# Einstellungen -- wo politische Umstaende dagegen sprechen, muss man anonym
+# bleiben koennen.
 #
 # Bis dahin stand hier fest verdrahtet der Hybrid-Betrieb, samt einem
 # Kommentar, der schlicht falsch war: "die Onion-Adresse allein macht schon
@@ -377,9 +376,8 @@ def setze_netze(conf: str, erlaubt, grund: str = "") -> str:
 
 # ── Wallet-Software im Heimnetz ────────────────────────────────────────────
 #
-# Aus dem Betrieb, 05.09.2026: "was mir auch schmecken wuerde, wenn ich meine
-# Transaktionen von meinem Hardware-Wallet dann auch ueber meinen BTC-Knoten
-# machen koennte."
+# Aus dem Betrieb, 05.09.2026: Transaktionen eines Hardware-Wallets sollen
+# auch ueber den eigenen Knoten laufen koennen.
 #
 # Der uebliche Weg dafuer ist Sparrow: die Wallet haelt die Schluessel selbst
 # (bzw. das Hardware-Geraet tut es), der eigene Knoten liefert nur die
@@ -834,8 +832,8 @@ class Lightningeinstellungen:
     """
     # EINE Stelle fuer den Namen. Er stand hier als nackte Zeichenkette, und
     # lightning_bereitstellen uebergab ihn nie -- also hiess JEDER Knoten
-    # dieser Software "SatoshiCortex", auch des Betreibers. Am 09.09.2026:
-    # "ich moechte nicht das alles immer nur satoshicortex heisst!!"
+    # dieser Software "SatoshiCortex", auch der eigene. Aus dem Betrieb,
+    # 09.09.2026: jeder Knoten soll seinen eigenen Namen tragen koennen.
     alias: str = ALIAS_VORGABE
     farbe: str = FARBE_VORGABE
     # Keine Grundgebuehr. Der Netz-Median lag 2026 bei rund 0,444 Sat, aber
@@ -901,9 +899,9 @@ class Lightningeinstellungen:
     # naechsten Neustart gesperrt und damit offline, ohne dass irgendwo etwas
     # danebenstuende.
     #
-    # Aus dem Betrieb, 05.09.2026 zu den Swap-Bindungen: "dann muss unser System so
-    # sauber und stabil laufen, dass wir wirklich 60 Monate am Stueck online
-    # bleiben und nicht zwischendurch staendig Abbrueche haben." Genau das
+    # Aus dem Betrieb, 05.09.2026 zu den Swap-Bindungen: dafuer muss das System
+    # so stabil laufen, dass es wirklich 60 Monate am Stueck online bleibt,
+    # ohne Abbrueche zwischendurch. Genau das
     # waere so ein Abbruch gewesen -- und der teuerste, weil unbemerkt.
     entsperrdatei: str = ""
     tor_aktiv: bool = True
@@ -1246,10 +1244,9 @@ def baue_lnd(einstellungen: Lightningeinstellungen) -> str:
 #
 # Folge: Sichtbarkeit, Alias und Farbe waren nach der Einrichtung
 # unveraenderlich. Der Schalter stand auf "nur ueber Tor", und der Knoten
-# kuendigte weiter die Wohnanschrift an. Der Betreiber fragte am 09.09.2026
-# ausdruecklich danach -- "wenn ich spaeter mal sage ich will nur noch tor,
-# ob das dann alles auch noch funktioniert?" -- und die ehrliche Antwort war
-# nein.
+# kuendigte weiter die Wohnanschrift an. Aus dem Betrieb kam am 09.09.2026
+# ausdruecklich die Frage, ob spaeter "nur noch Tor" auch wirklich alles
+# umstellt -- und die ehrliche Antwort war nein.
 #
 # Der Ersatz ist ein Erbauer statt dreier Flicker: die gewuenschte Datei aus
 # dem heutigen Zustand bauen, mit der vorhandenen vergleichen, bei

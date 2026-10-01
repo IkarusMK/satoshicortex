@@ -352,9 +352,8 @@ def test_der_graphpfad_steht_in_LNDs_routentabelle():
 
 # ── Die Verteilung statt der Erklaerung ────────────────────────────────────
 #
-# Der Betreiber, 21.09.2026, zu dem Absatz, der unter dem Median stand: "was
-# das den bitte fuer ein riesen text ?? ... kann mann nicht einfach machen:
-# 50% 0-100 die anderen 50% 100-600".
+# Aus dem Betrieb, 21.09.2026, zu dem Absatz, der unter dem Median stand: viel
+# zu viel Text -- lieber einfach die Anteile, etwa 50 % 0-100, 50 % 100-600.
 #
 # Doch. Der Absatz erklaerte in fuenf Zeilen, dass die Verteilung schief ist.
 # Ein paar Prozentzahlen ZEIGEN es -- und sagen nebenbei mehr, als der Absatz

@@ -470,8 +470,8 @@ and that is LND's condition, not ours.
 | Tab | For what |
 |---|---|
 | **Wallet** | The MONEY. On-chain balance, channel balance, transactions, depositing, sending, receiving, paying. |
-| **Channels** | The CONNECTIONS. Open channels, opening and closing, fees per channel, watchtowers, forwards. |
-| **Node** | The IDENTITY. Pubkey, alias, announced addresses, reachability, proof of ownership. |
+| **Channels** | The CONNECTIONS. An overview, one row per channel, earnings, fees and rebalancing, opening and closing, what went through your node, watchtowers. |
+| **Node** | The IDENTITY. Pubkey, alias, announced addresses, reachability, your node in the network, proof of ownership. |
 | **Setup** | Everything you do ONCE. Create or restore a wallet, backup, unlock method, delete the wallet. |
 
 The split is deliberate: setup used to live under *Wallet*, and what you went
@@ -576,6 +576,24 @@ groups such as LightningNetwork+.
 
 ### Channels
 
+**The page.** On top an overview, like the balance in the wallet: capacity,
+what is on your side and on the far side, and what the last 30 days earned
+net — with buttons that jump to opening, rebalancing, fees and earnings. Below
+it one row per channel: the bar, the capacity, the fee with its automation
+step, the maximum per payment, how reachable the peer was, and the net of the
+last 30 days. A row unfolds into everything about that channel — its balance,
+its age (from the block in its channel id, not from LND's uptime counter), who
+opened it, the steering of fee and maximum, what it has earned and cost since
+opening — and the buttons that act on exactly this channel. *Rebalance from
+here* and *Close channel* do not act on their own: they pick this channel in
+the checked dialog further down and jump there, PIN included.
+
+Below the list the page is split into sections with a heading each:
+*Earnings*, *Steer* (fees, rebalancing), *Open & close*, *Watch* (what went
+through your node, route knowledge) and *Protection* (watchtowers). On a phone
+every row and every table turns into stacked blocks with the column names
+beside the values — nothing scrolls sideways.
+
 **Look first.** Under *Channels* you can inspect a peer before opening a
 channel to it. The information comes from your OWN graph — every node announces
 itself, and yours heard it. Nobody is asked and nobody is told whom you are
@@ -599,7 +617,19 @@ period. Both are stated.
 
 **Fees.** Settable per channel: base fee and rate in ppm. Steering during
 operation is simple: make it expensive where a channel is draining, cheap where
-it should be refilled.
+it should be refilled — by hand, or by the automation below. A channel you
+pick by name in the fee panel and set by hand is marked *fixed*; the automation
+leaves it alone from then on. Setting *all channels* by hand marks nothing — on
+automatic channels the automation sets its own rate again at its next turn.
+
+**Maximum per payment.** Every channel announces the largest single payment it
+forwards (`max_htlc`). Too large, and senders try amounts that fail on the
+balance anyway; too small, and the channel forwards nothing worth having. Set
+it in the unfolded row — *fixed* to an amount, or *following the fill level*:
+half of what is spendable on your side, rounded down to 10,000 sat, never below
+1 % of the capacity, and only re-announced when it is off by more than a
+quarter. The application checks it against what LND accepts for that channel
+(the in-flight limit negotiated when it opened) and says so before it tries.
 
 ### What the network charges — and the automatic mode
 
@@ -629,8 +659,39 @@ The panel then shows:
 from the last four weeks, and every new measurement day pushes the oldest one
 out.
 
-**The automatic mode** sets the rate once a day to today's network median —
-bounded by that band. Four things matter here:
+**The automatic mode** prices each channel by how full it is on your side. The
+anchor is today's network median, bounded by that band; each channel gets a
+step of it:
+
+| On your side (average) | Step | Rate |
+|---|---|---|
+| 80 % and more | 1 | half the anchor |
+| 50 – 80 % | 2 | the anchor |
+| 20 – 50 % | 3 | one and a half times the anchor |
+| below 20 % | 4 | three times the anchor |
+
+Plenty on your side may flow out cheaply; where it runs dry it gets dearer, so
+the channel does not empty completely. With *following the fill level* the
+maximum per payment moves along with it.
+
+**It decides on the average, never on the moment.** The fill level of every
+channel is measured hourly and kept for two weeks. The automation looks at the
+average of the last 24 hours — or 72, if you choose *every three days* — and
+touches a channel at most once in that period. A burst that empties a channel
+for ten minutes and flows back right after changes nothing. A channel without
+enough measurements — right after the update, or a channel that is new — waits
+until at least half the period has been measured; until then its row says it
+is still measuring. At the step boundaries there are five percentage points of
+slack, so a channel sitting at 50 % does not flip back and forth.
+
+**It never moves money.** It changes the price and the maximum per payment,
+nothing else. Rebalancing stays a button you press, with your PIN.
+
+**One switch for all, one choice per channel.** The switch in the fee panel
+puts every channel on automatic that you have not decided on yourself. In a
+channel's row you can choose *automatic* or *fixed* for that one channel —
+automatic channels are steered even with the switch off, fixed ones never. Five
+things matter here:
 
 1. **Today does not count towards its own band.** Otherwise today's measurement
    would always lie within its own bounds: an outlier would open its own limit
@@ -639,17 +700,19 @@ bounded by that band. Four things matter here:
 2. **It touches nothing before a band exists.** Below seven measurement days
    nothing happens — a band made of two points is not a safeguard, it is a
    costume.
-3. **It only touches the rate, never the base fee, and applies to all
-   channels.** Steering individual channels by liquidity direction is something
-   else and stays manual — that needs the HTLC stream, not the network median.
+3. **It only touches the rate and the maximum per payment, never the base
+   fee** — and never a channel on *fixed*.
 4. **It leaves trivia alone.** Every change is an announcement to the whole
    network; whoever broadcasts daily over two ppm falls foul of the peers' rate
    limiting and in the end reaches fewer of them than someone who keeps still.
    Below five ppm difference the rate stays put.
+5. **It writes down what it did.** Every change goes into the log with the
+   channel, its step and the average fill level it was based on.
 
-What the automatic mode *would* do is shown even when it is **off**. A switch
-with a surprise behind it does not belong on a node holding money. And turning
-it off leaves the rate where it is — nothing springs back.
+What the automatic mode *would* do is shown even when it is **off** — in the
+fee panel and in every channel's row. A switch with a surprise behind it does
+not belong on a node holding money. And turning it off leaves the rate where it
+is — nothing springs back.
 
 **"Adopt median"** only writes the number into the field. It is applied with
 *Set fees*. That is deliberate too.
@@ -661,6 +724,29 @@ simply no channel policy to set anything on.
 node knows a few hundred channels instead of thirty thousand; a median from
 that would be a number without backing — and it would then sit in the band for
 four weeks. Until then the panel says it is still waiting.
+
+### Earnings per channel
+
+What a channel brought in, against what it cost — per 7, 30 or 90 days or since
+the start. All of it comes from your own LND:
+
+- **Earned** is the fee of every forward, counted at the **outgoing** channel.
+  That is where you sold liquidity; the incoming side only delivered the
+  payment.
+- **Opening** counts only if you opened the channel — the fee of the funding
+  transaction, found by the label LND writes on it.
+- **Rebalancing** counts at the channel that was **refilled**: that is the one
+  the money was spent for.
+- **Closing** is the fee of the closing transaction, again by its label.
+
+On top the totals for the period and a chart per month, earned against costs.
+Below it one row per channel, with what a million sat of its capacity brings in
+a month — the number that compares a small channel with a large one. Closed
+channels keep their final balance in a section of their own.
+
+Two limits. Fees of outside swap services such as Boltz never reach LND and
+are not in it — the page says so. And forwards are only as old as LND's own
+history: what happened before a restore from the twenty-four words is gone.
 
 ### One node address, three things you can do with it
 

@@ -49,8 +49,8 @@ STELLEN = 1
 # Stand bis zum 04.09.2026 auf 9 -- also 18 Einheiten Durchmesser auf einer
 # Karte von 2000 Einheiten Breite. Deutschland ist in dieser Projektion rund
 # 44 Einheiten breit: der Punkt fuer Andorra war damit fast halb so gross wie
-# Deutschland. Der Betreiber: "entweder sind sie nicht sauber ... viel zu gross oder
-# unnoetig". Die Lage stimmt uebrigens -- gegengeprueft an Andorra, Singapur,
+# Deutschland. Aus dem Betrieb: entweder unsauber, viel zu gross oder
+# unnoetig. Die Lage stimmt uebrigens -- gegengeprueft an Andorra, Singapur,
 # Barbados, Hongkong, Malta und Island, Abweichung hoechstens 0,2 Grad. Es
 # war wirklich nur die Groesse.
 PUNKT_RADIUS = 3

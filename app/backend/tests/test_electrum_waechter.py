@@ -1,7 +1,7 @@
 """Der Waechter fuer die Electrum-Apps: schlaegt er an, wenn er soll?
 
-Aus dem Betrieb, 28.09.2026: "wie konstant ist das ganze nicht das wir da
-nach 6 monaten und 3 updates nicht mehr dabei sind und raus fliegen".
+Aus dem Betrieb, 28.09.2026: die Frage, wie bestaendig das ist -- dass man
+nicht nach sechs Monaten und drei Updates herausfliegt.
 Geprueft wird die Auswertung -- ohne Netz, mit ausgedachten Quelltexten.
 """
 import importlib.util

@@ -77,8 +77,8 @@ body {
 
    <summary> erbt nichts von ".panel h3" und bekommt die Vorgabeschrift des
    Browsers: zwischen lauter orangenen Versalien stand beim Wallet-Loeschen
-   eine weisse Zeile. Aus dem Betrieb, 10.09.2026: "in einem anderen text disgin
-   find ich nicht gut!"
+   eine weisse Zeile. Aus dem Betrieb, 10.09.2026: eine Zeile in anderer
+   Gestaltung stoert.
 
    Die Werte sind bewusst dieselben wie oben statt in eine gemeinsame Regel
    gezogen -- ein Test haelt sie deckungsgleich, und so bleibt die
@@ -328,7 +328,7 @@ details.panel[open] > summary::after {
   /* Der Schleier ist Farbe, kein Bedienelement. Ohne diese Zeile liegt er
      ueber der Karte und schluckt JEDEN Klick: elementFromPoint mitten in
      Deutschland lieferte "karte-schleier", nie das Land. Aus dem Betrieb, am
-     06.09.2026: "wenn ich auf ein Land klicke, passiert nix."
+     06.09.2026: ein Klick auf ein Land bewirkte nichts.
 
      Warum es nicht auffiel: der Pruefstand hat den Klick per
      dispatchEvent direkt auf den Pfad geschickt. Das umgeht die
@@ -634,6 +634,32 @@ button.blockkasten.offen {
   white-space: nowrap;
 }
 .ausw-tabelle tr:last-child td { border-bottom: 0; }
+
+/* Auf dem Handy: jede Zeile ein Block, jeder Wert mit seinem Namen davor
+   (30.09.2026). Die Namen setzt tabelleStapelbar() aus der Kopfzeile; ohne
+   sie bliebe die Tabelle, wie sie ist. */
+@media (max-width: 640px) {
+  table.stapel, table.stapel tbody, table.stapel tr, table.stapel td {
+    display: block; width: 100%;
+  }
+  table.stapel thead, table.stapel colgroup, table.stapel tr:has(> th) { display: none; }
+  table.stapel tr { padding: 10px 0; border-bottom: 1px solid var(--border); }
+  table.stapel tr:last-child { border-bottom: 0; }
+  table.stapel td, .ausw-tabelle table.stapel td.zahl,
+  .ausw-tabelle table.stapel td.zahl + td, .ausw-tabelle table.stapel td.text {
+    min-width: 0;
+    display: flex; justify-content: space-between; align-items: baseline;
+    gap: 12px; padding: 3px 0; border: 0; white-space: normal; text-align: right;
+  }
+  table.stapel td::before {
+    content: attr(data-titel); flex: 0 0 auto; max-width: 48%; text-align: left;
+    color: var(--dim); font-family: var(--sans); font-size: 10.5px;
+    letter-spacing: .06em; text-transform: uppercase;
+  }
+  table.stapel td:not([data-titel])::before { content: none; }
+  table.stapel td:first-child { font-weight: 600; }
+  .ausw-tabelle { overflow-x: visible; }
+}
 /* Rechtsbuendige Zahlenspalten brauchen Luft NACH LINKS, sonst kleben sie
    bei knapper Breite an der Spalte davor: "5 min0.0364 BTC". Auf 1850 Pixel
    faellt das nicht auf, auf 1000 sofort. */
@@ -1125,8 +1151,8 @@ a:hover { color: var(--btc); }
 body.ansicht-welt .inhalt { max-width: none; padding: 0; }
 /* Der Streifen liegt UEBER der Karte, und die Karte ist am Bildschirmrand
    festgemacht. Ohne diese Zeile verschluckt er die halbe Suedhalbkugel --
-   Aus dem Betrieb, 04.09.2026: "die ganze Leiste im Bild verschluckt quasi die
-   suedliche Himmelsphaere der Weltkarte."
+   Aus dem Betrieb, 04.09.2026: die Leiste verdeckte die halbe Suedhalbkugel
+   der Weltkarte.
    Die Hoehe kommt gemessen aus der Anzeige, nicht geraten: der Streifen
    bricht auf schmalen Geraeten um und ist dann doppelt so hoch. Bis die
    erste Messung da ist, gilt ein Naeherungswert. */
@@ -1152,8 +1178,8 @@ body.ansicht-welt #karte-hintergrund svg { opacity: 1; }
 body.ansicht-welt #karte-hintergrund { pointer-events: auto; }
 
 /* ... und alles, was DARUEBER liegt, muss die Klicks durchlassen.
-   Gemessen am 06.09.2026, nachdem der Betreiber meldete "wenn ich auf ein Land
-   klicke, passiert nix": von 175 Laendern war KEIN EINZIGES erreichbar.
+   Gemessen am 06.09.2026, nachdem aus dem Betrieb gemeldet wurde, dass ein
+   Klick auf ein Land nichts bewirkt: von 175 Laendern war KEIN EINZIGES erreichbar.
    171 lagen unter der Inhaltsflaeche, zwei unter dem Kopf, zwei unter dem
    Streifen. Der Schleier, den ich zuerst gefunden hatte, war nur eine von
    mehreren Schichten.
@@ -1350,15 +1376,15 @@ body.ansicht-welt section[data-ansicht="welt"] { flex: 1 1 auto; }
 
 /* Die beiden Bereiche der Wallet. Groesser als die Ueberschrift eines
    Kastens: sie ordnen Kaesten, sie sind keiner. */
-.w-bereich {
+.bereich-kopf {
   margin-top: 18px; padding: 18px 2px 0;
   border-top: 1px solid var(--border);
 }
-.w-bereich h2 {
+.bereich-kopf h2 {
   display: flex; align-items: center; gap: 12px; margin: 0 0 6px;
   font-size: 20px; font-weight: 700; color: var(--text);
 }
-.w-bereich p { max-width: 78ch; }
+.bereich-kopf p { max-width: 78ch; }
 
 /* Wohin ein Knopf im Guthaben gesprungen ist: der Rand leuchtet kurz auf.
    Die Kopfleiste steht oben fest -- ohne den Abstand laege die
@@ -1429,6 +1455,128 @@ body.ansicht-welt section[data-ansicht="welt"] { flex: 1 1 auto; }
 .kanal-erreichbar.mittel { color: var(--dim); }
 .kanal-erreichbar.schwach { color: var(--warn); }
 
+/* ── Die Kanaele als Zeilen (30.09.2026) ────────────────────────────────────
+   Aus dem Betrieb: die Seite sollte uebersichtlich werden. Zu:
+   eine Zeile je Kanal mit allem, was man vergleichen will. Auf: die
+   Einzelheiten und jeder Handgriff zu genau diesem Kanal. Die Spalten sind
+   dieselben in Kopf und Zeile -- sonst stuenden die Zahlen schief. */
+.kz-spalten, .kz-kopf {
+  display: grid; align-items: center; column-gap: 14px;
+  grid-template-columns: minmax(130px, 1.3fr) minmax(150px, 1.8fr) 78px 104px 104px 78px 132px 18px;
+}
+.kz-spalten {
+  margin-top: 12px; padding: 0 10px 8px; border-bottom: 1px solid var(--border);
+  color: var(--dim); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase;
+}
+.kz { border-bottom: 1px solid var(--border); }
+.kz:last-child { border-bottom: 0; }
+.kz.offen { background: var(--surface-2); border-radius: 10px; border-bottom-color: transparent; }
+.kz-kopf {
+  width: 100%; padding: 12px 10px; border: 0; background: none; color: inherit;
+  font: inherit; text-align: left; cursor: pointer; border-radius: 10px;
+  transition: background-color .15s ease;
+}
+.kz-kopf:hover { background: rgb(255 190 105 / .05); }
+.kz-kopf:focus-visible { outline: 2px solid var(--btc); outline-offset: 2px; }
+.kz-name { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.kz-text { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kz-verteilung { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.kz-wert { display: flex; flex-direction: column; gap: 2px; font-family: var(--mono);
+           font-size: 13px; font-variant-numeric: tabular-nums; }
+.kz-klein { font-family: var(--sans); font-size: 11px; color: var(--dim); }
+.kz-wert.gut > span:first-child { color: var(--ok); }
+.kz-wert.schwach > span:first-child { color: var(--warn); }
+.kz-pfeil { color: var(--dim); transition: transform .2s ease; }
+.kz.offen .kz-pfeil { transform: rotate(180deg); }
+
+.kz-detail {
+  display: grid; gap: 14px 22px; padding: 4px 10px 16px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1fr);
+}
+.kz-gruppe h4 {
+  margin: 4px 0 8px; font-size: 11px; font-weight: 700; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--btc-2);
+}
+.kz-gruppe .stat .v.stark { color: var(--text); font-weight: 700; }
+.kz-handgriffe { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px;
+                 padding-top: 12px; border-top: 1px solid var(--border); }
+.kz-handgriffe .btn, .kz-leiste .btn { padding: 7px 14px; font-size: 13px; }
+.kz-formular { display: flex; flex-direction: column; gap: 8px; }
+.kz-formular p { margin: 0; }
+.kz-wahl { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap;
+           align-items: center; gap: 6px; }
+.kz-wahl legend { width: 100%; margin-bottom: 4px; font-size: 12.5px; font-weight: 600; }
+.kz-wahl label { position: relative; }
+.kz-wahl input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.kz-wahl span {
+  display: inline-block; padding: 5px 12px; border-radius: 999px; font-size: 12.5px;
+  border: 1px solid var(--border); color: var(--dim);
+  transition: border-color .15s ease, color .15s ease, background-color .15s ease;
+}
+.kz-wahl input:checked + span { border-color: var(--border-hi); color: var(--text);
+                                background: rgb(247 147 26 / .12); }
+.kz-wahl input:focus-visible + span { outline: 2px solid var(--btc); outline-offset: 2px; }
+.kz-felder { display: flex; flex-wrap: wrap; gap: 10px; }
+.kz-feld { display: flex; flex-direction: column; gap: 4px; }
+.kz-feld input { width: 140px; }
+.kz-leiste { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+
+@media (max-width: 1100px) {
+  /* Schmal: Name, Kapazitaet und Pfeil oben, der Balken darunter, dann die
+     Werte nebeneinander -- jeder mit seinem Spaltennamen, weil die
+     Kopfzeile hier fehlt. */
+  .kz-spalten { display: none; }
+  .kz-kopf { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+  .kz-kopf > .kz-name { flex: 1 1 auto; order: 1; }
+  .kz-kopf > .kz-wert:nth-child(3) { order: 2; }
+  .kz-kopf > .kz-pfeil { order: 3; }
+  .kz-kopf > .kz-verteilung { order: 4; flex: 1 1 100%; }
+  /* Oben buendig: ein Wert ohne zweite Zeile (Erreichbarkeit) sass sonst
+     mittig und eine halbe Zeile tiefer als sein Nachbar. */
+  .kz-kopf > .kz-wert:nth-child(n+4) { order: 5; flex: 1 1 20%; min-width: 96px; align-self: flex-start; }
+  .kz-kopf > .kz-wert:nth-child(n+4)::before {
+    content: attr(data-titel); font-family: var(--sans); font-size: 10px;
+    letter-spacing: .08em; text-transform: uppercase; color: var(--dim);
+  }
+  .kz-detail { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Ueberblick und Ertrag: dieselben grossen Zahlen wie beim Guthaben. */
+.lu-zahlen {
+  display: grid; gap: 14px; margin-bottom: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+.lu-zahlen .kennzahl-gross .wert { white-space: nowrap; }
+.lu-knoepfe { margin-top: 12px; }
+
+/* Ein Umschalter fuer den Zeitraum -- Knoepfe, von denen einer an ist. */
+.segmente { display: inline-flex; gap: 4px; padding: 3px; margin: 6px 0 16px;
+            border: 1px solid var(--border); border-radius: 999px; }
+.segmente button {
+  border: 0; background: none; color: var(--dim); font: inherit; font-size: 12.5px;
+  padding: 5px 12px; border-radius: 999px; cursor: pointer;
+}
+.segmente button.an { background: rgb(247 147 26 / .16); color: var(--text); }
+.segmente button:focus-visible { outline: 2px solid var(--btc); outline-offset: 2px; }
+
+/* Monate: eingenommen nach oben, Kosten nach unten, eine Nulllinie. */
+#le-monate { margin: 4px 0 14px; }
+.le-diagramm { width: 100%; height: auto; display: block; }
+.le-null { stroke: var(--border-hi); stroke-width: 1; }
+.le-ein { fill: #d9720a; }
+.le-aus { fill: #3f8fc4; }
+.le-treffer { fill: transparent; }
+g:hover > .le-treffer { fill: rgb(255 190 105 / .06); }
+.le-achse { fill: var(--dim); font-size: 11px; font-family: var(--sans); }
+.le-legende { display: flex; gap: 16px; font-size: 12px; color: var(--dim); margin-bottom: 4px; }
+.le-legende b { color: var(--text); font-weight: 600; }
+.le-legende i { display: inline-block; width: 10px; height: 10px; border-radius: 3px;
+                margin-right: 6px; vertical-align: -1px; }
+.le-legende i.le-ein { background: #d9720a; }
+.le-legende i.le-aus { background: #3f8fc4; }
+#le-geschlossen { margin: 10px 0; }
+#le-geschlossen summary { cursor: pointer; color: var(--dim); font-size: 13px; }
+
 /* ── Ein Land aus der Naehe ────────────────────────────────────────────────
    Eine Auflage ueber der Weltansicht, kein Umbau an ihr. Wer sie schliesst,
    findet die Karte darunter unveraendert vor -- das war die Bedingung. */
@@ -1460,8 +1608,8 @@ body.ansicht-welt section[data-ansicht="welt"] { flex: 1 1 auto; }
   gap: 28px;
   /* Nicht ueber die ganze Breite: auf einem 2000 Punkte breiten Bildschirm
      wurde Singapur riesig und die Tabelle klebte als duenner Streifen am
-     rechten Rand. Aus dem Betrieb, 06.09.2026: "waere auch gut, wenn das ein wenig
-     ansprechender gestaltet wird." */
+     rechten Rand. Aus dem Betrieb, 06.09.2026: das sollte ansprechender
+     aussehen. */
   width: min(100%, 1400px);
   margin: 0 auto;
   padding: 22px 24px 26px;
@@ -1604,8 +1752,8 @@ body.ansicht-welt section[data-ansicht="welt"] { flex: 1 1 auto; }
 
 /* Anklickbar, und zwar in beide Richtungen: ein Gebiet auf der Karte
    markiert seine Zeile, eine Zeile markiert ihr Gebiet. Aus dem Betrieb, am
-   06.09.2026: "ich klicke in Bild 2 auf ein Bundesland und dann wird mir in
-   der rechten Tabelle die Zeile markiert, in der ich geklickt habe." */
+   06.09.2026: ein Klick auf ein Gebiet markiert seine Zeile in der Tabelle
+   rechts. */
 .wl-tabelle tbody tr { cursor: pointer; transition: background .15s ease; }
 .wl-tabelle tbody tr:hover td { background: rgb(255 201 140 / .07); }
 .wl-tabelle tbody tr.gewaehlt td {
@@ -1834,8 +1982,8 @@ body.ansicht-welt .weltkarte .kleine circle { cursor: pointer; }
 #news-abgewiesen { margin: 14px 0 0; }
 
 /* ── Ablesen am Chart ───────────────────────────────────────────────────────
-   Aus dem Betrieb, 06.09.2026: "ich will dann wie in einem richtigen chart auf nen
-   punkt gehen koennen mit uhrzeit tag oder so und dann kurs". */
+   Aus dem Betrieb, 06.09.2026: wie in einem richtigen Chart auf einen Punkt
+   zeigen und Tag, Uhrzeit und Kurs ablesen. */
 
 .kurs-bild svg { cursor: crosshair; }
 .kurs-bild svg:focus-visible { outline: 1px solid var(--border-hi); }
@@ -1871,8 +2019,8 @@ body.ansicht-welt .weltkarte .kleine circle { cursor: pointer; }
 
 /* Wo stehe ich, und ist das schon endgültig?
    Der Ablauf hatte drei Schritte und sagte nie, der wievielte gerade dran
-   ist. Der Betreiber drückte auf "Wörter erzeugen" und wusste nicht, ob er damit
-   gerade eine Wallet angelegt hat. */
+   ist. Im Betrieb wurde "Wörter erzeugen" gedrückt, und danach war unklar,
+   ob damit gerade eine Wallet angelegt war. */
 .schrittzahl {
   display: inline-block;
   margin-bottom: 6px;
@@ -1964,8 +2112,8 @@ body.ansicht-welt .weltkarte .kleine circle { cursor: pointer; }
 /* ── Werte, die man weitergeben koennen muss ────────────────────────────────
 
    Eine Kennung ist 66 Zeichen lang, eine Verbindungsadresse noch laenger.
-   Gekuerzt sind sie nur noch zum Ansehen gut -- Aus dem Betrieb, 10.09.2026: "solte
-   die volle kennung stehen damit sie mal kopieren kann".
+   Gekuerzt sind sie nur noch zum Ansehen gut -- Aus dem Betrieb, 10.09.2026: die
+   volle Kennung gehoert hin, damit man sie kopieren kann.
 
    Also vollstaendig und umbrechend, damit nichts aus dem Kasten laeuft, und
    in Festbreite, damit man Zeichen fuer Zeichen vergleichen kann. */

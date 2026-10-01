@@ -1,8 +1,8 @@
 """Externe Wallets: Zeus als Fernbedienung fuer diesen Knoten.
 
-Aus dem Betrieb, 26.09.2026: "also wenn dann will ich vollen umfangreichen
-funktionen also alles weil du ja gesagt hast wir koennen dann die rechte fuer
-zeus in der app steuern! ... und es wird dann nur tor und vpn angeboten".
+Aus dem Betrieb, 26.09.2026: der volle Funktionsumfang, wenn schon -- die
+Rechte fuer Zeus werden in der Anwendung gesteuert, und angeboten werden nur
+Tor und VPN.
 
 Zeus spricht LNDs REST-Schnittstelle an -- direkt, an dieser Anwendung
 vorbei. Es braucht dafuer eine Adresse, unter der es LND erreicht, und einen

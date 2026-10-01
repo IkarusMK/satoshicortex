@@ -50,8 +50,8 @@ from typing import Any, Dict, Iterable, Iterator, List, Optional
 
 log = logging.getLogger(__name__)
 
-# Vier Wochen. Sie stehen NICHT still -- Aus dem Betrieb, 18.09.2026: "die 4 wochen
-# sind ja auch nicht fest sondern aendern sich ja mit ne". Genau so: jeder
+# Vier Wochen. Sie stehen NICHT still -- Aus dem Betrieb, 18.09.2026: die vier
+# Wochen sind kein festes Fenster, sie wandern mit. Genau so: jeder
 # neue Messtag schiebt den aeltesten aus dem Fenster.
 FENSTER_TAGE = 28
 
@@ -275,9 +275,8 @@ def _linie(politik: Any) -> Optional[Dict[str, int]]:
 # jeden Tag woanders liegt, kann man nicht mit gestern vergleichen.
 #
 # Warum ueberhaupt Stufen: bis zum 21.09.2026 stand unter dem Median ein
-# fuenfzeiliger Absatz, der ERKLAERTE, dass die Verteilung schief ist. Der
-# Betreiber dazu: "was das den bitte fuer ein riesen text ??". Er hat recht
-# -- fuenf Prozentzahlen zeigen dieselbe Schiefe auf einen Blick, und sie
+# fuenfzeiliger Absatz, der ERKLAERTE, dass die Verteilung schief ist. Aus
+# dem Betrieb kam: viel zu viel Text. Zu Recht -- fuenf Prozentzahlen zeigen dieselbe Schiefe auf einen Blick, und sie
 # sagen zusaetzlich, WO die Masse liegt. Das stand in dem Absatz nicht.
 STUFEN_GRENZEN = (1, 10, 100, 1000)
 
@@ -376,9 +375,9 @@ def messen(knoten, eigene_kennung: str = "",
 def band(verlauf: List[Dict[str, Any]], ohne_tag: str = "") -> Dict[str, Any]:
     """Ober- und Untergrenze aus den letzten vier Wochen.
 
-    OHNE den heutigen Tag, und das ist der ganze Punkt. Der Betreiber will das Band
-    als Absicherung: "Obergrenze ist max wert der letzten 4 wochen und
-    untergrenze ist dann min wert der letzten 4 wochen". Zaehlte die heutige
+    OHNE den heutigen Tag, und das ist der ganze Punkt. Das Band ist als
+    Absicherung gewollt: oben der hoechste, unten der niedrigste Wert der
+    letzten vier Wochen. Zaehlte die heutige
     Messung mit, laege sie IMMER innerhalb ihres eigenen Bandes -- eine
     Messung, die einmal danebengeht, wuerde sich ihre Grenze selbst
     aufmachen und ungebremst durchschlagen. Genau davor soll das Band

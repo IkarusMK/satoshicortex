@@ -361,7 +361,7 @@ def test_adresse_nachtragen_braucht_eine_anmeldung(tmp_path, monkeypatch):
 
 
 def test_adresse_nachtragen_geht_auch_bei_alter_einrichtung(client):
-    """Des Betreibers Fall am 26.08.: eingerichtet unter 0.3.2, wo die Auswahl noch
+    """Der Fall aus dem Betrieb am 26.08.: eingerichtet unter 0.3.2, wo die Auswahl noch
     nicht festgehalten wurde. Die erste Fassung dieses Weges lehnte das ab und
     verlangte eine komplette Neueinrichtung -- fuer eine einzige Zeile."""
     _richte_ein(client)
@@ -491,10 +491,10 @@ def test_status_nennt_alle_drei_projekte(client):
 
 
 def test_die_fassungspruefung_braucht_keinen_knoten(client, monkeypatch):
-    """Aus dem Betrieb, 03.09.2026: "der fassungskasten hat nie zu schweigen ...
-    eine begruendung fuer ne fehl funktion ist trotzdem eine fehlfunktion".
+    """Aus dem Betrieb, 03.09.2026: der Versionskasten darf nie schweigen --
+    eine Begruendung fuer eine Fehlfunktion bleibt eine Fehlfunktion.
 
-    Er hat recht. Die Auskunft liegt fertig im Arbeitsspeicher; sie hing nur
+    Zu Recht. Die Auskunft liegt fertig im Arbeitsspeicher; sie hing nur
     als Beipack an /status, und der wartet auf bitcoind. Dieser Weg darf
     keinen einzigen RPC-Aufruf ausloesen -- dann kann er auch nicht in eine
     Frist laufen.
@@ -531,7 +531,8 @@ def test_die_tor_pause_schaltet_die_versionsabfrage_nicht_ab(client, monkeypatch
     geht ueber genau diesen Dienst.
 
     Waere es anders, stuende im Kasten "Ohne Tor wird nicht nachgefragt" --
-    ein Satz. Der Betreiber sah gar nichts, und das hatte einen anderen Grund.
+    ein Satz. Im Betrieb war gar nichts zu sehen, und das hatte einen anderen
+    Grund.
     """
     from satcortex import rpc as rpc_modul
     from satcortex import updates as updates_modul
@@ -593,9 +594,9 @@ def _versionen_und_kette(monkeypatch, gefragt):
 
 
 def test_der_kasten_weiss_wem_die_installation_folgt(tmp_path, monkeypatch):
-    """Aus dem Betrieb, 23.09.2026: "ich will ja immer latest! und nicht
-    gepinnt auf eine version!" -- und der Kasten reichte ihm eine Zeile zum
-    Festnageln. Er muss wissen, wem die Installation folgt, sonst kann er
+    """Aus dem Betrieb, 23.09.2026: gewollt ist immer latest, keine feste
+    Version -- und der Kasten reichte eine Zeile zum Festnageln. Er muss
+    wissen, wem die Installation folgt, sonst kann er
     nicht den richtigen Weg nennen."""
     c = _mit_fassung(tmp_path, monkeypatch, "1.0.2", abbild_tag="latest")
     _richte_ein(c)
@@ -1160,9 +1161,8 @@ def test_der_erneuerte_takt_regelt_bitcoind_nicht_gleichzeitig_um(client, monkey
 
 # ── Vier Wege ins Netz, unabhaengig voneinander ────────────────────────────
 #
-# Des Betreibers Anforderung vom 29.08.2026, woertlich: "es muss 4 wege geben zum
-# verbinden ... keiner dieser regler solte sich geseitig ausschliessen oder
-# behindern sollen koennen". Tor, IPv4, IPv6 und die eigene Adresse sind
+# Die Anforderung aus dem Betrieb vom 29.08.2026: vier Wege zum Verbinden, und
+# keiner dieser Regler darf einen anderen ausschliessen oder behindern. Tor, IPv4, IPv6 und die eigene Adresse sind
 # deshalb vier Schalter, nicht ein Auswahlfeld: Tor und Clearnet sind kein
 # Entweder-oder, und gerade Knoten, die beide Welten sprechen, sind knapp.
 
@@ -1399,9 +1399,9 @@ def test_vor_der_einrichtung_wird_nicht_gemessen(client):
 
 # ── Lightning: die Wallet anlegen ──────────────────────────────────────────
 #
-# Der heikelste Ablauf im Projekt. Die Vorgabe des Betreibers steht ueber allem und ist
-# aelter als dieses Repo: "eine wallet seed gehoert immer auf ein blatt papier
-# nie auf platte irgendwo". Die Tests hier pruefen deshalb nicht nur, dass es
+# Der heikelste Ablauf im Projekt. Die Vorgabe aus dem Betrieb steht ueber allem
+# und ist aelter als dieses Repo: ein Seed gehoert auf Papier, nie auf eine
+# Platte. Die Tests hier pruefen deshalb nicht nur, dass es
 # funktioniert, sondern vor allem, was NICHT passiert.
 
 WOERTER = [f"wort{n:02d}" for n in range(1, 25)]
@@ -2191,6 +2191,13 @@ class LndVollstaendig(FakeLnd):
         # Die offenen Kanaele, roh wie LND sie schickt. None: der eine
         # Standardkanal zu ACINQ.
         self.kanaele_roh = None
+        # Was GetChanInfo fuer einen Kanal liefert -- ohne Eintrag: nichts.
+        self.linie = None
+        # Fuer den Ertrag (30.09.2026): Weiterleitungen, geschlossene Kanaele
+        # und eigene Zahlungen, roh wie LND sie schickt.
+        self.weiter_roh = []
+        self.geschlossen_roh = []
+        self.zahlungen_roh = []
         # Was der Zahl-Strom meldet, und was das Weiterverfolgen einer
         # Zahlung meldet. "ausbleiben" heisst: keine Antwort in der Frist.
         self.zahl_meldungen = [{"result": {"status": "IN_FLIGHT"}}]
@@ -2266,8 +2273,16 @@ class LndVollstaendig(FakeLnd):
         if nackt == "/v1/graph/info":
             return {"num_nodes": 6100, "num_channels": 20500,
                     "total_network_capacity": "300000000000"}
+        if nackt.startswith("/v1/graph/edge/"):
+            # Die eigene Linie eines Kanals (GetChanInfo) -- in dieser
+            # Attrappe unbekannt; die Anwendung muss damit leben.
+            return dict(self.linie or {})
         if nackt == "/v1/switch":
-            return {"forwarding_events": []}
+            return {"forwarding_events": list(self.weiter_roh)}
+        if nackt == "/v1/channels/closed":
+            return {"channels": list(self.geschlossen_roh)}
+        if nackt == "/v1/payments":
+            return {"payments": list(self.zahlungen_roh)}
         if nackt == "/v1/peers":
             return {"peers": [{"pub_key": "02" + "ee" * 32, "inbound": False,
                                "sync_type": "ACTIVE_SYNC"}]}
@@ -2290,7 +2305,13 @@ def test_die_kanalansicht_kommt_in_einer_antwort(client, lnd_voll):
     assert d["guthaben"]["kanal_hier"] == 42000
     assert d["kanaele"][0]["gegenstelle"] == "ACINQ"
     assert d["netz"]["knoten"] == 6100
-    assert d["weiterleitungen"]["anzahl"] == 0
+    # Die Weiterleitungen stehen seit dem 30.09.2026 im Ertrag -- hier lasen
+    # sie bei jedem Neuladen die ganze Historie fuer eine einzige Summe.
+    assert "weiterleitungen" not in d
+    assert "/v1/switch" not in [p.split("?")[0] for p in lnd_voll.gefragt]
+    # Je Kanal: was gilt und was die Automatik setzen wuerde.
+    assert d["kanaele"][0]["steuerung"]["gebuehr"] == "fest"
+    assert d["kanaele"][0]["steuerung"]["stufe"] == 3      # 40 % auf deiner Seite
     # Die Leitungen kommen mit -- und eine Leitung ist kein Kanal.
     assert d["verbindungen"] == [{"kennung": "02" + "ee" * 32, "name": "",
                                   "mit_kanal": False, "eingehend": False,
@@ -2301,9 +2322,10 @@ def test_ein_ausfall_nimmt_nicht_die_ganze_ansicht_mit(client, lnd_voll):
     """Eine Ansicht, die wegen der Weiterleitungsstatistik auch die
     Kanalliste verschweigt, waere schlechter als eine unvollstaendige."""
     _richte_ein(client)
-    lnd_voll.faellt_aus = {"/v1/switch", "/v1/graph/info"}
+    lnd_voll.faellt_aus = {"/v1/fees", "/v1/graph/info"}
     d = client.get("/api/lightning/kanaele").json()
-    assert "weiterleitungen" not in d and "netz" not in d
+    assert "netz" not in d
+    assert d["kanaele"][0]["satz_ppm"] is None, "ohne Bericht: unbekannt, nicht 0"
     assert d["kanaele"][0]["kapazitaet"] == 5_000_000
     assert d["knoten"]["alias"] == "Testknoten"
 
@@ -2410,8 +2432,9 @@ def test_das_gebackene_macaroon_haelt_genau_die_liste(client, lnd_macaroon):
     Begruendung stimmte: onchain:write erlaubt bei LND auch SendCoins, die
     Berechtigung laesst sich nicht trennen.
 
-    Sie ist jetzt drin, und zwar aus die Bedingung des Betreibers vom 30.08.2026: "ich
-    werde nix dahin ueberweisen solange ich es nicht zurueck schicken kann".
+    Sie ist jetzt drin, und zwar wegen der Bedingung aus dem Betrieb vom
+    30.08.2026: eingezahlt wird erst, wenn man das Geld auch zurueckschicken
+    kann.
     Was den Ausschlag gab, ist die Rechnung dahinter:
 
       * Fuer jemanden mit der PLATTE aendert es nichts -- dort liegt ohnehin
@@ -2861,8 +2884,8 @@ def test_kein_rpc_aufruf_wird_je_takt_wiederholt(client, monkeypatch):
 
 
 def test_die_einstellungen_warten_nicht_auf_bitcoind(client, monkeypatch):
-    """Aus dem Betrieb, 03.09.2026: "solange der Bitcoin Knoten wegschreibt kann
-    die ganze App nix machen". Die Schalter stehen in einer Datei auf der
+    """Aus dem Betrieb, 03.09.2026: solange der Bitcoin-Knoten schreibt, steht
+    die ganze Anwendung. Die Schalter stehen in einer Datei auf der
     Platte -- diese Seite darf keinen einzigen RPC-Aufruf ausloesen."""
     from satcortex import rpc as rpc_modul
 
@@ -2884,10 +2907,8 @@ def test_die_einstellungen_warten_nicht_auf_bitcoind(client, monkeypatch):
 
 # ── Die Daten liegen bereit, sie werden nicht geholt (04.09.2026) ───────────
 #
-# Der Betreiber: "der aufruf der app dauert immer noch sehr lange im browser .. bis
-# man mal die daten sieht ... vielleicht liegt es daran das unsere app kein
-# richtiges backend und frontend hat ... wo die daten zur bereitstellung
-# liegen??"
+# Aus dem Betrieb: die Anwendung brauchte im Browser sehr lange, bis Daten zu
+# sehen waren -- vermutet wurde, dass ein Backend fehlt, das sie bereithaelt.
 #
 # Der Einwand traf. Jeder Endpunkt holte seine Zahlen selbst, sobald der
 # Zwischenspeicher aelter als drei Sekunden war -- und der Anzeigetakt sind
@@ -2981,10 +3002,9 @@ def test_die_kennzahlen_holen_die_kettenlage_nicht_ein_zweites_mal(client, monke
 
 # ── Lightning-Sichtbarkeit gehoert zu den Netzeinstellungen (04.09.2026) ────
 #
-# Der Betreiber: "kann man das nicht ueber die einstellung wo wir bis jetzt auch
-# unsere ip geschichten haben mit einbinden?? ... man soll immer die wahl
-# haben ob only ueber tor (anonym) oder tor mit ip freigabe router oder ip
-# freigabe clearnet mit dyndns weiterleitung."
+# Aus dem Betrieb: das gehoert zu den Einstellungen, in denen schon die
+# Adressfragen stehen -- mit der Wahl zwischen nur Tor (anonym), Tor mit
+# Freigabe im Router, oder Clearnet mit DynDNS-Weiterleitung.
 
 def test_die_sichtbarkeit_ueberlebt_das_speichern(client):
     _richte_ein(client)
@@ -2999,9 +3019,9 @@ def test_die_sichtbarkeit_ueberlebt_das_speichern(client):
 
 
 def test_die_wahl_gilt_fuer_beide_dienste(client):
-    """Aus dem Betrieb, 05.09.2026: "verstehe nicht, warum diese Einstellungen nur
-    fuer LND gelten und nicht generell fuer unsere App?" -- und: "kann ja
-    auch fuer BTC gut sein, die Auswahl."
+    """Aus dem Betrieb, 05.09.2026: warum gelten diese Einstellungen nur fuer
+    LND und nicht fuer die ganze Anwendung? Die Auswahl taugt auch fuer
+    Bitcoin.
 
     Also gilt sie fuer beide. "Nur ueber Tor" heisst dann auch bei bitcoind
     onlynet=onion; die Haekchen fuer IPv4 und IPv6 sind in dieser Betriebsart
@@ -3125,11 +3145,9 @@ def test_wer_nichts_ankuendigt_bleibt_still(client):
 
 # ── Wallet-Software im Heimnetz (05.09.2026) ────────────────────────────────
 #
-# Der Betreiber: "was mir auch schmecken wuerde wenn ich meine transaktionen von
-# meinem hardware wallet dann auch ueber mein btc knoten machen koennte ...
-# der bitcoin core zugangsdaten ... solte dann in den einstellungen sichtbar
-# sein weil wenn ich mich mit der macsoftware an meinem knoten anmelden will
-# brauche ich ja die daten."
+# Aus dem Betrieb: Transaktionen eines Hardware-Wallets sollen ueber den eigenen
+# Knoten laufen koennen -- und die Zugangsdaten zu Bitcoin Core gehoeren dafuer
+# sichtbar in die Einstellungen, weil die Wallet-Software sie braucht.
 #
 # Sparrows eigene Beschreibung, am 05.09.2026 nachgeschlagen: "Sparrow does
 # not use Bitcoin Core's internal wallet" -- es wird also keine Wallet im
@@ -3202,10 +3220,9 @@ def test_die_zugangsdaten_sind_die_des_knotens(client):
 
 # ── Der Assistent kennt, was die Einstellungen koennen (05.09.2026) ─────────
 #
-# Der Betreiber: "das sind dann aber alles so Einstellungen, die sollten dann in der
-# example.env und vor allem auch in den Einstellungen am Anfang beim
-# Installationsverfahren als Schritt gezeigt werden, oder nicht?? Wenn jemand
-# das so neu installiert, hat er ja noch keine Ahnung."
+# Aus dem Betrieb: solche Einstellungen gehoeren in die example.env und vor
+# allem als Schritt in die Einrichtung -- wer neu installiert, weiss noch
+# nichts.
 #
 # Er hat recht, und der Befund war schlimmer als die Frage: seit 0.38.0 fuehrte
 # die Einstellungsseite mit der Sichtbarkeitswahl, der Assistent zeigte
@@ -3338,8 +3355,8 @@ def test_ohne_gebietsnamen_sagt_es_das_statt_leer_zu_wirken(tmp_path):
 
 
 def test_auch_gebiete_ohne_gegenstellen_stehen_in_der_liste(client):
-    """Aus dem Betrieb, 06.09.2026: "ich klicke auf ein leuchtendes ODER NICHT
-    leuchtendes Bundesland."
+    """Aus dem Betrieb, 06.09.2026: auch ein Gebiet, das nicht leuchtet, laesst
+    sich anklicken.
 
     Ein Umriss, den man nicht anklicken kann, sieht kaputt aus -- auch wenn
     dahinter nur eine Null steht. Und nur was in der Liste steht, bekommt in
@@ -3698,9 +3715,8 @@ def test_nach_dem_abgleich_wird_der_indexstand_mitgeliefert(client, monkeypatch)
     dauert Stunden. Solange findet die Transaktionssuche nichts, und
     Wallet-Software bekommt keine Antwort.
 
-    Bis zum 08.09.2026 stand darueber nirgends etwas. Der Betreiber hat es von
-    selbst vermutet: "vielleicht liegt es daran, dass das nicht geklappt
-    hat." Eine Anwendung, in der man raten muss, was der Knoten gerade tut,
+    Bis zum 08.09.2026 stand darueber nirgends etwas. Im Betrieb wurde es nur
+    vermutet. Eine Anwendung, in der man raten muss, was der Knoten gerade tut,
     erklaert ihn nicht.
     """
     from satcortex import rpc as rpc_modul
@@ -3791,7 +3807,7 @@ def test_steht_die_kette_wird_lightning_eingerichtet(client, monkeypatch):
 
 
 def test_der_dienst_meldet_sich_danach_als_freigegeben(client, monkeypatch):
-    """Was die Oberflaeche zeigt, ist genau das, was der Betreiber vermisst hat."""
+    """Was die Oberflaeche zeigt, ist genau das, was im Betrieb gefehlt hat."""
     from satcortex import rpc as rpc_modul
     _richte_ein(client)
     vorher = {d["name"]: d["zustand"]
@@ -3982,8 +3998,8 @@ def _mempool_strom(monkeypatch, rpc_modul, gefragt=None, n=30, roh=None):
 
 
 def test_die_kacheln_kommen_aus_dem_eigenen_knoten(client, monkeypatch):
-    """Nichts davon wird von aussen geholt -- Aus dem Betrieb, 08.09.2026: "jede
-    info die wir brauchen kommt aus dem netzwerk und nicht von extern"."""
+    """Nichts davon wird von aussen geholt -- Aus dem Betrieb, 08.09.2026: jede
+    Auskunft kommt aus dem Netz selbst, nicht von fremden Diensten."""
     from satcortex import rpc as rpc_modul
     _richte_ein(client)
     gefragt = []
@@ -4103,7 +4119,7 @@ def test_der_grosse_aufruf_wird_nicht_bei_jedem_blick_wiederholt(client,
 
 
 def test_lightning_haengt_nicht_am_zehn_minuten_takt(client, monkeypatch):
-    """Der Fehler, den Aus dem Betrieb, 08.09.2026 gemeldet hat: nach dem Update auf
+    """Der Fehler, der am 08.09.2026 aus dem Betrieb gemeldet wurde: nach dem Update auf
     0.46.0 stand LND weiter auf "wartet auf Einrichtung".
 
     Zwei Ursachen, beide im Takt und nicht in der Logik. Der Waechter schlief
@@ -4194,7 +4210,7 @@ def test_was_ueber_die_grenze_geht_wird_zusammengefasst(client, monkeypatch):
 
 
 def test_ein_alter_block_kommt_aus_der_kette(client, monkeypatch):
-    """Aus dem Betrieb, 08.09.2026: "und wie find ich jetzt satoshis nachricht??"
+    """Aus dem Betrieb, 08.09.2026: die Frage, wo Satoshis Nachricht zu finden ist.
 
     Die Blockansicht wirbt in ihrem eigenen Erklaertext damit ("im
     allerersten Block steht dort die Schlagzeile, mit der alles anfing") und
@@ -4249,9 +4265,8 @@ def test_eine_unsinnige_hoehe_wird_abgewiesen(client, monkeypatch):
 
 # ═══════════════════════════════════ die Sichtbarkeit wirkt wirklich ═══
 #
-# Aus dem Betrieb, 09.09.2026, bevor er umgestellt hat: "wichtiger ist, wenn ich
-# spaeter mal sage ich will nur noch tor, ob das dann alles auch noch
-# funktioniert?" Die ehrliche Antwort war NEIN.
+# Aus dem Betrieb, 09.09.2026, vor dem Umstellen: die Frage, ob spaeter "nur
+# noch Tor" auch wirklich alles umstellt. Die ehrliche Antwort war NEIN.
 #
 # lnd.conf wurde genau einmal geschrieben. Danach flickte nur noch das
 # Adressnachfuehren an den externalip-Zeilen -- und auch das nur, solange
@@ -4375,9 +4390,8 @@ def test_der_entsperrweg_ueberlebt_den_wechsel(client, monkeypatch):
 
 # ═════════════ das Passwort kennt der Nutzer -- immer ══════════════════
 #
-# Aus dem Betrieb, 09.09.2026: "wenn ich auch das auto entsperren aktiviere sollte
-# ich das passwort selbst gewaehlt haben oder es mir wenigstens anzeigen
-# lassen". Bis dahin stand in wallet_passwort:
+# Aus dem Betrieb, 09.09.2026: wer das automatische Entsperren einschaltet, muss
+# das Passwort selbst gewaehlt haben oder es wenigstens sehen koennen. Bis dahin stand in wallet_passwort:
 #
 #     if automatisch:
 #         return secrets.token_urlsafe(32)
@@ -4435,10 +4449,9 @@ def test_auch_die_wiederherstellung_wuerfelt_nichts(client, lnd_da):
 
 # ═══════════════════ was jetzt zu tun ist -- und wann nicht ════════════
 #
-# Aus dem Betrieb, 09.09.2026, nach dem Neustart von LND: "in der uebersicht steht
-# das lnd laeuft aber nix vom wallet ... auf kanaele steht dass das wallet
-# bereit ist aber gesperrt ist (aber nicht wo ich es entsperren kann..) und
-# bei wallet werde ich aufgefordert das wallet passwort einzugeben."
+# Aus dem Betrieb, 09.09.2026, nach dem Neustart von LND: die Uebersicht meldete
+# "LND laeuft" ohne ein Wort zur Wallet, unter Kanaele stand "gesperrt" ohne
+# Weg zum Entsperren, und erst unter Wallet wurde nach dem Passwort gefragt.
 #
 # Der Zustand stand dort, wo man nicht handeln kann, und das Handeln dort,
 # wo man nicht hinsieht. Und seine Bedingung dazu: "wenn alles da, muss man
@@ -4479,7 +4492,7 @@ def test_eine_gesperrte_wallet_ist_dringend(client, lnd_da, monkeypatch):
 
 
 def test_steht_alles_gibt_es_keinen_hinweis(client, lnd_da, monkeypatch):
-    """Die Bedingung des Betreibers, woertlich. Kein Dauerbanner."""
+    """Die Bedingung aus dem Betrieb: ist alles erledigt, kein Dauerbanner."""
     _richte_ein(client)
     _mit_kette(client, monkeypatch)
     lnd_da.stand = "SERVER_ACTIVE"
@@ -4559,8 +4572,7 @@ def test_vor_der_einrichtung_fuehrt_der_assistent(client):
 
 # ═══════════════════════ der Knoten bekommt einen Namen ════════════════
 #
-# Aus dem Betrieb, 09.09.2026: "ich moechte nicht das alles immer nur
-# satoshicortex heisst!!"
+# Aus dem Betrieb, 09.09.2026: nicht jeder Knoten soll "SatoshiCortex" heissen.
 #
 # Er hatte recht, und es war peinlich: alias stand als Vorgabe in einer
 # Datenklasse, und lightning_bereitstellen uebergab ihn NIE. In der ganzen
@@ -4617,8 +4629,8 @@ def test_eine_unsinnige_farbe_wird_abgewiesen(client):
 
 # ═══════════════════ sich anschliessen, ohne Geld zu bewegen ═══════════
 #
-# Aus dem Betrieb, 09.09.2026: "man will sich ja nicht nur ein kanal oder knoten
-# erstellen sondern sich auch einen anschliessen." Befund 20: das Recht
+# Aus dem Betrieb, 09.09.2026: man will nicht nur selbst Kanaele anlegen,
+# sondern sich auch an andere Knoten anschliessen. Befund 20: das Recht
 # peers:write lag seit jeher im Macaroon -- benutzt hat es nie jemand.
 
 def test_eine_unbrauchbare_adresse_ist_kein_ausfall(client, lnd_da):
@@ -4717,11 +4729,11 @@ def test_das_verbinden_oeffnet_keinen_kanal(client, lnd_voll, tmp_path):
 
 def test_der_sicherungs_hinweis_laesst_sich_wegnehmen(client, lnd_da,
                                                       monkeypatch):
-    """Aus dem Betrieb, 09.09.2026: "das aufmerksam machen auf die kanal sicherung
-    nervt! ... das sollten wir dem kunden ueberlassen, es sollte keine
-    pflicht sein!"
+    """Aus dem Betrieb, 09.09.2026: der staendige Hinweis auf die
+    Kanalsicherung nervt -- das entscheidet der Nutzer, eine Pflicht ist es
+    nicht.
 
-    Er hat recht. Die anderen Hinweise verschwinden von allein, sobald man
+    Zu Recht. Die anderen Hinweise verschwinden von allein, sobald man
     sie erledigt -- dieser beschreibt eine WAHL, und eine Wahl, die man
     taeglich neu wegklicken muss, ist keine.
     """
@@ -4762,9 +4774,8 @@ def test_das_wegnehmen_ueberdauert_einen_neustart(client, lnd_da, monkeypatch):
 
 # ═══════════════════════ die Wallet wieder loswerden ═══════════════════
 #
-# Aus dem Betrieb, 09.09.2026: "mach es dann moeglich ein wallet zu loeschen mit
-# dem wallet passwort zum entsperren ... dann kann ich die ganze
-# initialisierung nochmal machen und testen."
+# Aus dem Betrieb, 09.09.2026: eine Wallet soll sich mit ihrem Passwort loeschen
+# lassen, damit man die ganze Einrichtung noch einmal durchlaufen kann.
 #
 # Sein Riegel ist der richtige: bei abgeschaltetem Auto-Entsperren liegt das
 # Wallet-Passwort NIRGENDS auf der Platte. Er verlangt aber einen Umweg --
@@ -4848,7 +4859,7 @@ def test_mit_auto_entsperren_laesst_sich_nicht_sperren(client, lnd_da,
 # Aus dem Betrieb, 10.09.2026: unter "Knoten" blieb die Verbindungsadresse leer,
 # obwohl in den Einstellungen alles stand -- Sichtbarkeit "Tor und Clearnet",
 # eigene Adresse eingetragen, und bitcoind kuendigte sie nachweislich an
-# ("Angekuendigt wird zurzeit: 78.223.248.60, ...onion").
+# ("Angekuendigt wird zurzeit: 198.51.100.60, ...onion").
 #
 # Der Grund war eine Bedingung, die auf der falschen Seite haengt:
 #
@@ -4873,7 +4884,7 @@ def _lightning_lage(hoehe=966_370):
 
 def _mit_lightning(client, monkeypatch, adresse="203.0.113.9"):
     """Ein eingerichteter Knoten mit fertiger Kette und geschriebener
-    lnd.conf -- der Zustand, in dem der Betreiber stand."""
+    lnd.conf -- der Zustand aus dem Betrieb."""
     from satcortex import dyndns as dyndns_modul
     from satcortex import rpc as rpc_modul
     monkeypatch.setattr(dyndns_modul, "loese_auf", lambda namen: list(namen))
@@ -4944,14 +4955,14 @@ def test_ein_dns_aussetzer_nimmt_die_lnd_adresse_nicht_mit(
 
 # ── Die drei Wege, auf denen eine Wallet wieder aufgeht ────────────────────
 #
-# Aus dem Betrieb, 10.09.2026: "wie ich es habe ist unintressant! weil das soll sich
-# jeder nutzer aussuchen koennen ob sich das wallet selbst entsperrt ob ich
-# den tresor will .. oder nicht".
+# Aus dem Betrieb, 10.09.2026: wie es auf einem einzelnen Knoten eingestellt
+# ist, spielt keine Rolle -- jeder Nutzer waehlt selbst, ob sich die Wallet
+# von allein entsperrt.
 #
 # Der Tresor, der hier bis zum 10.09.2026 als dritter Weg stand, ist weg.
-# Der Betreiber hat ihn zerlegt: "ich tausche ein passwort gegen das andere obwohl
-# beide die selbe funktion unterm strich haben!!" -- und die Rechnung geht
-# auf. Gegen "ich tippe das Wallet-Passwort" gewann er nichts und kostete ein
+# Aus dem Betrieb kam der Einwand, der ihn erledigt hat: ein Passwort gegen
+# ein anderes getauscht, das unterm Strich dasselbe tut -- und die Rechnung
+# geht auf. Gegen "ich tippe das Wallet-Passwort" gewann er nichts und kostete ein
 # Artefakt mehr auf der Platte; gegen "von allein entsperren" lieferte er
 # nicht, wofuer man diese Betriebsart nimmt.
 #
@@ -4989,8 +5000,8 @@ def test_die_drei_wege_sind_beim_anlegen_waehlbar(client, lnd_da, weg,
 
 
 def test_im_weg_merken_liegt_das_passwort_auf_keiner_platte(client, lnd_da):
-    """Der wichtigste Test dieser Gruppe -- und die Antwort auf des Betreibers
-    Einwand, sein Wallet-Passwort liege unverschluesselt herum.
+    """Der wichtigste Test dieser Gruppe -- und die Antwort auf den Einwand aus
+    dem Betrieb, das Wallet-Passwort liege unverschluesselt herum.
 
     Er sucht das Passwort in JEDER Datei, die die Anwendung angefasst hat,
     genau wie es der Seed-Test tut."""
@@ -5194,9 +5205,8 @@ def test_von_datei_auf_merken_ohne_dass_jemand_etwas_tippen_muss(
 
 
 def test_von_aus_auf_merken_geht_ohne_alles(client, lnd_da):
-    """DER BEFUND VOM 10.09.2026. Der Betreiber: "habe aber gerade den Haken
-    gesetzt bei fuer die Laufzeit merken aber das wird noch nicht
-    uebernommen".
+    """DER BEFUND VOM 10.09.2026. Aus dem Betrieb: der Haken "fuer die Laufzeit
+    merken" wurde nicht uebernommen.
 
     Er hatte den Weg "aus", und der Wechsel verlangte von ihm ein getipptes
     Passwort UND eine gesperrte Wallet -- fuer nichts. "aus" legt nirgends
@@ -5329,8 +5339,8 @@ def test_der_tresor_ist_kein_weg_mehr(client, lnd_da):
 
 # ── Die PIN an der Oberflaeche ─────────────────────────────────────────────
 #
-# Aus dem Betrieb, 08.09.2026: "eine art: PIN. fuer Zahlungen ansich also knoten
-# oeffnen oder schliessen geld transferieren".
+# Aus dem Betrieb, 08.09.2026: eine eigene PIN fuer alles, was Geld bewegt --
+# Kanaele oeffnen und schliessen, Zahlungen, Ueberweisungen.
 #
 # EINRICHTEN VERLANGT DAS KONTOPASSWORT, und das ist kein Zierrat: waere es
 # anders, koennte eine uebernommene Sitzung sich SELBST eine PIN geben und
@@ -5444,8 +5454,8 @@ def test_ohne_eingerichtete_pin_bleibt_das_loeschen_wie_es_war(client, lnd_da):
 
 # ── Senden: der Weg zurueck aus der Wallet heraus ──────────────────────────
 #
-# Die Bedingung des Betreibers vom 30.08.2026: "ich werde nix dahin ueberweisen solange
-# ich es nicht zurueck schicken kann". Eine Wallet, aus der man nicht wieder
+# Die Bedingung aus dem Betrieb vom 30.08.2026: eingezahlt wird erst, wenn man
+# das Geld auch zurueckschicken kann. Eine Wallet, aus der man nicht wieder
 # herauskommt, ist keine Wallet, sondern ein Einbahnstrassenschild.
 #
 # Es kam NACH der PIN und nicht davor, und das ist der Grund: mit
@@ -5501,8 +5511,8 @@ def test_die_schaetzung_bewegt_nichts(client, lnd_da, monkeypatch):
 
 def test_gesendet_wird_mit_dem_satz_aus_dem_eigenen_knoten(client, lnd_da,
                                                            monkeypatch):
-    """Aus dem Betrieb, 30.08.2026: "jede info die wir brauchen kommt aus dem
-    netzwerk und nicht von extern". Der Satz kommt aus estimatesmartfee des
+    """Aus dem Betrieb, 30.08.2026: jede Auskunft kommt aus dem Netz selbst,
+    nicht von fremden Diensten. Der Satz kommt aus estimatesmartfee des
     EIGENEN bitcoind -- und wird aufgerundet, nie ab: eine Zahlung knapp
     unter der Schaetzung bleibt liegen."""
     _sendebereit(client, lnd_da, monkeypatch)
@@ -5659,8 +5669,7 @@ def test_die_anwendung_darf_jetzt_onchain_schreiben(client):
 
 # ── Sperren: der Knopf, der eine Minute lang schwieg ───────────────────────
 #
-# Aus dem Betrieb, 11.09.2026: "dazu steht hier wallet sperren .. da drueck ich
-# drauf passiert nix".
+# Aus dem Betrieb, 11.09.2026: "Wallet sperren" gedrueckt, und nichts passierte.
 #
 # Es passierte sehr wohl etwas -- LND wurde beendet und neu gestartet, was bis
 # zu neunzig Sekunden dauert. Nur sah man davon nichts. Ein Knopf, der eine
@@ -5709,9 +5718,8 @@ def test_mit_entsperrdatei_bringt_das_sperren_nichts(client, lnd_da):
 
 # ── Wenn LND den Seed ablehnt, sagt er WARUM ───────────────────────────────
 #
-# Aus dem Betrieb, 11.09.2026: "er sagt er kann mit der seed kein wallet wieder
-# herstellen die pruefsummer stummt nicht .. bin mir aber zu 100% sicher das
-# dass stimmt!"
+# Aus dem Betrieb, 11.09.2026: LND lehnte die Wiederherstellung ab, die
+# Pruefsumme stimme nicht -- obwohl die Woerter sicher stimmten.
 #
 # Die Meldung behauptete in JEDEM Fall, der Zettel sei falsch -- LNDs eigener
 # Wortlaut blieb im Protokoll. LND lehnt aber aus mehreren Gruenden ab. Und
@@ -5747,9 +5755,8 @@ def test_die_abfuhr_von_lnd_nennt_ihren_grund(client, lnd_da):
 
 # ── Kommen die Woerter unveraendert bei LND an? ────────────────────────────
 #
-# Aus dem Betrieb, 11.09.2026: "und was ist wenn die app einfach die woerter nicht
-# wieder zurueck in die pruefsumme zurueck umwandelt .. dann kann lnd das auch
-# nicht erkennen".
+# Aus dem Betrieb, 11.09.2026: die Vermutung, die Anwendung wandle die Woerter
+# nicht richtig zurueck, sodass LND die Pruefsumme nicht erkennen kann.
 #
 # Die richtige Frage, und sie gehoert gemessen statt beteuert. aezeed rechnet
 # die Pruefsumme aus den WOERTERN -- also darf zwischen Tastatur und LND kein
@@ -5811,7 +5818,7 @@ def test_der_seed_aus_dem_anlegen_passt_zum_wiederherstellen(client, lnd_da):
 
 # ── Wenn getinfo gerade nicht antwortet (11.09.2026) ───────────────────────
 #
-# Der Betreiber: "aber es wird mir noch keine verbindungs adresse angezeigt".
+# Aus dem Betrieb: noch immer keine Verbindungsadresse.
 #
 # Seine beiden Protokolle nebeneinander sagten alles:
 #
@@ -5898,9 +5905,8 @@ def test_ohne_je_eine_antwort_sagt_die_auskunft_wenigstens_das(
 
 # ── Ist das noch derselbe Knoten? (11.09.2026) ─────────────────────────────
 #
-# Der Betreiber, nach seiner Wiederherstellung: "keine ahnung habe mir die kennung
-# nicht vorher angesehen .. oder muss ich alles noch mal neu machen weil ich
-# die kennung nicht hatte?"
+# Aus dem Betrieb, nach einer Wiederherstellung: die Frage, ob alles neu gemacht
+# werden muss, weil die Kennung vorher nicht notiert war.
 #
 # Musste er nicht -- aber dass er sie sich von HAND haette notieren sollen,
 # war unser Versaeumnis. Die Anwendung kennt die Kennung ohnehin: sie ist der
@@ -5957,7 +5963,7 @@ def test_dieselbe_kennung_sagt_nichts(client, monkeypatch, tmp_path):
 
 
 def test_eine_andere_kennung_faellt_auf(client, monkeypatch, tmp_path):
-    """Genau das, wofuer der Betreiber sich einen Zettel haette machen sollen."""
+    """Genau das, wofuer man sich sonst einen Zettel haette machen muessen."""
     _mit_kennung(monkeypatch, tmp_path, KENNUNG_A)
     _richte_ein(client)
     client.get("/api/lightning/kanaele")
@@ -6001,8 +6007,8 @@ def test_eine_neue_kennung_laesst_sich_bewusst_uebernehmen(
 
 # ── Was fuer einen Kanal einzuzahlen ist (11.09.2026) ──────────────────────
 #
-# Der Betreiber: "ok dein knoten soll die menge an sat haben dann musst du aber das
-# plus exit und gebueren an sat einzahlen weisst du was ich meine?"
+# Aus dem Betrieb: wer einen Kanal anlegt, soll gleich lesen, was er einzahlen
+# muss -- den Betrag plus Reserve fuer den Ausstieg und die Gebuehren.
 #
 # Sein Gefuehl stimmt, der Mechanismus ist ein anderer: die Schliessgebuehr
 # geht beim einvernehmlichen Schliessen vom KANALGUTHABEN ab. Zusaetzlich in
@@ -6040,7 +6046,7 @@ def test_ohne_gebuehrenschaetzung_rechnet_der_rechner_nicht(client, lnd_voll):
 
 # ── Kanal oeffnen und ueber Lightning zahlen (12.09.2026) ──────────────────
 #
-# Der Betreiber: "ja dann machen wir mal mit Punkt 1 und 2 weiter."
+# Aus dem Betrieb: weiter mit den Punkten 1 und 2.
 #
 # Beides gibt Geld aus der Hand, beides steht hinter derselben PIN wie das
 # Senden -- und die wird ZUERST geprueft. Eine Reihenfolge, in der erst der
@@ -6115,7 +6121,7 @@ def test_die_ruecklage_zaehlt_beim_kanal_mit(client, lnd_voll, monkeypatch):
 
 # ── Und jetzt die Erfolgspfade (12.09.2026) ────────────────────────────────
 #
-# Der Betreiber: "89% grün .. warum nicht 100%??" -- die Zahl ist die Abdeckung,
+# Aus dem Betrieb: 89 % gruen, warum nicht 100 %? -- die Zahl ist die Abdeckung,
 # nicht die Bestehensquote. Beim Nachsehen fiel aber auf, dass ausgerechnet
 # die ERFOLGSPFADE dieser beiden Endpunkte nicht durchlaufen wurden: geprueft
 # war "PIN fehlt", "Betrag zu klein", "Guthaben reicht nicht" -- nicht, dass
@@ -6198,7 +6204,7 @@ def test_eine_eigene_gebuehrengrenze_wird_genommen(client, lnd_voll,
 
 # ── Ein zu kleiner Kanal ist ein SICHERHEITSproblem (12.09.2026) ───────────
 #
-# Der Betreiber: "ist das alles nochmal validiert gegen unsere lndinfo quelle?"
+# Aus dem Betrieb: die Frage nach einer Pruefung gegen lightningnode.info.
 #
 # War es nicht -- und beim Nachholen kam ein Befund heraus, den ich nicht auf
 # dem Schirm hatte. lightningnode.info nennt 200K-500K sat als Untergrenze und
@@ -6228,7 +6234,7 @@ def test_ein_ausreichender_kanal_wird_nicht_angemahnt(client, lnd_voll,
 
 
 def test_knapp_ist_eine_warnung_und_kein_riegel(client, lnd_voll, monkeypatch):
-    """Die Entscheidung gehoert dem Betreiber. Ein Riegel waere Bevormundung
+    """Die Entscheidung gehoert dem, der den Knoten betreibt. Ein Riegel waere Bevormundung
     -- und LNDs eigene Untergrenze liegt bei 20.000."""
     _kanalbereit(client, monkeypatch)
     a = client.post("/api/lightning/kanal/oeffnen", json={
@@ -6492,8 +6498,8 @@ def test_die_bewegungen_brauchen_eine_anmeldung(tmp_path):
 
 # ── Empfangen ueber Lightning (16.09.2026) ─────────────────────────────────
 #
-# Der Betreiber: "Rechnungen bezahlen gibt es ja schon ... solte halt nur auch geld
-# rein bekommen". Bis dahin hatte die Anwendung keinen Endpunkt dafuer.
+# Aus dem Betrieb: Rechnungen bezahlen ging schon, Geld empfangen noch nicht.
+# Bis dahin hatte die Anwendung keinen Endpunkt dafuer.
 
 def test_eine_rechnung_laesst_sich_ausstellen(client, lnd_da):
     _richte_ein(client)
@@ -6761,7 +6767,7 @@ def test_die_einzelne_rechnung_braucht_eine_anmeldung(tmp_path):
 # ── Die Uebersicht braucht Guthaben, ohne die teure Kanal-Antwort ──────────
 
 def test_die_lightning_antwort_traegt_das_guthaben(client, lnd_da):
-    """Aus dem Betrieb, 16.09.2026 wollte das Guthaben auf der Startseite. Die
+    """Aus dem Betrieb, 16.09.2026: das Guthaben gehoert auf die Startseite. Die
     grosse Kanal-Antwort zieht getinfo, Kanalliste, Graph und
     Weiterleitungen mit -- fuer eine Seite, die alle zehn Sekunden laedt,
     waere das zu teuer."""
@@ -7242,9 +7248,8 @@ def test_mehr_adressen_als_erlaubt_werden_nicht_alle_gemessen(
 
 # ── Was das Netz fuers Weiterleiten nimmt ──────────────────────────────────
 #
-# Aus dem Betrieb, 18.09.2026: "wenn dann 100% und alle 3 Stufen gemeinsam!
-# Obergrenze ist max wert der letzten 4 wochen und untergrenze ist dann min
-# wert der letzten 4 wochen fuer die automatik".
+# Aus dem Betrieb, 18.09.2026: alle drei Stufen gemeinsam, oben begrenzt durch
+# den hoechsten, unten durch den niedrigsten Wert der letzten vier Wochen.
 #
 # Drei Stufen: messen, aufheben, nachfuehren. Geprueft wird jede einzeln --
 # und vor allem, dass die dritte NICHT laeuft, solange die zweite noch keine
@@ -7295,6 +7300,14 @@ class LndMitNetzgraph(LndMitMacaroon):
         if nackt == "/v1/channels" and daten is None and not self.hat_kanaele:
             return {"channels": []}
         return super().ruf(pfad, macaroon, daten, zeitlimit)
+
+
+# Ein Kanal, dem sich gezielt etwas setzen laesst: mit Kanalpunkt, Nummer
+# und Gegenstelle. 60 % auf deiner Seite -- die mittlere Stufe.
+ROUTING_KANAL = {"active": True, "peer_alias": "Alpha", "chan_id": "1001",
+                 "channel_point": "dd" * 32 + ":0",
+                 "remote_pubkey": "03" + "cd" * 32, "capacity": "5000000",
+                 "local_balance": "3000000", "remote_balance": "2000000"}
 
 
 @pytest.fixture
@@ -7387,6 +7400,8 @@ def test_mit_messreihe_zieht_die_automatik_den_satz_nach(
     _richte_ein(client)
     _messreihe(client, [120, 130, 125, 140, 135, 128, 132, 138])
     lnd_netzgraph.eigen = 40           # weit weg vom Netz
+    lnd_netzgraph.kanaele_roh = [ROUTING_KANAL]
+    _fuellstaende(client, anteil=0.6, verfuegbar=3_000_000)
     _messen(client)
     r = client.post("/api/lightning/gebuehrenautomatik",
                     json={"automatik": True})
@@ -7395,17 +7410,22 @@ def test_mit_messreihe_zieht_die_automatik_den_satz_nach(
     # eigene Kanal zaehlt dabei mit; er IST ein Teil des Netzes.
     # 125 liegt im Band 120-140, wird also unveraendert uebernommen.
     assert (r.json()["satz_ppm"], r.json()["grund"]) == (125, "median")
-    assert lnd_netzgraph.gebuehren["fee_rate_ppm"] == 125
-    # Fuer ALLE Kanaele -- einzelne nach Liquiditaetsrichtung zu steuern ist
-    # etwas anderes und bleibt Handarbeit.
-    assert lnd_netzgraph.gebuehren["global"] is True
+    # Seit dem 30.09.2026 je Kanal nach Fuellstand: 60 % auf deiner Seite
+    # ist die mittlere Stufe -- dort gilt genau das Netz-Mittel.
+    gesetzt = lnd_netzgraph.gebuehren
+    assert gesetzt["fee_rate_ppm"] == 125
+    assert "global" not in gesetzt
+    assert gesetzt["chan_point"] == {"funding_txid_str": "dd" * 32,
+                                     "output_index": 0}
+    # Der Hoechstbetrag folgt mit: die Haelfte der 3 Mio auf deiner Seite.
+    assert gesetzt["max_htlc_msat"] == str(1_500_000 * 1000)
     # Und die Grundgebuehr bleibt, wo sie war.
-    assert lnd_netzgraph.gebuehren["base_fee_msat"] == "0"
+    assert gesetzt["base_fee_msat"] == "0"
 
 
 def test_die_obergrenze_kommt_aus_den_vier_wochen_und_nicht_von_heute(
         client, lnd_netzgraph):
-    """Genau die Bedingung des Betreibers, und der Grund, warum der heutige Tag NICHT
+    """Genau die Bedingung aus dem Betrieb, und der Grund, warum der heutige Tag NICHT
     ins eigene Band gehoert: sonst deckelt sich ein Ausreisser selbst auf
     seinen eigenen Wert und schlaegt ungebremst durch."""
     _richte_ein(client)
@@ -7481,6 +7501,8 @@ def test_nach_dem_setzen_steht_nicht_gleich_wieder_ein_vorschlag_da(
     _richte_ein(client)
     _messreihe(client, [120, 130, 125, 140, 135, 128, 132, 138])
     lnd_netzgraph.eigen = 40
+    lnd_netzgraph.kanaele_roh = [ROUTING_KANAL]
+    _fuellstaende(client, anteil=0.6, verfuegbar=3_000_000)
     _messen(client)
     gesetzt = client.post("/api/lightning/gebuehrenautomatik",
                           json={"automatik": True}).json()
@@ -7588,8 +7610,8 @@ def test_werte_ausserhalb_der_spanne_werden_abgelehnt(client, monkeypatch, wert)
 # ── Die Uhr der Kette in der Uebersicht ────────────────────────────────────
 
 def test_status_zaehlt_bis_zur_naechsten_halbierung(client, monkeypatch):
-    """Der Betreiber, 21.09.2026: "anzahl der bloecke bis zum naechsten
-    halving .. geschaetztes datum .. und wie hoch die revard ist".
+    """Aus dem Betrieb, 21.09.2026: Bloecke bis zum naechsten Halving, das
+    geschaetzte Datum und die Belohnung danach.
 
     Gerechnet, nicht geholt: die Hoehe liegt ohnehin in der Antwort.
     """
@@ -7793,3 +7815,214 @@ def test_ohne_lightning_gibt_es_kein_wegwissen(client):
     _richte_ein(client)
     a = client.get("/api/lightning/wegwissen")
     assert a.status_code in (409, 503)
+
+
+# ── Routing-Betrieb: Automatik je Kanal, Ertrag, Steuerung (30.09.2026) ────
+#
+# Aus dem Betrieb: ein Schwall, der einen Kanal fuer ein paar Minuten leert
+# und gleich zurueckfliesst, darf nichts umstellen -- entschieden wird ueber
+# den Durchschnitt, einmal am Tag oder alle drei Tage.
+
+def _fuellstaende(client, anteil, verfuegbar, stunden=24, nummer="1001"):
+    """Eine Messreihe direkt in die Ablage -- einen Tag abzuwarten ist keine
+    Pruefmethode."""
+    import time as zeitmodul
+    from satcortex import store as store_modul
+    a = store_modul.Ablage(str(client.tmp / "fast" / "app" / "auswertung.db"))
+    jetzt = int(zeitmodul.time())
+    for i in range(stunden):
+        a.fuellstand_merken([{"nummer": nummer, "anteil_hier": anteil,
+                              "verfuegbar": verfuegbar}], jetzt - i * 3600)
+    a.schliesse()
+
+
+def _wahl(client):
+    import json as js
+    return js.loads((client.tmp / "config" / "einrichtung.json")
+                    .read_text(encoding="utf-8"))["gebuehrenwahl"]
+
+
+def test_die_automatik_entscheidet_nach_dem_tagesschnitt(client, lnd_netzgraph):
+    """Gerade ist der Kanal bei 60 % (mittlere Stufe) -- im Schnitt der
+    letzten 24 Stunden aber fast leer. Entschieden wird nach dem Schnitt:
+    teuer, damit er nicht ganz leerlaeuft."""
+    _richte_ein(client)
+    _messreihe(client, [120, 130, 125, 140, 135, 128, 132, 138])
+    lnd_netzgraph.eigen = 40           # Netz-Median 125, wie oben
+    lnd_netzgraph.kanaele_roh = [ROUTING_KANAL]
+    _fuellstaende(client, anteil=0.1, verfuegbar=500_000)
+    _messen(client)
+    r = client.post("/api/lightning/gebuehrenautomatik", json={"automatik": True})
+    assert r.json()["kanaele"][0]["stufe"] == 4
+    assert lnd_netzgraph.gebuehren["fee_rate_ppm"] == 375        # 125 x 3
+    assert lnd_netzgraph.gebuehren["max_htlc_msat"] == str(250_000 * 1000)
+
+
+def test_je_kanal_hoechstens_einmal_am_tag(client, lnd_netzgraph):
+    _richte_ein(client)
+    _messreihe(client, [120, 130, 125, 140, 135, 128, 132, 138])
+    lnd_netzgraph.kanaele_roh = [ROUTING_KANAL]
+    _fuellstaende(client, anteil=0.6, verfuegbar=3_000_000)
+    _messen(client)
+    client.post("/api/lightning/gebuehrenautomatik", json={"automatik": True})
+    assert lnd_netzgraph.gebuehren is not None
+    # Jetzt kippt der Schnitt -- aber der Kanal wurde eben erst gesetzt.
+    lnd_netzgraph.gebuehren = None
+    _fuellstaende(client, anteil=0.05, verfuegbar=100_000)
+    ergebnis = client.app.state.gebuehren_nachziehen()
+    assert ergebnis["getan"] is False and lnd_netzgraph.gebuehren is None
+    assert _wahl(client)["kanaele"][ROUTING_KANAL["channel_point"]]["zuletzt_s"]
+
+
+def test_ohne_messreihe_fasst_die_automatik_keinen_kanal_an(client, lnd_netzgraph):
+    """Direkt nach dem Update oder bei einem neuen Kanal gibt es nur ein paar
+    Messungen -- das ist der Augenblick, kein Durchschnitt. Die Automatik
+    wartet, bis der halbe Abstand gemessen ist, auch beim Einschalten."""
+    _richte_ein(client)
+    _messreihe(client, [120, 130, 125, 140, 135, 128, 132, 138])
+    lnd_netzgraph.eigen = 40
+    lnd_netzgraph.kanaele_roh = [ROUTING_KANAL]
+    _fuellstaende(client, anteil=0.1, verfuegbar=500_000, stunden=3)
+    _messen(client)
+    r = client.post("/api/lightning/gebuehrenautomatik", json={"automatik": True})
+    assert r.json()["getan"] is False
+    assert r.json()["grund"] == "misst_fuellstand"
+    assert lnd_netzgraph.gebuehren is None
+    [kanal] = client.get("/api/lightning/kanaele").json()["kanaele"]
+    assert kanal["steuerung"]["misst_noch"] is True
+    # Ein halber Tag mehr Messung: jetzt ist es ein Durchschnitt.
+    _fuellstaende(client, anteil=0.1, verfuegbar=500_000, stunden=12)
+    ergebnis = client.app.state.gebuehren_nachziehen()
+    assert ergebnis["getan"] is True
+    assert lnd_netzgraph.gebuehren["fee_rate_ppm"] == 375        # 125 x 3
+    [kanal] = client.get("/api/lightning/kanaele").json()["kanaele"]
+    assert kanal["steuerung"]["misst_noch"] is False
+
+
+def test_ein_kanal_auf_automatik_sagt_dass_er_noch_misst(client, lnd_netzgraph):
+    """In der Zeile auf Automatik gestellt, aber ohne Messreihe: gespeichert,
+    gesetzt wird noch nichts -- und die Antwort sagt warum."""
+    _richte_ein(client)
+    _messreihe(client, [120, 130, 125, 140, 135, 128, 132, 138])
+    lnd_netzgraph.kanaele_roh = [ROUTING_KANAL]
+    _messen(client)
+    r = client.post("/api/lightning/kanal/steuerung", json={
+        "punkt": ROUTING_KANAL["channel_point"], "gebuehr": "automatik",
+        "hoechstbetrag": "fuellstand"})
+    assert r.status_code == 200, r.text
+    assert r.json()["automatik"]["grund"] == "misst_fuellstand"
+    assert lnd_netzgraph.gebuehren is None
+    assert _wahl(client)["kanaele"][ROUTING_KANAL["channel_point"]]["gebuehr"] == "automatik"
+
+
+def test_ein_fester_kanal_bleibt_unberuehrt(client, lnd_netzgraph):
+    _richte_ein(client)
+    _messreihe(client, [120, 130, 125, 140, 135, 128, 132, 138])
+    lnd_netzgraph.kanaele_roh = [ROUTING_KANAL]
+    _messen(client)
+    r = client.post("/api/lightning/kanal/steuerung", json={
+        "punkt": ROUTING_KANAL["channel_point"], "gebuehr": "fest",
+        "satz_ppm": 400, "basis_msat": 0, "hoechstbetrag": "fest",
+        "hoechstbetrag_sat": 800_000})
+    assert r.status_code == 200, r.text
+    gesetzt = lnd_netzgraph.gebuehren
+    assert gesetzt["fee_rate_ppm"] == 400
+    assert gesetzt["max_htlc_msat"] == str(800_000 * 1000)
+    # Die Automatik fuer alle einschalten: der feste Kanal bleibt, wie er ist.
+    lnd_netzgraph.gebuehren = None
+    r = client.post("/api/lightning/gebuehrenautomatik", json={"automatik": True})
+    assert r.json()["getan"] is False
+    assert lnd_netzgraph.gebuehren is None
+
+
+def test_ein_hoechstbetrag_ueber_der_grenze_wird_abgewiesen(client, lnd_netzgraph):
+    """LND nimmt max_htlc nur bis zum ausgehandelten Hoechstwert in Bewegung
+    (routing/localchans/manager.go) -- besser gleich mit Grund abweisen."""
+    _richte_ein(client)
+    lnd_netzgraph.kanaele_roh = [{**ROUTING_KANAL, "local_constraints": {
+        "max_pending_amt_msat": str(1_000_000 * 1000)}}]
+    r = client.post("/api/lightning/kanal/steuerung", json={
+        "punkt": ROUTING_KANAL["channel_point"], "gebuehr": "fest",
+        "satz_ppm": 100, "hoechstbetrag": "fest", "hoechstbetrag_sat": 2_000_000})
+    assert r.status_code == 400
+    assert r.json()["detail"] == {"meldung": "kz_hb_zu_hoch", "grenze": 1_000_000}
+    assert lnd_netzgraph.gebuehren is None
+
+
+def test_ein_unbekannter_kanal_wird_abgewiesen(client, lnd_netzgraph):
+    _richte_ein(client)
+    r = client.post("/api/lightning/kanal/steuerung", json={
+        "punkt": "ee" * 32 + ":9", "gebuehr": "fest", "satz_ppm": 100,
+        "hoechstbetrag": "fuellstand"})
+    assert r.status_code == 404
+
+
+def test_von_hand_gesetzt_heisst_fest(client, lnd_netzgraph):
+    """Wer einen Kanal im Gebuehrenkasten von Hand setzt, will ihn so. Die
+    Automatik ueberschriebe ihn sonst beim naechsten Lauf."""
+    _richte_ein(client)
+    lnd_netzgraph.kanaele_roh = [ROUTING_KANAL]
+    client.post("/api/lightning/gebuehren", json={
+        "satz_ppm": 250, "basis_msat": 0,
+        "kanalpunkt": ROUTING_KANAL["channel_point"]})
+    assert _wahl(client)["kanaele"][ROUTING_KANAL["channel_point"]]["gebuehr"] == "fest"
+
+
+def test_der_fuellstand_wird_stuendlich_gemessen_nicht_oefter(client, lnd_netzgraph):
+    from satcortex import store as store_modul
+    _richte_ein(client)
+    lnd_netzgraph.kanaele_roh = [ROUTING_KANAL]
+    client.app.state.fuellstand_wenn_faellig()
+    client.app.state.fuellstand_wenn_faellig()
+    a = store_modul.Ablage(str(client.tmp / "fast" / "app" / "auswertung.db"))
+    mittel = a.fuellstand_mittel(0)
+    a.schliesse()
+    assert mittel["1001"]["messungen"] == 1
+    assert mittel["1001"]["anteil"] == 0.6
+
+
+def test_die_kanalliste_zeigt_was_die_automatik_taete(client, lnd_netzgraph):
+    _richte_ein(client)
+    _messreihe(client, [120, 130, 125, 140, 135, 128, 132, 138])
+    lnd_netzgraph.eigen = 40
+    lnd_netzgraph.kanaele_roh = [ROUTING_KANAL]
+    lnd_netzgraph.linie = {
+        "node1_pub": ROUTING_KANAL["remote_pubkey"], "node2_pub": "02" + "ab" * 32,
+        "node2_policy": {"time_lock_delta": 80, "fee_rate_milli_msat": "150",
+                         "max_htlc_msat": "4950000000"}}
+    _messen(client)
+    [kanal] = client.get("/api/lightning/kanaele").json()["kanaele"]
+    assert kanal["hoechstbetrag_sat"] == 4_950_000
+    assert kanal["steuerung"] == {
+        "gebuehr": "fest", "hoechstbetrag": "fest", "stufe": 2,
+        "wuerde_ppm": 125, "wuerde_hoechstbetrag_sat": 1_500_000,
+        "zuletzt_s": None, "wartet": False, "misst_noch": True}
+
+
+def test_der_ertrag_je_kanal(client, lnd_netzgraph):
+    import time as zeitmodul
+    _richte_ein(client)
+    jetzt_ns = int(zeitmodul.time()) * 1_000_000_000
+    lnd_netzgraph.kanaele_roh = [ROUTING_KANAL, {
+        **ROUTING_KANAL, "chan_id": "1002", "peer_alias": "Beta",
+        "channel_point": "ee" * 32 + ":1"}]
+    lnd_netzgraph.weiter_roh = [
+        {"timestamp_ns": str(jetzt_ns - 3600 * 10**9), "chan_id_in": "1002",
+         "chan_id_out": "1001", "amt_in": "100025", "amt_out": "100000",
+         "fee_msat": "25000"}]
+    lnd_netzgraph.bewegungen_roh = [
+        {"tx_hash": "aa", "label": "0:openchannel:shortchanid-1001",
+         "total_fees": "400", "time_stamp": str(int(zeitmodul.time()) - 86400),
+         "amount": "-5000400"}]
+    lnd_netzgraph.geschlossen_roh = [
+        {"chan_id": "1003", "remote_pubkey": "02" + "77" * 32,
+         "capacity": "500000", "close_type": "COOPERATIVE_CLOSE",
+         "open_initiator": "INITIATOR_LOCAL"}]
+    d = client.get("/api/lightning/ertrag?zeitraum=30").json()
+    je = {k["nummer"]: k for k in d["kanaele"]}
+    assert je["1001"]["zeitraum"]["eingenommen_sat"] == 25
+    assert je["1001"]["zeitraum"]["kosten_sat"] == 400
+    assert je["1002"]["zeitraum"]["rein_sat"] == 100_025
+    assert je["1003"]["offen"] is False
+    assert d["summe"]["netto_sat"] == 25 - 400
+    assert len(d["monate"]) == 6

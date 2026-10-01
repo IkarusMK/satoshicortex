@@ -1,8 +1,7 @@
 """Der Umrechner rechnet -- und zwar nachweislich.
 
-Aus dem Betrieb, 10.09.2026: "dann brauchen wir auch noch mal nen richtigen
-waehrungs rechner .. damit mann auch klar kommt mit den sat und bitcoin und
-waehrungen".
+Aus dem Betrieb, 10.09.2026: ein richtiger Waehrungsrechner, damit man mit
+sat, Bitcoin und Waehrungen zurechtkommt.
 
 Die uebrigen Oberflaechen-Tests pruefen Quelltext: steht der Aufruf da, ist
 der Schluessel uebersetzt. Fuer einen Rechner reicht das nicht -- eine
@@ -134,7 +133,7 @@ def test_ein_bitcoin_sind_hundert_millionen_sats(rechne):
 
 
 def test_ein_euro_sind_rund_1504_sats(rechne):
-    """Gegengerechnet mit dem Vorbild, das der Betreiber verlinkt hat."""
+    """Gegengerechnet mit dem Vorbild, das im Betrieb verlinkt wurde."""
     d, = rechne([["rechnerUmrechnen", ["fiat", 1, KURS]]])
     assert d["sat"] == 1504
     # 1 / 66468,30 = 0,0000150447... -- gerundet 1504 Sats, wie beim Vorbild.

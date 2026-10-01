@@ -113,8 +113,8 @@ def test_ipv6_geht_als_ipv6_hinaus(attrappe):
 
 def test_abgelehnt_ist_ein_befund(attrappe):
     """Der Ausgangsknoten hat den Rechner ERREICHT und ein RST bekommen. Damit
-    steht fest: die Freigabe fehlt. Genau dieser Fall lag am 31.08.2026 bei
-    Der Betreiber vor -- "Connection refused nach 0,0 Sekunden"."""
+    steht fest: die Freigabe fehlt. Genau dieser Fall lag am 31.08.2026 im
+    Betrieb vor -- "Connection refused nach 0,0 Sekunden"."""
     a = attrappe(antwortcode=0x05)
     d = erreichbar.pruefe_eine("203.0.113.7", 8333, a.adresse, zeitlimit=5)
     assert d["geprueft"] is True
@@ -283,7 +283,7 @@ def test_pruefe_reicht_den_handschlag_durch(attrappe):
 
 # ── Was der SOCKS-CONNECT allein schon beweist ────────────────────────────
 #
-# Des Betreibers Screenshot vom 01.09.2026: "IPv4 · 203.0.113.7 — die Verbindung
+# Ein Bildschirmfoto aus dem Betrieb vom 01.09.2026: "IPv4 · 203.0.113.7 — die Verbindung
 # kam zustande und brach dann ab", rot. Der Satz verschwieg genau das, wofuer
 # man den Knopf drueckt: dass die Freigabe im Router traegt. Antwort 0x00 aus
 # RFC 1928 heisst "succeeded" -- der Ausgangsknoten HAT eine TCP-Verbindung

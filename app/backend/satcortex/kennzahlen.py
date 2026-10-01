@@ -126,9 +126,9 @@ def gebuehren(knoten: rpc.Knoten) -> Dict[str, float]:
 
 # ── Was ein Kanal an On-Chain-Gebuehren kostet ─────────────────────────────
 #
-# Aus dem Betrieb, 04.09.2026: "die Gebuehrenlage beim Oeffnen und Schliessen, das
-# sollte unsere App dann direkt da, wo es passiert, sauber anzeigen, damit es
-# nicht zu boesen Ueberraschungen kommt."
+# Aus dem Betrieb, 04.09.2026: die Gebuehrenlage beim Oeffnen und Schliessen
+# gehoert genau dorthin, wo es passiert -- damit es keine boesen
+# Ueberraschungen gibt.
 #
 # Besonders wichtig bei einem kleinen Einstieg: bei einem Kanal von rund 146.000
 # Sats sind zwei Sats je vByte Kleingeld -- zweihundert waeren ein Drittel
@@ -243,9 +243,8 @@ def schwierigkeit(knoten: rpc.Knoten, lage: Dict[str, Any],
 
 # ── Ist die Gebuehr gerade teuer oder guenstig? ────────────────────────────
 #
-# Aus dem Betrieb, 11.09.2026: "waere das nicht gut wenn er uns sagen wuerde ob das
-# momentan teuer oder guenstig ist im durchschnitt .. ?? das mann ne
-# orientierung hat".
+# Aus dem Betrieb, 11.09.2026: gewuenscht war eine Orientierung, ob es gerade
+# teuer oder guenstig ist, gemessen am Durchschnitt.
 #
 # Eine Zahl wie "2,2 sat/vB" sagt einem Menschen nichts. Erst der Vergleich
 # macht daraus eine Auskunft. Und der Vergleich kommt aus der EIGENEN Kette,
@@ -332,9 +331,8 @@ def einordnung(satz: float, verlauf: Optional[Dict[str, Any]]) -> Optional[str]:
 
 # ── Die Uhr der Kette ──────────────────────────────────────────────────────
 #
-# Der Betreiber, 21.09.2026: "sone arte block zeit in der uebersicht .. anzahl
-# der bloecke bis zum naechsten halving .. geschaetztes datum .. und wie hoch
-# die revard ist beim naechsten halving".
+# Aus dem Betrieb, 21.09.2026: eine Blockzeit in der Uebersicht -- Bloecke bis
+# zum naechsten Halving, das geschaetzte Datum und die Belohnung danach.
 #
 # Die Blockhoehe ist die einzige Uhr, nach der Bitcoin geht -- nicht der
 # Kalender. Alle drei Auskuenfte haengen an ihr, und die Hoehe hat dieser

@@ -4,11 +4,9 @@ laenger.
 WARUM ES DAS GIBT, UND WARUM DER TRESOR WEG IST.
 
 Bis zum 10.09.2026 stand hier ein Tresor: das Wallet-Passwort, verschluesselt
-mit einer Passphrase, die der Nutzer nach jedem Neustart tippt. Der Betreiber hat
-ihn zerlegt, und er hatte recht:
-
-    "das macht keinen sinn ich tausche ein passwort gegen das andere obwohl
-     beide die selbe funktion unterm strich haben!!"
+mit einer Passphrase, die der Nutzer nach jedem Neustart tippt. Aus dem
+Betrieb kam der Einwand, und er traf: so tauscht man ein Passwort gegen ein
+anderes, das unterm Strich dasselbe tut.
 
 Nachgerechnet stimmt das genau. Gegen "ich tippe das Wallet-Passwort" gewinnt
 ein Tresor nichts -- gleicher Aufwand, ein Artefakt mehr auf der Platte -- und

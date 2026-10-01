@@ -281,8 +281,8 @@ class Kontoverwaltung:
 
 # ── Die Freigabe: das Schloss vor jeder Geldbewegung ───────────────────────
 #
-# Aus dem Betrieb, 08.09.2026: "eine art: PIN. fuer Zahlungen ansich also knoten
-# oeffnen oder schliessen geld transferieren".
+# Aus dem Betrieb, 08.09.2026: eine eigene PIN fuer alles, was Geld bewegt --
+# Kanaele oeffnen und schliessen, Zahlungen, Ueberweisungen.
 #
 # SIE SCHUETZT GEGEN ETWAS ANDERES ALS DER TRESOR, und darin liegt der ganze
 # Grund, warum es beide gibt:
