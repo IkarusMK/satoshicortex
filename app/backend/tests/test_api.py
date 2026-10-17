@@ -575,6 +575,9 @@ def _mit_fassung(tmp_path, monkeypatch, version, abbild_tag=""):
 def _versionen_und_kette(monkeypatch, gefragt):
     from satcortex import rpc as rpc_modul
     from satcortex import updates as updates_modul
+    # Die Registry gibt es im Pruefstand nicht -- hier liegt alles bereit.
+    monkeypatch.setattr(updates_modul, "abbild_bereit",
+                        lambda projekt, version, proxy=None: True)
 
     def hole(proxy=None, projekt=None):
         gefragt.append(projekt.name)
@@ -2295,6 +2298,174 @@ def lnd_voll(monkeypatch):
     knoten = LndVollstaendig()
     monkeypatch.setattr(api_modul.lnd, "Knoten", lambda **kw: knoten)
     return knoten
+
+
+# ── Welche LND-Fassung laeuft (Befund 17.10.2026) ──────────────────────────
+#
+# Aus dem Betrieb: in der .env stand v0.21.4-beta, der Container lief damit
+# -- und die Update-Pruefung meldete trotzdem eine neuere Fassung. Sie fragte
+# LND gar nicht, sondern verglich immer die Fassung, die wir ausliefern.
+
+class LndMitFassung(LndVollstaendig):
+    """Wie LndVollstaendig, nur meldet GetInfo auch die Fassung."""
+
+    def __init__(self, fassung):
+        super().__init__()
+        self.fassung = fassung
+
+    def ruf(self, pfad, macaroon="readonly", daten=None, zeitlimit=None):
+        d = super().ruf(pfad, macaroon=macaroon, daten=daten,
+                        zeitlimit=zeitlimit)
+        if pfad.split("?")[0] == "/v1/getinfo":
+            return {**d, "version": self.fassung}
+        return d
+
+
+def _lnd_versionen(monkeypatch, *lnd_versionen, bereit=None):
+    """Was der Feed meldet -- und was davon als Abbild bereitliegt. Ohne
+    Angabe liegt alles bereit; gefragt wird nie wirklich."""
+    from satcortex import rpc as rpc_modul
+    from satcortex import updates as updates_modul
+    gefragt = []
+
+    def liegt_bereit(projekt, version, proxy=None):
+        gefragt.append((projekt.name, version, proxy))
+        return (bereit or {}).get(version, True)
+    monkeypatch.setattr(updates_modul, "abbild_bereit", liegt_bereit)
+
+    def hole(proxy=None, projekt=None):
+        if projekt.name == "lnd":
+            return list(lnd_versionen)
+        if projekt.name == "satcortex":
+            return [(1, 0, 0)]
+        return [(31, 1)]
+    monkeypatch.setattr(updates_modul, "hole_versionen", hole)
+    monkeypatch.setattr(rpc_modul, "kettenlage", lambda _k, *_a: {
+        "kette": "main", "hoehe": 964_000, "kopfzeilen": 964_000,
+        "fortschritt": 1.0, "im_erstsync": False, "belegt_bytes": 1,
+        "kennung": "/Satoshi:31.1.0/",
+        "verbindungen_ein": 0, "verbindungen_aus": 10, "erreichbar": False,
+        "blockzeit": 1_758_600_000, "adressen": [], "netze": {},
+        "empfangen_bytes": 0, "gesendet_bytes": 0})
+    return gefragt
+
+
+def test_die_laufende_lnd_fassung_kommt_aus_lnd_selbst(client, monkeypatch):
+    """Verglichen wird, was LND unter GetInfo meldet -- nicht die Fassung,
+    die wir ausliefern. Wer schon auf der neuesten steht, bekommt kein
+    Update angeboten."""
+    from satcortex import api as api_modul
+    knoten = LndMitFassung("0.21.4-beta commit=v0.21.4-beta")
+    monkeypatch.setattr(api_modul.lnd, "Knoten", lambda **kw: knoten)
+    _richte_ein(client)
+    _lnd_versionen(monkeypatch, (0, 21, 3), (0, 21, 4))
+
+    client.app.state.einmal_nachsehen()
+
+    lnd = client.get("/api/neuerungen").json()["neuerungen"]["lnd"]
+    assert lnd["laufend"] == "0.21.4-beta"
+    assert lnd["laeuft"] is True, "sonst steht dort 'verglichen mit der ausgelieferten'"
+    assert lnd["neueste"] == "0.21.4-beta"
+    assert lnd["gefunden"] is None
+
+
+def test_eine_aeltere_laufende_lnd_fassung_bekommt_das_update(client, monkeypatch):
+    from satcortex import api as api_modul
+    knoten = LndMitFassung("0.21.2-beta commit=v0.21.2-beta")
+    monkeypatch.setattr(api_modul.lnd, "Knoten", lambda **kw: knoten)
+    _richte_ein(client)
+    _lnd_versionen(monkeypatch, (0, 21, 2), (0, 21, 4))
+
+    client.app.state.einmal_nachsehen()
+
+    lnd = client.get("/api/neuerungen").json()["neuerungen"]["lnd"]
+    assert lnd["laufend"] == "0.21.2-beta"
+    assert lnd["gefunden"]["version"] == "0.21.4-beta"
+
+
+def test_gesperrt_gilt_die_zuletzt_gemeldete_lnd_fassung(client, monkeypatch):
+    """Bei gesperrter Wallet beantwortet LND kein GetInfo. Die Fassung
+    aendert sich aber nur, wenn jemand das Abbild tauscht -- die zuletzt
+    gemeldete ist also weiter richtig, und nicht die ausgelieferte."""
+    import time as zeitmodul
+    from satcortex import api as api_modul
+    knoten = LndMitFassung("0.21.4-beta commit=v0.21.4-beta")
+    monkeypatch.setattr(api_modul.lnd, "Knoten", lambda **kw: knoten)
+    _richte_ein(client)
+    _lnd_versionen(monkeypatch, (0, 21, 3), (0, 21, 4))
+    client.app.state.einmal_nachsehen()
+
+    # Zwei Tage spaeter, LND gesperrt: GetInfo schlaegt fehl.
+    knoten.faellt_aus.add("/v1/getinfo")
+    spaeter = zeitmodul.time() + 2 * 86_400
+    # Nur fuer die Pruefung -- sonst liefe auch die Anmeldung ab.
+    with monkeypatch.context() as m:
+        m.setattr(api_modul.time, "time", lambda: spaeter)
+        client.app.state.einmal_nachsehen()
+
+    lnd = client.get("/api/neuerungen").json()["neuerungen"]["lnd"]
+    assert lnd["laufend"] == "0.21.4-beta"
+    assert lnd["gefunden"] is None
+
+
+def test_ohne_lnd_wird_die_ausgelieferte_fassung_verglichen(client, monkeypatch):
+    """Vor dem ersten Start von LND gibt es nichts zu fragen. Dann bleibt es
+    beim Vergleich mit der ausgelieferten Fassung -- und die Oberflaeche
+    sagt dazu, dass es diese ist."""
+    from satcortex import updates as updates_modul
+    _richte_ein(client)
+    _lnd_versionen(monkeypatch, (0, 21, 3))
+
+    client.app.state.einmal_nachsehen()
+
+    lnd = client.get("/api/neuerungen").json()["neuerungen"]["lnd"]
+    assert lnd["laufend"] == "%d.%d.%d-beta" % updates_modul.LND_AUSGELIEFERT
+    assert lnd["laeuft"] is False
+
+
+def test_ohne_abbild_wird_eine_neue_fassung_noch_nicht_gemeldet(client,
+                                                                monkeypatch):
+    """Erschienen, aber unser Abbild ist noch nicht gebaut: keine Zeile zum
+    Abschreiben, deren Ziehen mit "manifest unknown" scheitern wuerde --
+    nur der Hinweis, dass sie kommt."""
+    from satcortex import api as api_modul
+    knoten = LndMitFassung("0.21.4-beta commit=v0.21.4-beta")
+    monkeypatch.setattr(api_modul.lnd, "Knoten", lambda **kw: knoten)
+    _richte_ein(client)
+    _lnd_versionen(monkeypatch, (0, 21, 4), (0, 21, 5),
+                   bereit={(0, 21, 5): False})
+
+    client.app.state.einmal_nachsehen()
+
+    lnd = client.get("/api/neuerungen").json()["neuerungen"]["lnd"]
+    assert lnd["gefunden"] is None
+    assert lnd["wartet_auf_abbild"] == "0.21.5-beta"
+    assert lnd["neueste"] == "0.21.5-beta"
+
+
+def test_liegt_das_abbild_bereit_wird_sie_gemeldet(client, monkeypatch):
+    from satcortex import api as api_modul
+    knoten = LndMitFassung("0.21.4-beta commit=v0.21.4-beta")
+    monkeypatch.setattr(api_modul.lnd, "Knoten", lambda **kw: knoten)
+    _richte_ein(client)
+    gefragt = _lnd_versionen(monkeypatch, (0, 21, 4), (0, 21, 5))
+
+    client.app.state.einmal_nachsehen()
+
+    lnd = client.get("/api/neuerungen").json()["neuerungen"]["lnd"]
+    assert lnd["gefunden"]["version"] == "0.21.5-beta"
+    assert lnd["gefunden"]["tag"] == "v0.21.5-beta"
+    assert lnd["gefunden"]["abbild"] == "bereit"
+    assert lnd["wartet_auf_abbild"] is None
+    # Gefragt wurde nach genau dieser Fassung, und ueber Tor.
+    [(name, version, proxy)] = [g for g in gefragt if g[0] == "lnd"]
+    assert version == (0, 21, 5)
+    assert proxy.startswith("http://")
+
+
+def test_vor_der_ersten_abfrage_wartet_nichts_auf_ein_abbild(client):
+    for name, eintrag in client.get("/api/neuerungen").json()["neuerungen"].items():
+        assert eintrag["wartet_auf_abbild"] is None, name
 
 
 def test_die_kanalansicht_kommt_in_einer_antwort(client, lnd_voll):

@@ -1117,7 +1117,9 @@ const I18N = {
     e_akt_eigen_latest: "Du folgst „latest“ — neu ziehen genügt, die .env bleibt, wie sie ist. In der Docker-Oberfläche deines NAS das Abbild neu laden und den Dienst neu starten, oder: „docker compose pull app“ und „docker compose up -d app“.",
     e_akt_eigen_fest: "In deiner .env steht eine feste Nummer ({folgt}). Setz die Zeile oben ein und stell den Dienst neu bereit — oder schreib „latest“ hinein, dann genügt künftig das Neuziehen.",
     e_akt_eigen_unklar: "Steht in deiner .env SATCORTEX_VERSION=latest, genügt es, das Abbild neu zu ziehen. Steht dort eine Nummer, setz sie auf {v} — oder auf „latest“, dann bleibst du künftig von selbst aktuell.",
-    e_akt_wie: "In der .env die Zeile hochsetzen (BITCOIN_VERSION= bzw. LND_VERSION=), dann neu bereitstellen. Haben wir das Abbild noch nicht gebaut, findet das Ziehen nichts — dann baust du es selbst: „docker compose build lnd“ und „docker compose up -d“. Das dauert etwa eine Minute: geladen, Signatur gegen die gepinnten Herausgeberschlüssel geprüft, ausgepackt. Übersetzt wird nichts.",
+    e_akt_wie: "In der .env die Zeile hochsetzen (BITCOIN_VERSION= bzw. LND_VERSION=), dann neu bereitstellen. Das Abbild liegt bereit: gebaut aus dem offiziellen Release, die Signaturen gegen die gepinnten Herausgeberschlüssel geprüft.",
+    e_akt_abbild_folgt: "{v} ist erschienen. Das Abbild dafür wird noch gebaut und geprüft – sobald es bereitliegt, steht hier die Zeile zum Übernehmen.",
+    e_akt_ungeprueft: "Ob das Abbild dafür schon bereitliegt, ließ sich gerade nicht prüfen. Scheitert das Ziehen mit „manifest unknown“, ist es noch nicht gebaut – dann die bisherige Nummer stehen lassen.",
     e_akt_fassung_unbekannt: "Der Dienst läuft — seine Fassungsnummer ließ sich gerade nur nicht abfragen. Sie kommt aus derselben Auskunft, die während des Erstabgleichs regelmäßig wartet. Beim nächsten Durchgang steht sie wieder da.",
     e_akt_laeuft_nicht: "Der Dienst läuft noch nicht — es gibt keine laufende Fassung, mit der sich vergleichen ließe. Sobald er läuft, wird nachgesehen.",
     e_akt_nicht_erreichbar: "Die Abfrage kam über Tor nicht durch. Das passiert — der Weg geht über drei fremde Rechner. Es wird beim nächsten Durchgang erneut versucht.",
@@ -2674,7 +2676,9 @@ const I18N = {
     e_akt_eigen_latest: "You follow “latest” — pulling again is enough, your .env stays as it is. Re-pull the image in your NAS's Docker interface and restart the service, or: “docker compose pull app” and “docker compose up -d app”.",
     e_akt_eigen_fest: "Your .env holds a fixed number ({folgt}). Put in the line above and redeploy — or write “latest” there, then pulling again will be enough from now on.",
     e_akt_eigen_unklar: "If your .env says SATCORTEX_VERSION=latest, pulling the image again is enough. If it holds a number, set it to {v} — or to “latest”, then you stay current on your own from now on.",
-    e_akt_wie: "Raise the line in your .env (BITCOIN_VERSION= or LND_VERSION=), then redeploy. If we have not built that image yet, the pull finds nothing — then build it yourself: “docker compose build lnd” and “docker compose up -d”. That takes about a minute: downloaded, signature checked against the pinned publisher keys, unpacked. Nothing is compiled.",
+    e_akt_wie: "Raise the line in your .env (BITCOIN_VERSION= or LND_VERSION=), then redeploy. The image is ready: built from the official release, its signatures checked against the pinned publisher keys.",
+    e_akt_abbild_folgt: "{v} has been released. Its image is still being built and verified – as soon as it is ready, the line to copy appears here.",
+    e_akt_ungeprueft: "Whether its image is ready could not be checked just now. If pulling fails with “manifest unknown”, it has not been built yet – keep the previous number.",
     e_akt_fassung_unbekannt: "The service is running — its version number just could not be queried. It comes from the same call that regularly waits during the initial sync. It will be back on the next round.",
     e_akt_laeuft_nicht: "The service is not running yet — there is no running version to compare against. It will be checked once it runs.",
     e_akt_nicht_erreichbar: "The lookup did not get through over Tor. That happens — the route goes through three foreign machines. It will be retried on the next pass.",
@@ -10330,6 +10334,13 @@ function neuerungsBlock(n, titel, schluessel) {
     return block;
   }
   if (!n.gefunden) {
+    // Erschienen, aber unser Abbild liegt noch nicht bereit (17.10.2026):
+    // keine Zeile zum Abschreiben, deren Ziehen mit "manifest unknown"
+    // scheitern wuerde -- und auch kein "aktuell", denn es gibt Neueres.
+    if (n.wartet_auf_abbild) {
+      block.append(hinweis(t("e_akt_abbild_folgt", { v: n.wartet_auf_abbild }), ""));
+      return block;
+    }
     block.append(hinweis(t(nurAbbild ? "e_akt_abbild_aktuell" : "e_akt_aktuell"), "ok"));
     return block;
   }
@@ -10348,6 +10359,12 @@ function neuerungsBlock(n, titel, schluessel) {
   block.append(hinweis(satz, art === "zweigwechsel" ? "warn" : ""));
   if (n.gefunden.auch_verfuegbar)
     block.append(hinweis(t("e_akt_auch", { v: n.gefunden.auch_verfuegbar }), ""));
+  // Die Registry war nicht zu erreichen: gemeldet wird trotzdem, aber mit
+  // dem Satz, was ein "manifest unknown" dann bedeutet.
+  if (n.gefunden.abbild === "ungeprueft")
+    block.append(hinweis(t("e_akt_ungeprueft"), ""));
+  if (n.wartet_auf_abbild)
+    block.append(hinweis(t("e_akt_abbild_folgt", { v: n.wartet_auf_abbild }), ""));
 
   if (schluessel === "satcortex") {
     block.append(eigeneFassungWie(n));

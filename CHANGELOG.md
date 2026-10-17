@@ -4,6 +4,39 @@ All notable changes to SatoshiCortex. Format loosely after
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning after
 [SemVer](https://semver.org/).
 
+## [1.5.1] — 2026-10-17
+
+### Fixed: the update check compares the LND version that actually runs
+
+*Settings → Updates* kept offering a newer LND although it was already
+running. The check never asked LND: it always compared the version this
+project ships (0.21.3), so raising `LND_VERSION` in the `.env` changed
+nothing. It now reads the version from LND itself and remembers it, so a
+locked wallet — where LND answers no such question — does not bring the old
+number back. Before LND has started for the first time, the shipped version is
+compared as before, and the page says so.
+
+### Changed: a new version is announced once its image is ready
+
+The feed a release comes from names it as soon as its tag exists — for LND
+0.21.4 a day before the signed files, and our image is built only after those.
+*Settings → Updates* now asks the registry over Tor whether the image is there
+and offers the `.env` line only then. Until it is, the page says the version
+has been released and its image is still being built. If the registry cannot
+be reached, the version is still named, with a note on what a
+`manifest unknown` would mean.
+
+### Fixed: a test that failed now and then on a busy CI machine
+
+The check that no background thread outlives shutdown also caught a helper
+thread of the test server that AnyIO stops without waiting for it. Those get a
+moment to finish now; anything that really hangs is still reported.
+
+### Upgrading
+
+Only the application image is new; Bitcoin Core, LND and Tor keep running.
+Nothing to change in `docker-compose.yml` or `.env`.
+
 ## [1.5.0] — 2026-10-01
 
 ### Added: fees per channel by fill level

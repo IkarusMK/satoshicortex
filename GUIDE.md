@@ -436,6 +436,15 @@ An image being ready does not mean it is running. What runs is what is in YOUR
 `.env`. The web interface shows under **Settings → Updates** what is new (the
 query goes over Tor, so it does not reveal that a node is standing here).
 
+It names a new version only once its image is in the registry — it asks the
+registry over the same Tor route. A release is often tagged before its signed
+files are out, and our image follows only after that; until then the page says
+the version has been released and its image is still being built, and shows no
+line to copy. If the registry cannot be reached, the version is named anyway,
+with a note on what a `manifest unknown` would mean. For LND the running
+version is read from LND itself; before LND has started for the first time,
+the shipped version is compared, and the page says so.
+
 ### When a pull comes up empty
 
 `manifest unknown` means: this version has not been built yet — for instance

@@ -453,3 +453,122 @@ def hole_versionen(proxy: Optional[str] = None,
         if v:
             versionen.append(v)
     return sorted(set(versionen))
+
+
+# ── Liegt das Abbild schon bereit? (Befund 17.10.2026) ─────────────────────
+#
+# Der Feed nennt eine Fassung, sobald ihr Tag steht. Bei LND stand
+# v0.21.4-beta am 30.09.2026 als Tag da, das Release mit den signierten
+# Dateien kam erst am Tag darauf -- und unser Abbild entsteht erst danach,
+# weil der Bau genau diese Signaturen prueft. Die Oberflaeche meldete die
+# Fassung trotzdem, mit der fertigen Zeile fuer die .env; wer ihr folgte,
+# bekam beim Ziehen "manifest unknown".
+#
+# Gemeldet wird deshalb erst, was in der Registry liegt. Gefragt wird wie
+# bei der Versionsabfrage ueber Tor: ein anonymes Token (ghcr.io verlangt
+# eines auch fuer oeffentliche Abbilder), dann ein HEAD auf das Manifest.
+
+# Die Manifestarten, die die Registry fuer unsere Abbilder ausliefert --
+# mehrere Plattformen (Index/Liste) oder eine einzelne.
+ABBILD_ANNAHME = ", ".join((
+    "application/vnd.oci.image.index.v1+json",
+    "application/vnd.docker.distribution.manifest.list.v2+json",
+    "application/vnd.oci.image.manifest.v1+json",
+    "application/vnd.docker.distribution.manifest.v2+json",
+))
+
+# Die Token-Antwort ist ein paar hundert Byte gross.
+HOECHSTLAENGE_TOKEN = 16 * 1024
+
+# Fehlt das Abbild der neuesten Fassung, wird auf die naechstaeltere
+# zurueckgegriffen -- aber nicht endlos: je Pruefung hoechstens so viele
+# Fragen an die Registry.
+ABBILD_FRAGEN_HOECHSTENS = 3
+
+
+def abbild_bereit(projekt: Projekt, version: Tuple[int, ...],
+                  proxy: Optional[str] = None) -> Optional[bool]:
+    """Liegt das Abbild dieser Fassung in der Registry?
+
+    True: ja. False: nein, die Registry kennt den Tag nicht (noch nicht
+    gebaut). None: liess sich nicht klaeren -- nicht erreichbar, abgewiesen,
+    gebremst. Daraus folgt NICHT, dass es das Abbild nicht gibt.
+    """
+    host, _, name = projekt.abbild.partition("/")
+    tag = projekt.tag_praefix + projekt.beschrifte(version)
+    oeffner = urllib.request.build_opener(
+        urllib.request.ProxyHandler({"https": proxy, "http": proxy} if proxy else {})
+    )
+    kopf = {"User-Agent": "satcortex"}
+    letzter = ""
+    for versuch in range(1, VERSUCHE + 1):
+        schritt = "token"
+        try:
+            anfrage = urllib.request.Request(
+                f"https://{host}/token?scope=repository:{name}:pull",
+                headers={**kopf, "Accept": "application/json"})
+            with oeffner.open(anfrage, timeout=ZEITSPERRE_SEKUNDEN) as antwort:
+                token = json.loads(
+                    antwort.read(HOECHSTLAENGE_TOKEN) or b"{}").get("token", "")
+            if not token:
+                return None
+            schritt = "manifest"
+            anfrage = urllib.request.Request(
+                f"https://{host}/v2/{name}/manifests/{tag}", method="HEAD",
+                headers={**kopf, "Accept": ABBILD_ANNAHME,
+                         "Authorization": f"Bearer {token}"})
+            with oeffner.open(anfrage, timeout=ZEITSPERRE_SEKUNDEN):
+                pass
+            return True
+        except urllib.error.HTTPError as fehler:
+            if schritt == "manifest" and fehler.code == 404:
+                return False
+            letzter = f"HTTP {fehler.code} ({schritt})"
+            if fehler.code < 500:
+                # Abgewiesen oder gebremst -- ein zweiter Anlauf sofort
+                # danach aendert daran nichts.
+                break
+        except (urllib.error.URLError, OSError, ValueError,
+                TimeoutError) as fehler:
+            letzter = _deutung(fehler, proxy)
+        log.info("Abbildabfrage (%s %s), Versuch %d von %d: %s",
+                 projekt.name, tag, versuch, VERSUCHE, letzter)
+    log.info("Abbildabfrage (%s %s) ohne Antwort: %s", projekt.name, tag, letzter)
+    return None
+
+
+def waehle_bereit(laufend: Tuple[int, ...], verfuegbar: List[Tuple[int, ...]],
+                  projekt: Projekt,
+                  bereit: Callable[[Tuple[int, ...]], Optional[bool]]
+                  ) -> Tuple[Optional[Dict], Optional[str]]:
+    """Wie waehle() -- aber gemeldet wird nur, was als Abbild bereitliegt.
+
+    Rueckgabe: die Neuerung (mit "abbild": "bereit" oder "ungeprueft") und
+    die lesbare Fassung, die erschienen ist, deren Abbild aber noch fehlt.
+    Ist die Registry nicht zu erreichen, wird nichts verschwiegen: eine
+    Sicherheitskorrektur darf nicht an einem Tor-Kreis haengen.
+    """
+    rest = sorted(set(verfuegbar))
+    wartet: Optional[str] = None
+    fragen = 0
+    while fragen < ABBILD_FRAGEN_HOECHSTENS:
+        gefunden = waehle(laufend, rest, projekt)
+        if not gefunden:
+            return None, wartet
+        kandidat = max(v for v in rest
+                       if projekt.beschrifte(v) == gefunden["version"])
+        fragen += 1
+        lage = bereit(kandidat)
+        if lage is False:
+            wartet = wartet or projekt.beschrifte(kandidat)
+            rest = [v for v in rest if v != kandidat]
+            continue
+        gefunden = {**gefunden, "abbild": "bereit" if lage else "ungeprueft"}
+        zusatz = gefunden.get("auch_verfuegbar")
+        if zusatz and fragen < ABBILD_FRAGEN_HOECHSTENS:
+            weiter = max(v for v in rest if projekt.beschrifte(v) == zusatz)
+            if bereit(weiter) is False:
+                gefunden["auch_verfuegbar"] = ""
+                wartet = wartet or zusatz
+        return gefunden, wartet
+    return None, wartet

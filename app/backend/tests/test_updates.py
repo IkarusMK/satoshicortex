@@ -430,3 +430,165 @@ def test_core_behaelt_seine_wartungszweige():
                               updates.BITCOIN_CORE)
     assert ergebnis["version"] == "30.2" and ergebnis["art"] == "wartung"
     assert ergebnis["auch_verfuegbar"] == "31.1"
+
+
+# ── Liegt das Abbild schon bereit? (Befund 17.10.2026) ─────────────────────
+#
+# Der Feed nennt eine Fassung, sobald ihr Tag steht -- bei LND am 30.09.2026
+# einen Tag vor dem Release, und vor unserem Abbild sowieso. Wer der Meldung
+# folgte, bekam beim Ziehen "manifest unknown". Gemeldet wird deshalb erst,
+# wenn das Abbild in der Registry liegt.
+
+class _Antwort:
+    def __init__(self, inhalt=b""):
+        self.inhalt = inhalt
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def read(self, n=-1):
+        return self.inhalt
+
+
+class _Registry:
+    """Antwortet wie ghcr.io: erst ein anonymes Token, dann das Manifest."""
+
+    def __init__(self, manifest=200, token=200, fehler=None):
+        self.manifest, self.token, self.fehler = manifest, token, fehler
+        self.anfragen = []
+        self.handler = []
+
+    def open(self, anfrage, timeout=None):
+        self.anfragen.append(anfrage)
+        if self.fehler:
+            raise self.fehler
+        url = anfrage.full_url
+        if "/token?" in url:
+            if self.token != 200:
+                raise urllib.error.HTTPError(url, self.token, "nein", {}, None)
+            return _Antwort(json.dumps({"token": "abc"}).encode())
+        if self.manifest != 200:
+            raise urllib.error.HTTPError(url, self.manifest, "fehlt", {}, None)
+        return _Antwort()
+
+
+def _mit_registry(monkeypatch, registry):
+    def baue(*handler):
+        registry.handler.extend(handler)
+        return registry
+    monkeypatch.setattr(updates.urllib.request, "build_opener", baue)
+    return registry
+
+
+def test_ein_gebautes_abbild_liegt_bereit(monkeypatch):
+    r = _mit_registry(monkeypatch, _Registry())
+    assert updates.abbild_bereit(updates.LND, (0, 21, 4),
+                                 proxy="http://tor:8118") is True
+    token, manifest = r.anfragen
+    assert token.full_url == ("https://ghcr.io/token?scope="
+                              "repository:ikarusmk/satcortex-lnd:pull")
+    # Der Tag heisst bei LND mit "v" -- genau so, wie er in die .env kommt.
+    assert manifest.full_url == ("https://ghcr.io/v2/ikarusmk/satcortex-lnd/"
+                                 "manifests/v0.21.4-beta")
+    assert manifest.get_method() == "HEAD"
+    assert manifest.get_header("Authorization") == "Bearer abc"
+    assert "application/vnd.oci.image.index.v1+json" in manifest.get_header("Accept")
+    assert manifest.get_header("User-agent") == "satcortex"
+    # Ueber Tor, wie die Versionsabfrage selbst.
+    [proxy] = r.handler
+    assert isinstance(proxy, urllib.request.ProxyHandler)
+    assert proxy.proxies == {"https": "http://tor:8118", "http": "http://tor:8118"}
+
+
+@pytest.mark.parametrize("projekt, version, pfad", [
+    (updates.BITCOIN_CORE, (31, 2, 0), "ikarusmk/satcortex-bitcoind/manifests/31.2"),
+    (updates.SATCORTEX, (1, 5, 1), "ikarusmk/satcortex/manifests/1.5.1"),
+])
+def test_der_tag_heisst_wie_in_der_env(monkeypatch, projekt, version, pfad):
+    r = _mit_registry(monkeypatch, _Registry())
+    assert updates.abbild_bereit(projekt, version) is True
+    assert r.anfragen[1].full_url == "https://ghcr.io/v2/" + pfad
+
+
+def test_fehlt_das_abbild_ist_es_noch_nicht_gebaut(monkeypatch):
+    _mit_registry(monkeypatch, _Registry(manifest=404))
+    assert updates.abbild_bereit(updates.LND, (0, 21, 5)) is False
+
+
+@pytest.mark.parametrize("registry", [
+    _Registry(fehler=urllib.error.URLError("Tor antwortet nicht")),
+    _Registry(token=503),
+    _Registry(manifest=429),
+    _Registry(manifest=401),
+])
+def test_unklar_ist_weder_ja_noch_nein(monkeypatch, registry):
+    """Nicht erreichbar, abgewiesen, gebremst: daraus folgt nicht, dass es
+    das Abbild nicht gibt."""
+    _mit_registry(monkeypatch, registry)
+    assert updates.abbild_bereit(updates.LND, (0, 21, 5)) is None
+
+
+def _bereit(liste):
+    gefragt = []
+
+    def frage(v):
+        gefragt.append(v)
+        return liste.get(v, True)
+    return frage, gefragt
+
+
+def test_gemeldet_wird_nur_was_bereitliegt():
+    frage, gefragt = _bereit({(0, 21, 4): False, (0, 21, 3): True})
+    gefunden, wartet = updates.waehle_bereit(
+        (0, 21, 2), [(0, 21, 2), (0, 21, 3), (0, 21, 4)], updates.LND, frage)
+    assert gefunden["version"] == "0.21.3-beta"
+    assert gefunden["tag"] == "v0.21.3-beta"
+    assert gefunden["abbild"] == "bereit"
+    assert wartet == "0.21.4-beta"
+    assert gefragt == [(0, 21, 4), (0, 21, 3)]
+
+
+def test_liegt_nichts_bereit_wird_nichts_gemeldet():
+    frage, _ = _bereit({(0, 21, 4): False, (0, 21, 3): False})
+    gefunden, wartet = updates.waehle_bereit(
+        (0, 21, 2), [(0, 21, 3), (0, 21, 4)], updates.LND, frage)
+    assert gefunden is None
+    assert wartet == "0.21.4-beta"
+
+
+def test_ungeprueft_wird_gemeldet_und_so_gekennzeichnet():
+    """Ist die Registry gerade nicht zu erreichen, wird nichts verschwiegen
+    -- eine Sicherheitskorrektur darf nicht an einem Tor-Kreis haengen."""
+    gefunden, wartet = updates.waehle_bereit(
+        (0, 21, 3), [(0, 21, 4)], updates.LND, lambda v: None)
+    assert gefunden["version"] == "0.21.4-beta"
+    assert gefunden["abbild"] == "ungeprueft"
+    assert wartet is None
+
+
+def test_ohne_neuere_fassung_wird_nicht_gefragt():
+    frage, gefragt = _bereit({})
+    assert updates.waehle_bereit((0, 21, 4), [(0, 21, 4)], updates.LND,
+                                 frage) == (None, None)
+    assert gefragt == []
+
+
+def test_auch_verfuegbar_nennt_nur_ein_bereites_abbild():
+    """Neben der Wartung im eigenen Zweig steht der naechste Zweig -- auch
+    der wird erst genannt, wenn es sein Abbild gibt."""
+    frage, _ = _bereit({(0, 22, 0): False})
+    gefunden, wartet = updates.waehle_bereit(
+        (0, 21, 3), [(0, 21, 4), (0, 22, 0)], updates.LND, frage)
+    assert gefunden["version"] == "0.21.4-beta"
+    assert gefunden["auch_verfuegbar"] == ""
+    assert wartet == "0.22.0-beta"
+
+
+def test_hoechstens_drei_fragen_je_projekt():
+    frage, gefragt = _bereit({(0, 21, v): False for v in range(10)})
+    updates.waehle_bereit((0, 21, 0), [(0, 21, v) for v in range(10)],
+                          updates.LND, frage)
+    assert len(gefragt) == updates.ABBILD_FRAGEN_HOECHSTENS == 3

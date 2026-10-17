@@ -4370,3 +4370,64 @@ def test_eine_kanalzeile_sagt_wenn_sie_noch_misst(js):
     assert "kz_misst_noch" not in ergebnis[1]
     # Ein fester Kanal wartet auf nichts -- die Automatik fasst ihn nicht an.
     assert "kz_misst_noch" not in ergebnis[2]
+
+
+# ── Erst melden, wenn das Abbild bereitliegt (Befund 17.10.2026) ───────────
+
+_NEUERUNG_DOM = """
+const t = (k, w) => (w && w.v ? k + ":" + w.v : k);
+const hinweis = (text, art) => ({ hinweis: text, art: art || "" });
+const datumZeit = () => "Zeit";
+const eigeneFassungWie = () => ({ eigen: true });
+const document = { createElement: (tag) => ({
+  tag, textContent: "", className: "", style: {}, kinder: [],
+  append(...k) { this.kinder.push(...k); } }) };
+"""
+
+
+def _neuerungshinweise(js, eintrag):
+    import json
+    return _ausfuehren_async(js, ["neuerungsBlock"], _NEUERUNG_DOM, f"""(async () => {{
+  const b = neuerungsBlock({json.dumps(eintrag)}, "Lightning (LND)", "lnd");
+  return {{ hinweise: b.kinder.filter((k) => k.hinweis).map((k) => [k.hinweis, k.art]),
+           zeile: (b.kinder.find((k) => k.tag === "pre") || {{}}).textContent || "" }};
+}})()""")
+
+
+_LND_STAND = {"stand": 1_760_000_000, "grund": "", "laeuft": True,
+              "laufend": "0.21.4-beta", "neueste": "0.21.5-beta",
+              "variable": "LND_VERSION", "gefunden": None,
+              "wartet_auf_abbild": None}
+
+
+def test_erschienen_aber_ohne_abbild_steht_nur_der_hinweis(js):
+    """Keine Zeile zum Abschreiben, kein "aktuell" -- sondern dass die
+    Fassung erschienen ist und ihr Abbild noch gebaut wird."""
+    d = _neuerungshinweise(js, {**_LND_STAND, "wartet_auf_abbild": "0.21.5-beta"})
+    assert d["hinweise"] == [["e_akt_abbild_folgt:0.21.5-beta", ""]]
+    assert d["zeile"] == ""
+
+
+def test_ungeprueft_wird_gesagt(js):
+    d = _neuerungshinweise(js, {**_LND_STAND, "gefunden": {
+        "version": "0.21.5-beta", "tag": "v0.21.5-beta", "art": "wartung",
+        "auch_verfuegbar": "", "abbild": "ungeprueft"}})
+    assert ["e_akt_wartung:0.21.5-beta", ""] in d["hinweise"]
+    assert ["e_akt_ungeprueft", ""] in d["hinweise"]
+    assert d["zeile"] == "LND_VERSION=v0.21.5-beta"
+
+
+def test_bereit_und_dahinter_eine_die_noch_kommt(js):
+    d = _neuerungshinweise(js, {**_LND_STAND, "laufend": "0.21.3-beta",
+                                "wartet_auf_abbild": "0.22.0-beta",
+                                "gefunden": {
+        "version": "0.21.4-beta", "tag": "v0.21.4-beta", "art": "wartung",
+        "auch_verfuegbar": "", "abbild": "bereit"}})
+    assert d["hinweise"] == [["e_akt_wartung:0.21.4-beta", ""],
+                             ["e_akt_abbild_folgt:0.22.0-beta", ""]]
+    assert d["zeile"] == "LND_VERSION=v0.21.4-beta"
+
+
+def test_ohne_neuerung_bleibt_es_bei_aktuell(js):
+    d = _neuerungshinweise(js, {**_LND_STAND, "neueste": "0.21.4-beta"})
+    assert d["hinweise"] == [["e_akt_aktuell", "ok"]]

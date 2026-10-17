@@ -134,7 +134,10 @@ def test_kein_hintergrundfaden_ueberlebt_seinen_testfall(tmp_path, monkeypatch):
     monkeypatch.setattr(shutil, "disk_usage",
                         lambda _p: nutzung(8000 * gb, 4000 * gb, 4000 * gb))
 
-    vorher = {f.name for f in threading.enumerate()}
+    # Nach Faeden, nicht nach Namen: "AnyIO worker thread" heissen viele, und
+    # ein gleichnamiger Faden aus einem frueheren Testfall verdeckte sonst
+    # jeden neuen -- ob dieser Test etwas prueft, hing an der Reihenfolge.
+    vorher = set(threading.enumerate())
 
     bulk = tmp_path / "bulk"; fast = tmp_path / "fast"
     bulk.mkdir(); fast.mkdir()
@@ -153,7 +156,7 @@ def test_kein_hintergrundfaden_ueberlebt_seinen_testfall(tmp_path, monkeypatch):
     client.get("/api/status")
     client.get("/api/kennzahlen")
 
-    gestartet = {f.name for f in threading.enumerate()} - vorher
+    gestartet = {f.name for f in threading.enumerate() if f not in vorher}
     assert "htlc-strom" in gestartet, (
         "der Dauerlaeufer lief gar nicht -- dann prueft dieser Test nichts. "
         "Wurde er umbenannt oder an eine andere Bedingung gehaengt? "
@@ -161,8 +164,17 @@ def test_kein_hintergrundfaden_ueberlebt_seinen_testfall(tmp_path, monkeypatch):
 
     app.state.hintergrund_stoppen(2.0)
 
+    # Die Hilfsfaeden der Testumgebung beendet AnyIO nur per Signal und
+    # wartet nicht darauf (WorkerThread.stop, anyio 4.15). Auf einem
+    # ausgelasteten Rechner lebt einer davon noch einen Augenblick -- so am
+    # 16.10.2026 in der CI, bei unveraendertem Code. Sie bekommen kurz Zeit;
+    # wer danach noch laeuft, haengt wirklich und wird gemeldet.
+    for f in threading.enumerate():
+        if f not in vorher and f.name == "AnyIO worker thread":
+            f.join(2.0)
+
     uebrig = sorted(f.name for f in threading.enumerate()
-                    if f.name not in vorher and f.is_alive())
+                    if f not in vorher and f.is_alive())
     assert not uebrig, (
         "diese Faeden laufen nach dem Einholen weiter -- sie beachten das "
         "Haltesignal nicht: " + repr(uebrig))

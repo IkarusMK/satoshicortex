@@ -907,6 +907,9 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
                  # die bereitstehende Version, oder sie kennt sie nicht. Sie
                  # gehoeren in die Antwort, nicht nur in einen Fliesstext.
                  "laufend": None, "neueste": None,
+                 # Erschienen, aber unser Abbild liegt noch nicht bereit
+                 # (17.10.2026) -- dann wird die Fassung nur angekuendigt.
+                 "wartet_auf_abbild": None,
                  "fehlversuche": 0}
         for p in updates.PROJEKTE
     }
@@ -6870,15 +6873,36 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
             log.exception("Nachregeln der Konfiguration fehlgeschlagen")
             return False
 
+    # Die zuletzt von LND selbst gemeldete Fassung. Sie aendert sich nur, wenn
+    # jemand das Abbild tauscht -- und bleibt richtig, wenn LND gerade
+    # gesperrt ist und GetInfo nicht beantwortet.
+    lnd_fassungsspeicher: Dict[str, Optional[Tuple[int, ...]]] = {"wert": None}
+
     def lnd_fassung() -> Tuple[Optional[Tuple[int, ...]], bool]:
         """Welche LND-Fassung verglichen wird -- und ob sie wirklich laeuft.
 
-        Sobald es den Dienst gibt, kommt die Nummer aus GetInfo. Bis dahin ist
-        es die, die wir ausliefern: die Frage, ob das Abbild noch aktuell ist,
+        Sobald LND antwortet, kommt die Nummer aus GetInfo. Bis dahin ist es
+        die, die wir ausliefern: die Frage, ob das Abbild noch aktuell ist,
         stellt sich schon vorher -- und gerade bei Lightning, wo eine Fassung
         Kanaele und damit Geld betrifft. Die Oberflaeche sagt dazu, woher die
-        Zahl stammt; hier steht die eine Zeile, die in Phase 7 wechselt.
+        Zahl stammt.
+
+        Befund vom 17.10.2026: hier stand bis dahin NUR die ausgelieferte
+        Fassung. Wer LND_VERSION in der .env hochgesetzt hatte, bekam das
+        Update weiter angeboten, obwohl es laengst lief.
         """
+        try:
+            knoten = lndverbindung()
+            if lnd.zustand(knoten)["stand"] == "bereit":
+                gemeldet = lnd.uebersicht(knoten).get("fassung", "")
+                fassung = updates.laufende_version_lnd(gemeldet)
+                if fassung:
+                    lnd_fassungsspeicher["wert"] = fassung
+        except (lnd.NichtErreichbar, lnd.LndFehler, lnd.Beschaeftigt,
+                OSError, ValueError) as fehler:
+            log.debug("LND-Fassung nicht abrufbar: %s", fehler)
+        if lnd_fassungsspeicher["wert"]:
+            return lnd_fassungsspeicher["wert"], True
         return updates.LND_AUSGELIEFERT, False
 
     def eine_pruefung(projekt: updates.Projekt, laufend, laeuft: bool,
@@ -6901,7 +6925,7 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         eintrag["laufend"] = projekt.beschrifte(laufend) if laufend else None
         if not tor_an:
             eintrag.update(stand=jetzt, gefunden=None, grund="tor_aus",
-                           laeuft=laeuft)
+                           laeuft=laeuft, wartet_auf_abbild=None)
             return
         # Zwei stille Rueckkehrpunkte standen hier -- und beide hinterliessen
         # dauerhaft "Noch nicht nachgesehen". Der Betreiber hat genau das gemeldet:
@@ -6916,6 +6940,7 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
             # der Dienst laeuft nicht -- oder er laeuft, und nur seine
             # Fassungsnummer ist gerade nicht abrufbar.
             eintrag.update(gefunden=None, laeuft=laeuft,
+                           wartet_auf_abbild=None,
                            grund="fassung_unbekannt" if laeuft
                            else "laeuft_nicht")
             return
@@ -6927,12 +6952,18 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
             # Rechner. Kein Drama, aber es gehoert gesagt.
             eintrag.update(gefunden=None, grund="nicht_erreichbar",
                            laeuft=laeuft, versucht=jetzt,
+                           wartet_auf_abbild=None,
                            fehlversuche=eintrag["fehlversuche"] + 1)
             return
+        # Gemeldet wird nur, was als Abbild bereitliegt -- gefragt wird die
+        # Registry ueber denselben Tor-Weg (Befund 17.10.2026).
+        gefunden, wartet = updates.waehle_bereit(
+            laufend, verfuegbar, projekt,
+            lambda v: updates.abbild_bereit(projekt, v, proxy=proxy))
         eintrag.update(stand=jetzt, grund="", laeuft=laeuft, versucht=jetzt,
                        fehlversuche=0,
                        neueste=projekt.beschrifte(max(verfuegbar)),
-                       gefunden=updates.waehle(laufend, verfuegbar, projekt))
+                       gefunden=gefunden, wartet_auf_abbild=wartet)
 
     def nach_updates_sehen(lage: Optional[Dict]) -> None:
         """Einmal taeglich nachsehen, ob es neuere Fassungen gibt.
