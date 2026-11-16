@@ -57,16 +57,18 @@ The question that comes before the first satoshi lands on the machine: who can
 reach the services' interfaces? Measured against the shipped
 `docker-compose.yml` and the configuration templates.
 
-**Exactly six ports are published:**
+**These ports are published:**
 
 | Port | Bound to | Who can reach it |
 |---|---|---|
 | Web interface (default 3333) | `LAN_BIND`, default `0.0.0.0` | your home network — behind a sign-in |
+| Web interface over HTTPS (default 3334) | `LAN_BIND`, default `0.0.0.0` | your home network — the same interface, encrypted with the node's own certificate. `WEBUI_TLS=off` switches the listener off |
 | Bitcoin P2P 8333 | all interfaces | the internet. **Intended**: this is the participation |
 | Lightning P2P 9735 | all interfaces | the internet. **Intended** |
 | Watchtower 9911 | all interfaces | the internet, **only if you forward it** — needed for clearnet only; over Tor the tower has its own onion address |
 | bitcoind RPC 8332 | `RPC_BIND`, default **`127.0.0.1`** | the server itself only |
 | LND REST 8080 | `LND_REST_BIND`, default **`127.0.0.1`**, and **no fixed port** unless `LND_REST_LAN_PORT` is set | nobody by default — Docker picks a random port on the server itself. Set both for the VPN route to external wallets; then your home network |
+| Electrum service 50001 | `ELECTRUM_BIND`, default **`127.0.0.1`**, and **no fixed port** unless `ELECTRUM_LAN_PORT` is set | nobody by default. Set both for hardware-wallet apps at home; then your home network, and over Tor whoever knows its onion address. The Electrum protocol has **no sign-in**: whoever reaches the port can ask about addresses — and so can test whether one belongs to an account registered here |
 
 **Not published** — and this is the more important half of the answer:
 
@@ -127,7 +129,9 @@ Two different answers, and both belong on the record:
   `lnd.conf`. On top of that every call requires a macaroon. The application
   bakes its own with exactly the rights it uses (`EIGENE_RECHTE` in `lnd.py`);
   since sending on-chain arrived on 2026-09-10 that includes `onchain:write`,
-  and every endpoint that moves money checks the PIN first. It does **not**
+  and every endpoint that moves money checks the PIN first — or, when no PIN
+  is set, the account password (since 2026-11-15; before that, no PIN meant
+  no second check at all). It does **not**
   include the right to issue keys: keys for external wallets are baked with
   LND's `admin.macaroon`, only on an explicit request behind the PIN.
 - **Application → bitcoind: no.** The call goes over `http://`, because Bitcoin
@@ -173,8 +177,8 @@ exposed. Eleven findings, all fixed.
 **1 — No authentication.** Every endpoint was open. Anyone who knew the address
 on the home network could configure the node. *Fixed:* account creation now
 comes BEFORE the wizard; everything else sits behind a sign-in. Passwords with
-scrypt (n=2^15), session cookie `HttpOnly` and `SameSite=Strict`, throttling
-after eight failed attempts.
+scrypt (n=2^15), session cookie `HttpOnly` and `SameSite=Strict` (today
+`Lax` — see finding 8), throttling after eight failed attempts.
 
 **2 — A running node could be reconfigured.** Completing the setup could be
 invoked arbitrarily often. That allowed switching Tor off, unleashing the
@@ -213,6 +217,15 @@ of 404). *Fixed.*
 failed on the JSON requirement, and without a CORS release browsers block the
 rest. *Improved:* session cookie with `SameSite=Strict`.
 
+*Later:* the cookie is `SameSite=Lax` since the sign-in through an identity
+provider arrived — the return from the provider is a navigation from another
+site, and under `Strict` the browser drops the cookie there, so the sign-in
+silently started over. `Lax` still keeps the cookie off writing calls from
+other sites. Since 2026-11-15 there is a second layer that does not depend on
+the cookie: writing calls whose `Sec-Fetch-Site` says `cross-site` or
+`same-site` (another port on the same host counts) are refused. It reads only
+what the browser itself reports, so it works unchanged behind a reverse proxy.
+
 ### Checked and sound
 
 - **Path traversal** via `../`, percent-encoded and double-encoded variants:
@@ -240,9 +253,30 @@ rest. *Improved:* session cookie with `SameSite=Strict`.
   only from requests that did not come through a reverse proxy. That assumes
   the interface port is not forwarded to the internet — what goes out are 8333,
   9735 and optionally 9911, nothing else. Over Tor, not even those.
-- **HTTPS** is not supplied by SatoshiCortex itself. On a home network that is
-  defensible; anyone exposing the interface belongs behind a reverse proxy with
-  TLS.
+
+  Since 2026-11-15 the detection fails **closed**. Until then a request counted
+  as "not through a proxy" when none of four forwarding headers was present —
+  a proxy that adds none of them let the internet reach the password form.
+  Now any of the common proxy headers (even empty), a caller inside the
+  container network (its gateway is the host itself, where a host-network
+  proxy sits) and, with an identity provider configured, a `Host` equal to the
+  provider's callback host all close the door. A browser at home reaching the
+  published port keeps its own address, so the door stays usable from the
+  home network — by IP, not by the public name. Creating the first account
+  follows the same rule.
+
+  **Who may enter is the provider's decision alone:** the application checks
+  no group or claim of its own. Restrict the client to your group in the
+  provider; an unrestricted client lets every user of the provider in.
+- **HTTPS** — since 2026-11-15 the interface also answers on a second port
+  (default 3334) with a certificate the node makes for itself: EC P-256, the
+  key created with mode 0600 under the configuration directory, kept across
+  restarts. The browser warns on the first visit, because nobody it knows
+  signed it; the interface shows the certificate's SHA-256 fingerprint to
+  compare. The plain port stays exactly as it was, so a reverse proxy in front
+  keeps working. Over HTTPS the session cookie is `__Host-satcortex_sitzung`
+  (`Secure`, bound to the host); both names are accepted, so nobody is signed
+  out by the update.
 - **Changes during operation** go through one narrow path, and only that one.
   `/knoten/netzwege` writes network visibility (Tor, clearnet, the announced
   addresses) in a single write, because every configuration change restarts
@@ -288,3 +322,98 @@ as much as the pipeline that ships it.
   read-only root.** Both were held back from the first round because the only
   honest proof is a full build and a stack coming up — neither can be shown on
   a laptop without Docker. They went in once CI could be watched.
+
+## Audit of 2026-11-15 — the application
+
+A full pass over the application itself (sign-in and web layer, money paths
+and LND, the Electrum service, configuration writing, outbound fetches), with
+every finding reproduced against the real code before it was fixed and every
+fix proven by a test that failed on the old code. Bitcoin Core, LND and Tor
+themselves were out of scope. The aim was set by the owner: nobody from
+outside gets in or changes anything — and handling stays as easy as before,
+no new prompts for settings.
+
+### High
+
+**1 — A session could write its own lines into `bitcoin.conf` and
+`lnd.conf`.** The single-line check rejected `\n` and control characters but
+not the Unicode line separators U+2028, U+2029 and U+0085. The files were
+re-read with `splitlines()`, which honours them, and written back with `\n`
+— so the next write turned the separator into a real line break. An alias
+`x⟨U+2028⟩no-macaroons=true` produced a line `no-macaroons=true` in
+`lnd.conf`; an announced address `fe80::1%x⟨U+2028⟩startupnotify=…` produced
+a `startupnotify=` line in `bitcoin.conf`, which Bitcoin Core runs through a
+shell. A signed-in session was enough; the PIN did not help. *Fixed:* every
+single-line value must be printable, addresses are parsed and written in
+their normalised form (no scope ids), the files are split on `\n` only, and
+the writer itself refuses any content with a separator other than `\n`.
+
+**2 — The Electrum service could be driven out of memory without a sign-in.**
+One 9 KB line with 100 header requests made a 32 MB answer; four connections
+took the server to 310 MB against the container's 400 MB. *Fixed:* a shared
+header budget per line, a cap on the answer, answers written piece by piece.
+Measured afterwards: 35 MB.
+
+**3 — Without a PIN, a session alone could move money.** The PIN was optional
+and, when not set, nothing else was asked. *Fixed, by the owner's choice:* the
+PIN stays optional; without one, every money path asks for the account
+password in the same field.
+
+### Medium
+
+- **Emergency door failed open** behind a proxy that sends no forwarding
+  header, and the first account could be created through the proxy. Now fails
+  closed (see the OIDC section above).
+- **Sign-in lock-out:** one counter for everyone — eight wrong passwords from
+  any device locked the owner out. Now counted per device, with a global
+  ceiling that slows guessing without shutting the owner out.
+- **PIN lock-out:** one counter for all sessions — a stolen session could keep
+  the owner from closing a channel. Now counted per session, under both cookie
+  names.
+- **Electrum:** no brake on the load it puts on Bitcoin Core (now a token
+  bucket and its own small thread pool), every new connection forced a full
+  re-read of the accounts (now at most every 10 s, or on a real change), and
+  running out of file handles stopped the accept loop for good (now it logs
+  and carries on). Connections count from the moment they are accepted.
+- **`time_lock_delta`** could be set down to LND's protocol minimum of 18 on
+  every channel. Floor now 40; nothing the application sets itself is lower.
+- **Seed words, keys and the PIN over plain HTTP** on the home network — the
+  built-in HTTPS port above.
+
+### Low
+
+- The backup target accepted any URL (fragment, query, internal hosts), and
+  fetching it followed redirects to other hosts with the credentials. Now
+  `http(s)` only, no internal targets, redirects only on the same host.
+- Peer and watchtower addresses could point at internal ports (a port-scan
+  oracle). Internal targets are refused before dialling.
+- Secret files were briefly visible with mode 0644 before `chmod`; the comments
+  claimed the opposite. Now created with 0600 from the first byte — wallet and
+  backup passwords, PIN, account, sessions, failed sign-ins, state.
+- The log said the application's macaroon lacked `onchain:write`; it has it,
+  deliberately. The text is true now.
+- Sending and opening a channel twice at once both ran. The second now gets
+  "already running".
+- A flood of identity-provider starts cleared all open sign-ins; the oldest
+  are evicted now, and starts are rate-limited per device.
+- `/openapi.json`, `/api/doku` and `/redoc` answered without a sign-in. They
+  still exist, behind it.
+- The news-feed guard against DTDs only looked at UTF-8; UTF-16 slipped past
+  (expat's own limit still stopped it). Foreign encodings are refused now.
+- Renovate merged patch updates of GitHub Actions on its own — actions that
+  run in the job holding `packages: write` and `id-token: write`. They are
+  merged by hand now, and every update waits seven days before it is proposed.
+- Smaller things: deeply nested JSON on the Electrum port, a NUL byte in a
+  path and an invalid channel point each ended in an unhandled error; the
+  `rpcallowip` check accepted IPv4-mapped and reserved ranges; subscriptions
+  and silent connections on the Electrum port were unbounded; log lines for
+  rejected Electrum connections were not throttled.
+
+### Checked and sound
+
+Passwords and sessions (scrypt, only token hashes stored, a new token per
+sign-in), no script injection anywhere in the interface (server data only via
+`textContent`, a strict CSP), the identity-provider flow (PKCE, pinned
+algorithms, issuer, audience, nonce), PIN storage and comparison, TLS to LND,
+the seed never stored or logged, input checks of the Electrum service, size
+and time limits on every outbound fetch, the hash-locked dependency tree.

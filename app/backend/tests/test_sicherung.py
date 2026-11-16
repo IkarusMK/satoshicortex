@@ -268,3 +268,80 @@ def test_jeder_grund_hat_einen_satz_in_beiden_sprachen_ohne_platzhalter():
         assert not fehlt, f"{sprache}: kein Satz fuer {fehlt}"
         mit_platzhalter = sorted(g for g in gruende if "{" in saetze[g])
         assert not mit_platzhalter, f"{sprache}: {mit_platzhalter}"
+
+
+# ── Weiterleitungen beim Zurueckholen ──────────────────────────────────────
+#
+# DER BEFUND VOM 15.11.2026, Rest aus der Pruefung der Geldwege: das Ziel
+# wird VOR dem Abruf geprueft, aber urllib folgt bei GET jeder Weiterleitung
+# -- samt der Basic-Anmeldung. Ein Ziel, das auf einen anderen Rechner (oder
+# einen Dienst im Inneren) weiterleitet, bekam so die Anmeldedaten und eine
+# Anfrage von hier aus. PUT folgt Weiterleitungen in urllib gar nicht.
+
+class Weiterleiter:
+    """Antwortet auf jedes GET mit einer Weiterleitung nach `wohin`."""
+
+    def __init__(self, wohin):
+        aussen = self
+        self.wohin = wohin
+
+        class Griff(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(302)
+                self.send_header("Location", aussen.wohin)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+
+            def log_message(self, *a):
+                pass
+
+        self.server = HTTPServer(("127.0.0.1", 0), Griff)
+        self.url = "http://127.0.0.1:%d/dav" % self.server.server_port
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def schliessen(self):
+        self.server.shutdown()
+
+
+def test_eine_weiterleitung_auf_einen_anderen_rechner_wird_nicht_befolgt(ziel):
+    """ROT vorher: das fremde Ziel bekam die Anfrage MIT der Anmeldung."""
+    fremd = ziel(inhalt=b"fremd")
+    # Derselbe Dienst, aber unter einem anderen Rechnernamen -- fuer urllib
+    # ein anderer Rechner.
+    anderswo = fremd.url.replace("127.0.0.1", "localhost")
+    w = Weiterleiter(anderswo + "/" + sicherung.DATEINAME)
+    try:
+        with pytest.raises(sicherung.ZielFehler) as f:
+            sicherung.hole_ab(w.url, "testnutzer", "geheim")
+    finally:
+        w.schliessen()
+    assert f.value.grund == "ziel_weiterleitung"
+    assert fremd.anfragen == [], "die Anmeldung ging an einen fremden Rechner"
+
+
+def test_eine_weiterleitung_ins_innere_wird_nicht_befolgt(ziel):
+    """Auch auf demselben Namen nicht, wenn das Ziel dahinter innen liegt --
+    sobald die Anwendung ihr Compose-Netz kennt."""
+    w = Weiterleiter("http://lnd:8080/v1/state")
+    try:
+        with pytest.raises(sicherung.ZielFehler) as f:
+            sicherung.hole_ab(w.url, "testnutzer", "geheim",
+                              netz_praefix="10.83.33")
+    finally:
+        w.schliessen()
+    assert f.value.grund in ("ziel_weiterleitung", "ziel_adresse_intern")
+
+
+def test_eine_weiterleitung_auf_demselben_rechner_geht_weiter(ziel):
+    """Kontrolle: ein Nextcloud, das von /dav nach /remote.php/dav umzieht
+    (oder von http nach https), bleibt nutzbar."""
+    z = ziel(inhalt=b"so-sieht-eine-kanalsicherung-aus")
+    w = Weiterleiter(z.url + "/" + sicherung.DATEINAME)
+    # Dieselbe Adresse, anderer Port: fuer den Browser ein anderer Ursprung,
+    # fuer diese Regel derselbe Rechner -- wie bei http -> https.
+    try:
+        zurueck = sicherung.hole_ab(w.url, "testnutzer", "geheim")
+    finally:
+        w.schliessen()
+    assert base64.b64decode(zurueck) == b"so-sieht-eine-kanalsicherung-aus"
+    assert z.anfragen[0]["auth"], "auf demselben Rechner geht die Anmeldung mit"

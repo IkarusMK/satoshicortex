@@ -1771,12 +1771,13 @@ def test_die_wiederholung_wird_im_browser_geprueft(html, js):
     assert 't("pin_stimmt_nicht")' in block
 
 
-def test_ohne_eingerichtete_pin_fragt_nichts_danach(js):
-    """Wer keine will, soll nicht ploetzlich vor einer Abfrage stehen, die
-    es fuer ihn gar nicht gibt."""
+def test_ohne_eingerichtete_pin_fragt_das_feld_das_kontopasswort(js):
+    """Bis zum 15.11.2026 fragte ohne PIN nichts -- und der Server auch
+    nicht. Jetzt steht dasselbe Feld da und schickt das Kontopasswort."""
     stelle = js.index("function mitPin(")
     block = js[stelle:js.index("\n}\n", stelle)]
-    assert 'PIN_DA ? { pin: $(feld).value } : {}' in block
+    assert 'PIN_DA ? { pin: $(feld).value }' in block
+    assert '{ konto_passwort: $(feld).value }' in block
     # Und ob sie eingerichtet ist, weiss nur der Server.
     laden = js[js.index("async function pinLaden("):]
     laden = laden[:laden.index("\n}\n")]

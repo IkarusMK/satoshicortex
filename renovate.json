@@ -17,17 +17,27 @@
       ]
     }
   ],
+  "minimumReleaseAge": "7 days",
   "packageRules": [
     {
-      "//": "Green: our own code and the tooling. If the checks fail, the pull request never gets through in the first place.",
+      "//": "Green: Python patch releases. The tree is hash-locked and the checks run before anything merges; if they fail, the pull request never gets through.",
       "matchManagers": [
-        "pip_requirements",
-        "github-actions"
+        "pip_requirements"
       ],
       "matchUpdateTypes": [
         "patch"
       ],
       "automerge": true
+    },
+    {
+      "//": "GitHub Actions are merged by hand, patches included. They run in the job that publishes and signs the images (packages: write, id-token: write); a moved action there reaches every operator through :latest. And every update, of any kind, waits a week (minimumReleaseAge above): a hijacked release is usually found and pulled within days (security review 2026-11-15).",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "automerge": false,
+      "addLabels": [
+        "review-by-hand"
+      ]
     },
     {
       "//": "Red: never merge automatically. A major release of Core changes policy and database format; with LND a database migration is even irreversible. IMPORTANT for context: this concerns MERGING, not building. Once the pull request is accepted the image is created and sits ready in the registry -- WHEN it gets deployed is still decided by the number in your own .env on the machine.",

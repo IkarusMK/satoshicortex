@@ -75,7 +75,7 @@
         <span class="small" id="g-err" style="color:var(--danger)"></span>
         <span class="spacer"></span>
         <button class="btn" id="g-submit" type="submit"></button>
-        <p class="dim small" id="g-tls" style="margin-top:14px;line-height:1.5"></p>
+        <div class="note hidden" data-tls-hinweis="lang"></div>
       </div>
     </form>
   </div>
@@ -266,6 +266,10 @@
       <button data-setlang="de">DE</button><button data-setlang="en">EN</button>
     </div>
   </header>
+
+  <!-- Nur ueber Klartext-HTTP von einem anderen Rechner -- siehe
+       zeigeTlsHinweise in app.js. Eine Auskunft, keine Sperre. -->
+  <div class="rahmen"><div class="note hidden" data-tls-hinweis="lang"></div></div>
 
   <div class="rahmen">
     <!-- EINE Ebene. Vorher trug der Kopf die Reiter (Bitcoin | Lightning |
@@ -720,7 +724,7 @@
             </label>
           </div>
 
-          <!-- Nur, wenn eine PIN eingerichtet ist. -->
+          <!-- PIN, oder -- ohne PIN -- das Kontopasswort (app.js, pinLaden). -->
           <label class="feld hidden" id="sd-pin-zeile">
             <b data-i18n="tg_pin"></b>
             <span class="dim small" data-i18n="sd_pin_d"></span>
@@ -1394,6 +1398,7 @@
           <h3 data-i18n="wh_titel"></h3>
           <p class="dim small" data-i18n="wh_lead"></p>
           <div class="note warn" data-i18n="wh_warnung"></div>
+          <div class="note hidden" data-tls-hinweis="kurz"></div>
 
           <h4 data-i18n="wh_woerter_titel"></h4>
           <p class="dim small" data-i18n="wh_woerter_d"></p>
@@ -1497,6 +1502,7 @@
           <h3 data-i18n="wl_woerter_titel"></h3>
           <p class="dim small" data-i18n="wl_woerter_d"></p>
           <ol class="seed" id="w-woerter"></ol>
+          <div class="note hidden" data-tls-hinweis="kurz"></div>
           <div class="note warn" data-i18n="wl_woerter_warnung"></div>
           <label class="switch">
             <input type="checkbox" id="w-abgeschrieben">
@@ -1775,9 +1781,9 @@
               <input type="text" id="tg-alias" autocomplete="off"
                      spellcheck="false">
             </label>
-            <!-- Nur, wenn eine PIN eingerichtet ist. Wer keine will, soll
-                 nicht ploetzlich vor einer Abfrage stehen, die es fuer ihn
-                 gar nicht gibt. -->
+            <!-- PIN, oder -- ohne PIN -- das Kontopasswort (app.js, pinLaden).
+                 Bis zum 15.11.2026 stand die Zeile nur bei eingerichteter
+                 PIN da; der Server fragte ohne PIN auch nichts. -->
             <label class="feld hidden" id="tg-pin-zeile">
               <b data-i18n="tg_pin"></b>
               <span class="dim small" data-i18n="tg_pin_d"></span>
@@ -1869,6 +1875,7 @@
             <input type="password" id="fz-pin" inputmode="numeric"
                    autocomplete="off" maxlength="12">
           </label>
+          <div class="note hidden" data-tls-hinweis="kurz"></div>
           <div style="display:flex;gap:12px;align-items:center;margin-top:14px">
             <button type="button" class="btn" id="fz-erstellen"
                     data-i18n="fz_erstellen"></button>
@@ -1879,6 +1886,7 @@
                auf; wer die Seite verlaesst, muss ein neues Geraet anlegen. -->
           <div class="hidden" id="fz-ergebnis" style="margin-top:14px">
             <div class="note warn" data-i18n="fz_einmal"></div>
+            <div class="note hidden" data-tls-hinweis="kurz"></div>
             <div class="ez-qr" id="fz-qr"></div>
             <div class="adresse" id="fz-text"></div>
             <div style="display:flex;gap:12px;align-items:center;margin-top:8px">

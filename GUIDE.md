@@ -123,6 +123,47 @@ So after uploading, either delete the shipped `docker-compose.yml` (the
 interface writes its own anyway), or do not paste the contents through the
 interface in the first place.
 
+## The interface over HTTPS
+
+Since 2026-11-15 the interface answers on **two** ports:
+
+| Port | What | For |
+|---|---|---|
+| 3333 (`WEBUI_PORT`) | plain HTTP, exactly as before | your reverse proxy, the healthcheck |
+| 3334 (`WEBUI_TLS_PORT`) | HTTPS with the node's own certificate | opening it directly on your home network |
+
+Over plain HTTP everything you type crosses the network readable — your PIN,
+the account password, the seed words when you create a wallet, a key for an
+external wallet. Over 3334 it does not.
+
+**The certificate** is made by the node itself on first start (EC P-256, ten
+years) and kept in the configuration directory; the key is readable by the
+application only. Nobody your browser knows has signed it, so the browser
+warns **once**. Before you accept, compare the SHA-256 fingerprint: the
+interface shows it in the hint at the top when you open it over plain HTTP,
+and the start log prints it. Same fingerprint — accept; it stays the same
+across restarts and updates.
+
+**Names in the certificate.** It always covers `satcortex`, `localhost` and
+`127.0.0.1`. For the browser to accept the name you type, add your NAS's
+address or name to the `.env`:
+
+    WEBUI_TLS_NAMES=192.168.1.20,nas.local
+
+Changing the list makes a new certificate (and a new fingerprint). Without it
+the browser additionally reports a name mismatch — the connection is still
+encrypted.
+
+**Behind a reverse proxy** nothing changes: it keeps talking to 3333, and the
+proxy's own certificate is what your browser sees. With `TLS_EXTERN=true` the
+interface knows that and shows no hint.
+
+**Switching it off:** `WEBUI_TLS=off`. If you bring your own certificate with
+`TLS_CERT`/`TLS_KEY`, it is used on both ports.
+
+The hint about plain HTTP can be closed and stays closed in that browser. It
+never blocks anything.
+
 ## Spotting occupied ports
 
 If a container does not start, an occupied port is the most common reason. Some
@@ -131,7 +172,7 @@ the failure then looks like a broken program.
 
 What is really listening:
 
-    sudo ss -tlnp | grep -E ':(3333|8333|9735)\b'
+    sudo ss -tlnp | grep -E ':(3333|3334|8333|9735)\b'
 
 And who owns a port:
 
@@ -521,9 +562,17 @@ Anything that merely looks is **not** behind it: a fee estimate, viewing an
 invoice, querying the graph, reading the balance. A lock in front of a query
 that does nothing makes the lock annoying and nothing safer.
 
-Without a configured PIN the server does not ask for one — then signing in to
-the interface is the only hurdle. On a machine with channel capital that is
-thin: whoever finds your browser open can send without further ado.
+Issuing or revoking a key for an external wallet sits behind it too, and
+settings do not: fees, watchtowers, the backup target and locking the wallet
+work as before. *Lock wallet* is the emergency brake — it must work at once.
+
+**No PIN set up?** Then the same field asks for your **account password**
+(since 2026-11-15). Until then no PIN meant no second check at all: whoever
+found your browser open could send without further ado. The PIN is simply the
+quicker of the two.
+
+Wrong tries count **per session**. Five lock that one session for fifteen
+minutes; a stolen session that guesses only locks itself, never you.
 
 ### How the wallet opens again after a restart
 
@@ -977,6 +1026,13 @@ wallets**. There is no electrs and no address index over the whole chain:
 **TLS or not, on the same port.** Both apps can connect either way; the
 service tells them apart by the first byte. Over Tor the connection is
 encrypted anyway.
+
+**The port has no sign-in** — the Electrum protocol has none. Whoever reaches
+it can ask about addresses and so find out whether one belongs to an account
+registered here. Keep it on your home network or Tor. The service limits what
+a single connection may ask for (headers per request, size of an answer,
+subscriptions, load on Bitcoin Core); a real wallet stays far below those
+limits, a flood does not take the application down.
 
 #### Connecting the apps, step by step
 

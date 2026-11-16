@@ -145,10 +145,16 @@ Two ideas carry the whole project:
 - **A PIN guards every step with consequences.** Sending on-chain, opening and
   closing a channel, paying an invoice, moving liquidity between your own
   channels, issuing or revoking a key for an external wallet and deleting the
-  wallet all ask for it, and it is checked *before* anything else. Five wrong
-  tries lock it for fifteen minutes; the counter lives in a file and survives a
-  restart. Setting it up requires the account password, so a hijacked session
-  cannot hand itself the key.
+  wallet all ask for it, and it is checked *before* anything else. No PIN set
+  up? Then the same field asks for your account password — a signed-in
+  session alone never moves money. Five wrong tries lock it for fifteen
+  minutes — for that session only, so a stolen one cannot lock you out; the
+  counter lives in a file and survives a restart. Setting it up requires the
+  account password, so a hijacked session cannot hand itself the key.
+- **HTTPS out of the box.** Next to the plain port (3333, unchanged for your
+  reverse proxy) the interface answers over HTTPS on 3334 with a certificate
+  the node makes for itself. Compare the fingerprint the interface shows on
+  your first visit, accept, done.
 - **The application can send on-chain — and that is a deliberate trade.** Its
   macaroon carries `onchain:write`, because a wallet you cannot get out of is
   not a wallet. LND grants *SendCoins* and *OpenChannel* on that same
@@ -229,7 +235,8 @@ key that may move money may move all of it.
 
 Open to the internet: **8333** and **9735** — the two ports that are *supposed*
 to be open, because they are how you take part. On the LAN: **3333** for the
-web interface. Three more only if you switch them on: bitcoind's RPC for
+web interface, and **3334** for the same interface over HTTPS. Three more only
+if you switch them on: bitcoind's RPC for
 Sparrow, the Electrum port for BitBoxApp and Trezor Suite, and LND's REST port
 for the VPN route to Zeus. The Tor routes need no open port — Tor gives Zeus
 and the Electrum service onion addresses of their own. ZMQ and gRPC never leave
@@ -434,7 +441,10 @@ docker compose up -d
 ```
 
 Then open `http://<your-server>:3333` — the default for `WEBUI_PORT` — and the
-setup wizard takes it from there.
+setup wizard takes it from there. The same interface answers encrypted on
+port 3334 (`https://`, the node's own certificate — your browser asks once;
+the interface shows the fingerprint to compare). Use that one whenever you
+type your PIN or look at the seed words over the network.
 
 **Note where the wizard starts.** It can only guide you from step 11 onward,
 because until `docker compose up` has run, it isn't running either. Everything
@@ -617,7 +627,10 @@ of the way.
 
 **Your provider decides, not SatoshiCortex.** In Pocket ID a new client allows
 *nobody* until you clear a group for it. Keeping a second list of names here
-would only be a second truth that drifts from the first one.
+would only be a second truth that drifts from the first one. The flip side:
+SatoshiCortex checks no group or claim of its own — a client that is open to
+every user of your provider lets every one of them in. Restrict it to your
+group.
 
 ### The emergency door
 
@@ -628,7 +641,12 @@ proxy**.
 
 From the internet there is genuinely only your provider. On your own network
 the door back in stays open, for the day the provider is down or a passkey is
-lost.
+lost — open it by the server's **IP address and port** (`http://` on 3333 or
+`https://` on 3334). Opened by your public domain name, even from home, it
+counts as "through the proxy" and stays shut; so does a request that carries
+any forwarding header, or one that arrives from the host itself, where a
+host-network proxy sits. When in doubt the door stays closed — a reverse proxy
+that forwards no header at all can no longer open it by accident.
 
 This rests on one assumption: **do not forward the web UI port to the
 internet.** Only 8333, 9735 and optionally 9911 belong out there.

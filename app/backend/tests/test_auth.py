@@ -134,14 +134,16 @@ def test_die_kontodatei_gehoert_niemandem_sonst(verwaltung):
     verwaltung.lege_an("testnutzer", "einlangespasswort")
     assert os.stat(verwaltung.datei).st_mode & 0o077 == 0
 
-    # Und es darf kein Zeitfenster geben, in dem sie offen liegt: die Rechte
-    # werden auf der temporaeren Datei gesetzt, BEVOR sie an ihren Platz
-    # geschoben wird.
-    quelle = Path(auth.__file__).read_text(encoding="utf-8")
-    for stelle in ("self.datei", "self.sitzungsdatei"):
-        block = quelle[quelle.index(f"temp = {stelle}.with_suffix"):]
-        block = block[:block.index("os.replace")]
-        assert "os.chmod(temp" in block, f"{stelle}: erst umbenannt, dann Rechte"
+    # Und es darf kein Zeitfenster geben, in dem sie offen liegt. Frueher
+    # suchte dieser Test im Quelltext nach "chmod vor replace" -- genau das
+    # Muster war aber die Luecke (DER BEFUND VOM 15.11.2026: write_text legt
+    # mit 0644 an, chmod kommt erst danach). Ob eine Datei schon bei der
+    # ANLAGE 0600 hat, pruefen jetzt test_sicherheit_geldwege
+    # (test_geheimnisse_werden_nie_breiter_als_0600_angelegt) und
+    # test_sicherheit_anmeldung fuer die Kontodatei; hier bleibt das
+    # Ergebnis fuer Sitzungen.
+    verwaltung.sitzung_eroeffnen()
+    assert os.stat(verwaltung.sitzungsdatei).st_mode & 0o077 == 0
 
 
 def test_eine_zerschossene_kontodatei_meldet_kein_konto_statt_zu_sterben(verwaltung):

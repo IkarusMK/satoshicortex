@@ -12,7 +12,7 @@ import hashlib
 
 import pytest
 
-from satcortex import fernzugang, settings
+from satcortex import auth, fernzugang, settings
 from tests.test_api import (PIN, FakeLnd, _client, _freigabe_ein, _platz,
                             _richte_ein)
 
@@ -414,8 +414,12 @@ def test_zwei_gleichzeitige_anfragen_bekommen_verschiedene_wurzeln(
     import threading
     import time as zeit
     _richte_ein(client_vpn)
-    # OHNE PIN: die PIN-Bremse laesst zwei Pruefungen im selben Augenblick
-    # nicht zu (429) -- gewollt, aber hier geht es um die Wurzeln.
+    # Die Bremse des Tors laesst zwei Pruefungen derselben Sitzung im selben
+    # Augenblick nicht zu (429) -- gewollt, aber hier geht es um die Wurzeln.
+    # Seit dem 15.11.2026 gilt sie auch ohne PIN (Kontopasswort), deshalb die
+    # Wartezeit hier auf null: geprueft wird die Sperre fz_sperre, nicht der
+    # Waechter.
+    monkeypatch.setattr(auth, "PIN_WARTEN", (0, 0, 0, 0))
     echt = lnd_geraete.ruf
 
     def langsam(pfad, *a, **kw):

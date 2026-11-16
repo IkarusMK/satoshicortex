@@ -34,6 +34,16 @@ def _praefix(name: str) -> str:
         return netz.PRAEFIX_VORGABE
 
 
+def tls_schalter(wert: Optional[str]) -> bool:
+    """Ist der zweite, verschluesselte Port an? WEBUI_TLS=off schaltet ihn ab.
+
+    Nur ein ausdrueckliches "aus" zaehlt. Ein Tippfehler ("of", "disable")
+    darf nicht still den sicheren Weg abschalten -- im Zweifel bleibt er an.
+    """
+    return (wert or "").strip().lower() not in (
+        "off", "0", "false", "no", "nein", "aus")
+
+
 @dataclass(frozen=True)
 class Einstellungen:
     bulk: str = os.environ.get("DATA_BULK_MOUNT", "/bulk")
@@ -105,6 +115,29 @@ class Einstellungen:
     # halten, nicht ob die Strecke zum Browser verschluesselt ist.
     tls_extern: bool = os.environ.get("TLS_EXTERN", "").strip().lower() in (
         "1", "true", "yes", "ja")
+
+    # Der zweite, verschluesselte Port (seit dem 16.11.2026).
+    #
+    # DER BEFUND VOM 15.11.2026: Seed-Woerter, Schluessel fuer externe Wallets
+    # und die PIN liefen im Heimnetz im Klartext, wo kein Reverse Proxy mit TLS
+    # davorsteht. Entschieden: SatoshiCortex bringt sein eigenes, selbst
+    # signiertes Zertifikat mit -- auf einem ZWEITEN Port. Der bisherige
+    # HTTP-Port bleibt wie er ist, denn viele erreichen die Oberflaeche ueber
+    # einen Proxy, der Klartext an 127.0.0.1 spricht, und ein Update darf den
+    # nicht kaputt machen.
+    #
+    # webui_tls_an: WEBUI_TLS=off schaltet den zweiten Port ab. Alles andere
+    # laesst ihn an (siehe tls_schalter).
+    # bind_tls_port: der Port IM Container; die Compose bildet ihn auf
+    # WEBUI_TLS_PORT ab.
+    # webui_tls_port: der Port von AUSSEN, nur fuer den Link in der
+    # Oberflaeche. None heisst NICHT "aus", sondern "die Compose reicht ihn
+    # nicht durch" -- eine aeltere Compose veroeffentlicht den Port gar nicht,
+    # und die Oberflaeche verlinkt dann nichts, was nicht erreichbar ist.
+    webui_tls_an: bool = tls_schalter(os.environ.get("WEBUI_TLS"))
+    webui_tls_namen: str = os.environ.get("WEBUI_TLS_NAMES", "")
+    bind_tls_port: int = _int("BIND_TLS_PORT", 8443)
+    webui_tls_port: Optional[str] = os.environ.get("WEBUI_TLS_PORT")
 
     # ------------------------------------------------------------------ OIDC
     # Anmeldung ueber einen eigenen Ausweisdienst -- Pocket ID, Authentik,

@@ -13,6 +13,7 @@ Docker startet ihn dann mit den neuen Werten neu.
 """
 from __future__ import annotations
 
+import logging
 import os
 import re
 from dataclasses import dataclass
@@ -21,6 +22,8 @@ from enum import Enum
 from pathlib import Path
 from . import storage
 from typing import Dict, List, Optional
+
+log = logging.getLogger(__name__)
 
 PLATZHALTER = re.compile(r"\{\{([A-Z_]+)\}\}")
 
@@ -97,6 +100,24 @@ class Konfigurationsablage:
         geschriebene Datei erwischen, wuerde er den Dienst grundlos neu starten
         -- bei bitcoind mitten im Schreiben des chainstate.
         """
+        # DER BEFUND VOM 15.11.2026: die Dienste lesen eine Zeile bis zum
+        # "\n", Pythons splitlines() aber hoert auch auf U+2028, U+2029,
+        # U+0085, \x0b, \x0c und \x1c-\x1e -- und \r. Wo beide
+        # verschieden zaehlen, kann ein Schritt, der mit splitlines() liest
+        # und mit "\n" schreibt, aus einem Zeichen eine Zeile machen. Das ist
+        # die letzte Sperre: so ein Inhalt kommt nie auf die Platte. Der Wert
+        # selbst steht nicht im Protokoll -- er ist, was ein Angreifer
+        # gewaehlt hat.
+        # Das angehaengte "x" haelt den Vergleich auch bei leerem Inhalt und
+        # nach dem letzten LF gleich -- sonst zaehlte splitlines() dort eine
+        # Zeile weniger als split(). "\r" sperrt zusaetzlich das CRLF, das
+        # beide Zaehlungen gleich behandeln.
+        if (len(inhalt.split("\n")) != len((inhalt + "x").splitlines())
+                or "\r" in inhalt):
+            log.error("Konfiguration %s verweigert: enthaelt andere "
+                      "Zeilentrenner als LF", name)
+            raise ValueError("Die Konfiguration enthaelt Zeilentrenner, "
+                             "die nicht LF sind.")
         ziel = self._conf(name)
         temp = ziel.with_suffix(".conf.tmp")
         temp.write_text(inhalt, encoding="utf-8")
@@ -147,15 +168,15 @@ class Konfigurationsablage:
         """Legt Zugangsdaten ab, die nur die Anwendung selbst braucht.
 
         Getrennt von den Konfigurationsdateien, weil die von allen Diensten
-        gelesen werden. Rechte 0600, und zwar VOR dem Sichtbarmachen -- sonst
-        gibt es ein Zeitfenster, in dem die Datei fuer alle lesbar ist.
+        gelesen werden. Rechte 0600, und zwar von der Anlage an: die Datei
+        entsteht mit os.open(..., 0o600), bevor ein Byte hineinkommt
+        (storage.schreibe_privat). Bis zum 15.11.2026 stand hier "VOR dem
+        Sichtbarmachen" -- gemeint war write_text, dann chmod, dann replace;
+        in der Zeit dazwischen lag der Inhalt mit 0644 da.
         """
         import json
         ziel = self.pfad / f"{name}.geheim.json"
-        temp = ziel.with_suffix(".json.tmp")
-        temp.write_text(json.dumps(daten), encoding="utf-8")
-        os.chmod(temp, 0o600)
-        os.replace(temp, ziel)
+        storage.schreibe_privat(ziel, json.dumps(daten))
 
     def lies_geheim(self, name: str) -> Optional[Dict]:
         import json

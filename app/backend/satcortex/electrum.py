@@ -43,11 +43,35 @@ PORT = 50001
 # Spezifikation empfiehlt mindestens eine Anpassungsperiode, also 2016.
 KOEPFE_HOECHSTENS = 2016
 
+# DER BEFUND VOM 16.11.2026: KOEPFE_HOECHSTENS galt je ANFRAGE. Eine Zeile mit
+# 100 x blockchain.block.headers [800000, 2016] (9,4 KB) liess 400.000
+# Core-Aufrufe und eine Antwort von 32 MB entstehen -- 185 MB Speicher fuer
+# eine einzige Verbindung, bei vier ueber 300 von 400 MB. Deshalb gilt die
+# Grenze je ZEILE: Sitzung.kopf_rest wird vom Server zu Beginn jeder Zeile
+# auf KOPF_BUDGET gesetzt, und jede Kopfanfrage zehrt davon. Eine einzelne
+# Anfrage (die BitBoxApp holt ihre 27.000 Koepfe in vielen Zeilen zu je 2016)
+# merkt davon nichts, und selbst zwei volle Anfragen in einer Zeile gehen noch
+# durch -- die Grenze trifft nur Zeilen, die kein Client schickt (Sparrow
+# fragt einzelne Koepfe, blockchain.block.header, je Zeile bis zu 100 Stueck
+# = 100 Koepfe). Das Budget kostet hoechstens 4032 Koepfe = 645 KB Antwort.
+KOPF_BUDGET = 2 * KOEPFE_HOECHSTENS
+
+# Wie viele Skripthashes eine Verbindung hoechstens abonniert. Gemessen: 234.000
+# Abos in 8 s auf EINER Verbindung (16 davon: Speicher und jede Auffrischung
+# geht je Abo ueber das Kontobuch). Echte Wallets brauchen wenige Tausend --
+# Sparrow mit Gap-Limit 1000 je Kette und Konto, Trezor Suite und BitBoxApp
+# weit darunter (je Konto ein Gap-Limit von 20 bis 100, je Kette). 20.000 liegt ueber allem, was eine Wallet mit nachvollziehbarem
+# Gap-Limit je abonniert, und weit unter dem, was dem Speicher wehtut.
+ABOS_HOECHSTENS = 20_000
+
 # Fehlercodes. -32601/-32602 sind JSON-RPC; 2 nimmt ElectrumX fuer "der
 # Knoten hat abgelehnt" -- so erkennen Apps, dass es nicht an ihnen lag.
 UNBEKANNT = -32601
 UNGUELTIG = -32602
 KNOTEN_LEHNT_AB = 2
+# Weder JSON-RPC noch Electrum nennen einen Code fuer "zu viel"; -32000 ist
+# der Bereich der Implementierung.
+ZU_VIEL = -32000
 
 _HEX = set("0123456789abcdef")
 
@@ -70,6 +94,9 @@ class Sitzung:
     letzter_kopf: Optional[Dict] = None
     # Skripthash -> zuletzt gemeldeter Status
     abos: Dict[str, Optional[str]] = field(default_factory=dict)
+    # Wie viele Koepfe in der laufenden Zeile noch geliefert werden duerfen
+    # (siehe KOEPFE_HOECHSTENS); der Server setzt es je Zeile neu.
+    kopf_rest: int = KOPF_BUDGET
 
 
 def _version_zerlegen(text: str) -> Tuple[int, ...]:
@@ -124,6 +151,39 @@ def _ganzzahl(wert: Any, was: str) -> int:
     if isinstance(wert, bool) or not isinstance(wert, int) or wert < 0:
         raise ElectrumFehler(UNGUELTIG, f"{was}: nicht-negative Ganzzahl erwartet")
     return wert
+
+
+# Was Core WIRKLICH arbeiten laesst. Die Skripthash-Befehle laufen ueber das
+# zwischengespeicherte Kontobuch und kosten Core nichts.
+_CORE_KOSTEN: Dict[str, int] = {
+    "server.features": 1,
+    "blockchain.headers.subscribe": 1,
+    "blockchain.block.header": 1,
+    "blockchain.block.headers": 1,
+    "blockchain.estimatefee": 1,
+    "blockchain.relayfee": 1,
+    "blockchain.transaction.get": 1,
+    "blockchain.transaction.get_merkle": 2,
+    "blockchain.transaction.broadcast": 2,
+}
+
+
+def kosten(methode: str, params: Any,
+           kopf_rest: int = KOPF_BUDGET) -> int:
+    """Was ein Befehl Core kostet, in Marken fuer die Bremse des Servers.
+
+    0 fuer alles, was Core nicht fragt. Koepfe kosten nach Menge: 2016 Koepfe
+    sind 4032 gebuendelte Aufrufe. Was das Kopfbudget der Zeile ohnehin
+    abschlaegt, kostet nichts -- es kommt ohne Core-Aufruf als Fehler zurueck,
+    und eine Zeile voller solcher Anfragen soll nicht die Bremse leeren.
+    """
+    grundkosten = _CORE_KOSTEN.get(methode, 0)
+    if methode == "blockchain.block.headers" and isinstance(params, list) \
+            and len(params) > 1 and isinstance(params[1], int) \
+            and not isinstance(params[1], bool):
+        anzahl = max(0, min(params[1], KOEPFE_HOECHSTENS, kopf_rest))
+        return grundkosten + anzahl // 100 if anzahl else 0
+    return grundkosten
 
 
 def _core_meldung(fehler: rpc.RpcFehler) -> str:
@@ -242,8 +302,13 @@ class Dienst:
         anzahl = min(_ganzzahl(anzahl, "count"), KOEPFE_HOECHSTENS)
         if pruefpunkt:
             raise ElectrumFehler(UNGUELTIG, "cp_height wird nicht unterstuetzt")
+        if anzahl and s.kopf_rest <= 0:
+            raise ElectrumFehler(ZU_VIEL, "in dieser Zeile sind schon "
+                                          f"{KOPF_BUDGET} Koepfe geliefert")
+        anzahl = min(anzahl, s.kopf_rest)
         spitze = self.knoten.ruf("getblockcount")
         anzahl = max(0, min(anzahl, spitze - start + 1))
+        s.kopf_rest -= anzahl
         # Zweimal gebuendelt statt 2*anzahl Einzelanfragen: die BitBoxApp
         # holt ab ihrem Pruefpunkt rund 27.000 Koepfe.
         hashes = self.knoten.stapel(
@@ -304,8 +369,12 @@ class Dienst:
         return buch.status(skript) if buch else None
 
     def _abonnieren(self, s: Sitzung, skript: Any):
+        schluessel = _hex32(skript, "scripthash")
+        if schluessel not in s.abos and len(s.abos) >= ABOS_HOECHSTENS:
+            raise ElectrumFehler(ZU_VIEL, f"hoechstens {ABOS_HOECHSTENS} "
+                                          "Abonnements je Verbindung")
         status = self._status(skript)
-        s.abos[_hex32(skript, "scripthash")] = status
+        s.abos[schluessel] = status
         return status
 
     def _abbestellen(self, s: Sitzung, skript: Any):

@@ -111,8 +111,19 @@ vanishes leaves the person searching for it.
 
 Six operations move money: sending on-chain, opening a channel, closing a
 channel, paying an invoice, rebalancing, deleting the wallet. Each sits behind
-the transaction PIN, and **the PIN is checked before anything else** — before
-amount validation, before address parsing. Do not reorder this.
+the transaction PIN — or, when no PIN is set, the account password — and
+**that check comes before anything else in the handler**, before amount
+validation, before address parsing. Do not reorder this. (FastAPI's schema
+check of the request body runs before the handler; it reveals field limits,
+nothing more.) Issuing and revoking keys for external wallets sit behind the
+same gate. The gate counts failures per session, under both cookie names
+(`satcortex_sitzung` and `__Host-satcortex_sitzung`).
+
+**Security fixes add no prompts.** The owner's rule: nobody from outside gets
+in or changes anything, and handling stays as easy as before. Close holes
+with validation, limits and access checks — not with another PIN prompt in
+front of a setting. `wallet/sperren` is the emergency brake and stays without
+one on purpose.
 
 The seed is never stored. Not in a file, not in the log, not in the state.
 

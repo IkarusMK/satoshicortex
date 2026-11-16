@@ -293,8 +293,12 @@ class Ablage:
         self.speichern(e)
 
     def speichern(self, e: Einrichtung) -> None:
-        temp = self.datei.with_suffix(".json.tmp")
-        temp.write_text(
+        # DER BEFUND VOM 15.11.2026: diese Datei trug keine eigenen Rechte
+        # (0644 unter der ueblichen umask). Sie haelt Wahlen und Ausweisdaten
+        # des Knotens, nichts fuer fremde Augen -- also wie die Geheimnisse:
+        # 0600 von der Anlage an.
+        storage.schreibe_privat(
+            self.datei,
             json.dumps(
                 {
                     "schritt": e.schritt.value,
@@ -310,7 +314,4 @@ class Ablage:
                     "electrumwahl": e.electrumwahl,
                 },
                 indent=2, ensure_ascii=False,
-            ),
-            encoding="utf-8",
-        )
-        os.replace(temp, self.datei)
+            ))

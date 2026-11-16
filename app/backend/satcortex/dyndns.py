@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import ipaddress
 import logging
+import re
 import socket
 from typing import Callable, List, Sequence
 
@@ -32,11 +33,39 @@ INTERVALL_SEKUNDEN = 600
 
 
 def ist_ip(wert: str) -> bool:
+    # DER BEFUND VOM 15.11.2026: ip_address() akzeptiert Scope-Kennungen
+    # ("fe80::1%x ..."), und alles hinter dem Prozentzeichen ist frei
+    # waehlbar. Als IP gilt hier nur, was OHNE solche Kennung eine ist --
+    # sonst ginge der Text unveraendert bis in die Konfigurationsdatei.
+    if "%" in wert or not wert.isprintable():
+        return False
     try:
         ipaddress.ip_address(wert)
         return True
     except ValueError:
         return False
+
+
+# Der Unterstrich ist kein RFC-1123-Zeichen, kommt bei DynDNS-Namen aber vor
+# und ist in einer conf-Zeile harmlos -- er bleibt erlaubt, damit alles weiter
+# geht, was vorher ging.
+_HOSTLABEL = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9_-]{0,61}[A-Za-z0-9])?$")
+
+
+def ist_hostname(wert: str) -> bool:
+    """Ein Hostname nach RFC 1123 -- sonst nichts, was DNS je fragen duerfte."""
+    if not wert or not wert.isprintable() or " " in wert:
+        return False
+    # Umlaut-Domains und der abschliessende Punkt eines FQDN gingen vorher
+    # durch getaddrinfo -- ueber IDNA in die ASCII-Form, die DNS kennt.
+    try:
+        ascii_form = wert.encode("idna").decode("ascii")
+    except UnicodeError:
+        return False
+    ascii_form = ascii_form[:-1] if ascii_form.endswith(".") else ascii_form
+    if not ascii_form or len(ascii_form) > 253:
+        return False
+    return all(_HOSTLABEL.match(l) for l in ascii_form.split("."))
 
 
 # Wie oft eine Abfrage wiederholt wird, bevor sie als gescheitert gilt.
@@ -137,6 +166,12 @@ def loese_auf(
         if ist_ip(eintrag):
             ergebnis.append(eintrag)
             continue
+        # DER BEFUND VOM 15.11.2026: was weder IP noch Hostname ist, wird gar
+        # nicht erst gefragt. "fe80::1%x<U+2028>..." erreichte sonst
+        # getaddrinfo und warf dort einen UnicodeError statt einer Antwort.
+        if not ist_hostname(eintrag):
+            log.warning("Eintrag ist weder IP noch Hostname -- uebersprungen")
+            continue
         ergebnis.extend(_aufloesen_gemerkt(eintrag, aufloeser))
     # Doppelte entfernen, Reihenfolge behalten.
     gesehen = set()
@@ -157,7 +192,7 @@ def hat_sich_geaendert(conf: str, soll: Sequence[str]) -> bool:
     # startete bitcoind bei jedem Durchgang neu.
     ist = sorted(
         z.strip().split("=", 1)[1]
-        for z in conf.splitlines()
+        for z in conf.split("\n")
         if z.strip().startswith("externalip=")
         and not onion.ist_onion(z.strip().split("=", 1)[1])
     )

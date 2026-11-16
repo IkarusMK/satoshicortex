@@ -28,6 +28,40 @@ def _platz(monkeypatch, frei_gb):
 
 ZUGANG = {"benutzer": "pruefer", "passwort": "ein-gutes-langes-passwort"}
 
+# DER BEFUND VOM 15.11.2026: ohne eingerichtete PIN bewegte eine nackte
+# Sitzung Geld. Seitdem verlangt jede Geldroute entweder die PIN oder -- wo
+# keine steht -- das Kontopasswort. Die aelteren Tests in dieser Datei pruefen
+# aber etwas anderes (Betrag, Adresse, Kanal ...) und schicken beides nicht
+# mit. Statt hundert Aufrufe einzeln umzuschreiben, haengt dieser Client
+# jedem solchen POST das Kontopasswort an -- WENN der Aufrufer das Feld nicht
+# selbst setzt. Wer das Tor selbst pruefen will, setzt client.auto_passwort =
+# False (tests/test_sicherheit_geldwege.py) oder gibt das Feld ausdruecklich
+# mit. Mit einer eingerichteten PIN ist das Kontopasswort ohne Wirkung; die
+# Tests, die eine fehlende PIN erwarten, sehen sie also weiterhin fehlen.
+GELDROUTEN = (
+    "/lightning/senden", "/lightning/senden/nachbessern",
+    "/lightning/kanal/oeffnen",
+    "/lightning/kanal/schliessen", "/lightning/rechnung/zahlen",
+    "/lightning/umschichten", "/lightning/wallet/loeschen",
+    "/fernzugang/geraet",
+)
+
+
+class _Client(TestClient):
+    auto_passwort = True
+
+    def post(self, url, *args, **kwargs):
+        pfad = str(url).split("?")[0]
+        koerper = kwargs.get("json")
+        if (self.auto_passwort and isinstance(koerper, dict)
+                and "konto_passwort" not in koerper
+                and pfad.startswith("/api")
+                and (pfad[4:] in GELDROUTEN
+                     or (pfad.startswith("/api/fernzugang/geraet/")
+                         and pfad.endswith("/widerrufen")))):
+            kwargs["json"] = {**koerper, "konto_passwort": ZUGANG["passwort"]}
+        return super().post(url, *args, **kwargs)
+
 
 def _client(tmp_path, konf=None, anmelden=True):
     """Client mit angelegtem Konto.
@@ -40,7 +74,7 @@ def _client(tmp_path, konf=None, anmelden=True):
     konf = konf or settings.Einstellungen(
         bulk=str(bulk), fast=str(fast), config_dir=str(tmp_path / "config")
     )
-    c = TestClient(api.baue_app(konf))
+    c = _Client(api.baue_app(konf))
     c.tmp = tmp_path
     if anmelden:
         if (tmp_path / "config" / "konto.json").exists():
@@ -2674,10 +2708,13 @@ def test_gebuehren_lassen_sich_je_kanal_setzen(client, lnd_macaroon):
     """Der eigentliche Betriebsgriff: teuer machen, wo ein Kanal leerlaeuft."""
     _richte_ein(client)
     client.post("/api/lightning/gebuehren", json={
-        "basis_msat": 1000, "satz_ppm": 800, "kanalpunkt": "abcdef:1"})
+        "basis_msat": 1000, "satz_ppm": 800, "kanalpunkt": "abcdef" * 10 + "abcd:1"})
     d = lnd_macaroon.gebuehren
     assert "global" not in d
-    assert d["chan_point"] == {"funding_txid_str": "abcdef", "output_index": 1}
+    # Seit dem 15.11.2026 muss der Kanalpunkt eine echte Txid tragen (64 Hex);
+    # "abcdef:1" war ein Platzhalter, den LND ohnehin abgelehnt haette.
+    assert d["chan_point"] == {"funding_txid_str": "abcdef" * 10 + "abcd",
+                               "output_index": 1}
 
 
 def test_unsinnige_gebuehren_werden_abgewiesen(client, lnd_macaroon):
@@ -5612,9 +5649,11 @@ def test_die_falsche_pin_loescht_nichts(client, lnd_da):
     assert a.json()["detail"]["meldung"] == "pin_falsch"
 
 
-def test_ohne_eingerichtete_pin_bleibt_das_loeschen_wie_es_war(client, lnd_da):
-    """Wer keine PIN eingerichtet hat, soll nicht ploetzlich vor einer
-    Abfrage stehen, die es fuer ihn gar nicht gibt."""
+def test_ohne_eingerichtete_pin_loescht_das_kontopasswort_frei(client, lnd_da):
+    """Bis zum 15.11.2026 hiess dieser Test "bleibt das Loeschen wie es war":
+    ohne PIN fragte nichts. Das war der Befund. Jetzt genuegt das
+    Kontopasswort (die Testhilfe _Client haengt es an) -- ohne wuerde es 403.
+    Die Gegenprobe steht in tests/test_sicherheit_geldwege.py."""
     _richte_ein(client)
     _wallet_mit_weg(client, "aus")
     lnd_da.stand = "LOCKED"
@@ -7857,7 +7896,7 @@ def test_ein_zeitlimit_beim_kanal_oeffnen_heisst_nicht_dass_nichts_geschah(
     _sendebereit(client, lnd_da, monkeypatch)
     lnd_da.beschaeftigt_auf = {"/v1/channels"}
     a = client.post("/api/lightning/kanal/oeffnen",
-                    json={"gegenstelle": "02" + "ab" * 32 + "@127.0.0.1:9735",
+                    json={"gegenstelle": "02" + "ab" * 32 + "@203.0.113.5:9735",
                           "betrag": 1_000_000})
     assert a.status_code == 504, a.text
     assert a.json()["detail"]["meldung"] == "kanal_unklar"

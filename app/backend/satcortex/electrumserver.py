@@ -22,6 +22,7 @@ auch die Spezifikation vor.
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import contextlib
 import datetime
 import hashlib
@@ -34,7 +35,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Optional, Set
+from typing import Any, Callable, Dict, List, Optional, Set
 
 from . import electrum, kontobuch, lesewallet, rpc
 
@@ -45,6 +46,128 @@ TLS_ERSTES_BYTE = b"\x16"
 _PARSE = -32700
 _ANFRAGE = -32600
 _INTERN = -32603
+
+# DER BEFUND VOM 16.11.2026 (alles am echten Server mit nachgebildetem Core
+# gemessen, siehe tests/test_sicherheit_electrum.py): der Port hat keine
+# Anmeldung und ist im Heimnetz und ueber Tor erreichbar. Die Grenzen unten
+# sind das, was daraus folgt.
+
+# Wie alt der Bestand mindestens sein muss, bevor eine NEUE VERBINDUNG ihn
+# als veraltet erklaeren darf. Vorher entwertete jede Verbindung ihn: 16.340
+# volle Neulesungen (listdescriptors + alle listtransactions, unter einer
+# globalen Sperre) in fuenf Sekunden. Der Grund dafuer war ein echter -- ohne
+# verbundene App wird nicht aufgefrischt, wer neu kommt soll nicht den Stand
+# von vor Stunden sehen --, und er bleibt gewahrt: zehn Sekunden Alter sind
+# fuer eine App, die gerade erst anfragt, nicht von Stunden zu unterscheiden.
+BESTAND_MINDESTALTER = 10.0
+
+# Obergrenze der Antwort auf EINE Zeile, in Bytes. 100 x transaction.get von
+# grossen Transaktionen waere sonst ein Vielfaches des Speichers der Anwendung.
+# 6 MB ist weit ueber dem, was Wallets in einer Zeile holen: Sparrow und
+# Trezor Suite fragen Transaktionen zu je einigen hundert Byte bis wenigen KB
+# (100 Stueck = unter 1 MB), die Geschichte einer einzelnen Adresse je ein paar
+# KB. Die erste Antwort einer Zeile geht immer durch (eine einzelne grosse
+# Transaktion als Hex darf nicht scheitern); die folgenden nur, solange die
+# Summe darunter bleibt.
+ANTWORT_HOECHSTENS = 6_000_000
+
+# Bremse fuer alles, was Core arbeiten laesst: Marken je Sekunde und wie viele
+# auf Vorrat. Eine Kopfanfrage ueber 2016 Koepfe kostet 21, ein transaction.get
+# eine. Core hat eine endliche Arbeitswarteschlange; 16 Verbindungen, die sie
+# fuellen, lassen die eigenen Aufrufe der Anwendung (LND-Anbindung, Oberflaeche)
+# in der Schlange warten. Eine App, die ihre 27.000 Koepfe holt (14 Anfragen,
+# 294 Marken), wartet dabei wenige Sekunden.
+#
+# Die Zahlen sind weit ueber dem, was ein erster Abgleich braucht: Sparrow holt
+# eine Wallet mit 5.000 Transaktionen als 5.000 transaction.get (= 5.000
+# Marken) in Zeilen zu je bis 100 -- 2.000 davon liegen auf Vorrat, den Rest
+# liefert die Bremse mit 500 je Sekunde, das sind rund 6 s Verzoegerung, nie
+# ein Fehler. Die BitBoxApp holt 27.000 Koepfe als 14 Anfragen = 294 Marken.
+CORE_RATE = 500.0
+CORE_FASSUNG = 2000.0
+# Muesste eine Anfrage laenger warten (Schlange von 10.000 Marken), bekommt sie
+# lieber gleich einen Fehler als nach dem Zeitlimit der App.
+CORE_WARTEZEIT = 20.0
+
+# Eigene Faden-Gruppe. Der Standard-Pool von asyncio ist derselbe, den
+# api.py mit asyncio.to_thread benutzt: eine Antwort aus Core, die dort Faeden
+# belegte, liess ein leeres to_thread 2,5 s warten. Wenige Faeden genuegen --
+# je Verbindung laeuft hoechstens eine Anfrage.
+POOL_FAEDEN = 4
+
+# Wie lange eine Verbindung Zeit hat, ihre erste Zeile zu vollenden und die
+# Version zu nennen. 16 Verbindungen, die ein einzelnes "{" schickten, hielten
+# sonst alle Plaetze die vollen zehn Minuten Leerlauf lang. Die Apps nennen
+# die Version als erste Zeile unmittelbar nach dem Verbinden; 60 s lassen auch
+# einem langsamen Tor-Kreis (Verbindung steht erst nach dem Kreisaufbau, die
+# Zeit davor zaehlt nicht) mehr als reichlich Spiel.
+VORLAUF = 60.0
+
+# Fehler beim Annehmen (EMFILE, ENFILE, ENOBUFS ...) sind meist voruebergehend.
+ANNAHME_PAUSE = 0.5
+
+LOG_FENSTER = 60.0
+
+
+class Gedrosselt:
+    """Ein Protokollaufruf, der je Fenster nur einmal durchkommt.
+
+    Abgewiesene Verbindungen und gescheiterte Handschluesse sind aus dem
+    Netz ausloesbar -- ein Schleifenaufruf von aussen waere sonst eine
+    Protokoll-Flut. Was in der Zwischenzeit unterdrueckt wurde, steht in der
+    naechsten Zeile als Zahl.
+    """
+
+    def __init__(self, ausgabe: Callable[..., None],
+                 fenster: float = LOG_FENSTER,
+                 uhr: Callable[[], float] = time.monotonic) -> None:
+        self._ausgabe = ausgabe
+        self._fenster = fenster
+        self._uhr = uhr
+        self._letzte: Optional[float] = None
+        self._verschluckt = 0
+
+    def __call__(self, text: str, *args: Any) -> None:
+        jetzt = self._uhr()
+        if self._letzte is not None and jetzt - self._letzte < self._fenster:
+            self._verschluckt += 1
+            return
+        if self._verschluckt:
+            text += f" (+{self._verschluckt} weitere seit der letzten Meldung)"
+        self._letzte = jetzt
+        self._verschluckt = 0
+        self._ausgabe(text, *args)
+
+
+class Eimer:
+    """Eine Marken-Bremse (token bucket).
+
+    Wird nur aus dem Ereignisfaden benutzt, braucht also keine Sperre.
+    """
+
+    def __init__(self, rate: float, fassung: float,
+                 uhr: Callable[[], float] = time.monotonic) -> None:
+        self._rate = rate
+        self._fassung = fassung
+        self._uhr = uhr
+        self._marken = fassung
+        self._stand = uhr()
+
+    def entnehmen(self, kosten: float,
+                  hoechstens: Optional[float] = None) -> Optional[float]:
+        """Marken buchen. Gibt zurueck, wie lange zu warten ist (0.0 = gleich),
+        oder None, wenn das laenger als hoechstens dauern wuerde -- dann wird
+        NICHTS gebucht."""
+        jetzt = self._uhr()
+        self._marken = min(self._fassung,
+                           self._marken + (jetzt - self._stand) * self._rate)
+        self._stand = jetzt
+        fehlt = kosten - self._marken
+        warten = max(0.0, fehlt / self._rate)
+        if hoechstens is not None and warten > hoechstens:
+            return None
+        self._marken -= kosten
+        return warten
 
 
 # ── Das Zertifikat ─────────────────────────────────────────────────────────
@@ -135,14 +258,17 @@ class Bestand:
     saehe aus, als waere das Geld weg.
     """
 
-    def __init__(self, leser) -> None:
+    def __init__(self, leser, uhr: Callable[[], float] = time.monotonic) -> None:
         self.leser = leser
+        self._uhr = uhr
         self._sperre = threading.Lock()
         self._stand = None
         self._frisch = False
+        self._versucht: Optional[float] = None    # None: noch nie gelesen
         self._leer = (kontobuch.Buch([]), frozenset())
 
     def _lesen(self) -> None:
+        self._versucht = self._uhr()
         try:
             self._stand = self.leser.lesen()
             self._frisch = True
@@ -161,8 +287,15 @@ class Bestand:
         with self._sperre:
             self._lesen()
 
-    def veraltet(self) -> None:
+    def veraltet(self, mindestalter: float = 0.0) -> None:
+        """Den Stand als veraltet erklaeren -- sofort (eine Kontenaenderung
+        darf nie warten) oder nur, wenn der letzte Leseversuch mindestens
+        mindestalter Sekunden her ist (neue Verbindungen, siehe
+        BESTAND_MINDESTALTER)."""
         with self._sperre:
+            if (mindestalter and self._versucht is not None
+                    and self._uhr() - self._versucht < mindestalter):
+                return
             self._frisch = False
 
 
@@ -193,7 +326,14 @@ class ElectrumServer:
                  mempool_abstand: float = 5.0,
                  takt: float = 30.0,
                  leerlauf: float = 600.0,
-                 handschlag: float = 15.0) -> None:
+                 handschlag: float = 15.0,
+                 vorlauf: float = VORLAUF,
+                 antwort_hoechstens: int = ANTWORT_HOECHSTENS,
+                 core_rate: float = CORE_RATE,
+                 core_fassung: float = CORE_FASSUNG,
+                 core_wartezeit: float = CORE_WARTEZEIT,
+                 stand_mindestalter: float = BESTAND_MINDESTALTER,
+                 annahme_pause: float = ANNAHME_PAUSE) -> None:
         self.dienst = dienst
         self.bestand = bestand
         self.tls = tls
@@ -209,6 +349,22 @@ class ElectrumServer:
         self._zuletzt = 0.0             # monotonic der letzten Auffrischung
         self.leerlauf = leerlauf
         self.handschlag = handschlag
+        self.vorlauf = vorlauf
+        self.antwort_hoechstens = antwort_hoechstens
+        self.core_wartezeit = core_wartezeit
+        self.stand_mindestalter = stand_mindestalter
+        self.annahme_pause = annahme_pause
+        self._bremse = Eimer(core_rate, core_fassung)
+        self._pool = concurrent.futures.ThreadPoolExecutor(
+            max_workers=POOL_FAEDEN, thread_name_prefix="electrum")
+        # Angenommen, aber noch nicht oder nicht mehr in _verbindungen: die
+        # Zaehlung gegen verbindungen_hoechstens beginnt beim Annehmen, nicht
+        # erst nach dem Handschlag -- sonst waren halboffene Verbindungen
+        # unbegrenzt.
+        self._angenommen = 0
+        self._log_abgewiesen = Gedrosselt(log.info)
+        self._log_handschlag = Gedrosselt(log.info)
+        self._log_annahme = Gedrosselt(log.warning)
         self._verbindungen: Set[_Verbindung] = set()
         self._aufgaben: Set[asyncio.Task] = set()
         self._sock: Optional[socket.socket] = None
@@ -238,6 +394,7 @@ class ElectrumServer:
             v.writer.close()
         if self._sock is not None:
             self._sock.close()
+        self._pool.shutdown(wait=False, cancel_futures=True)
 
     def anstossen(self, block: bool = True) -> None:
         """Neuer Block oder neue Transaktion -- aus JEDEM Faden aufrufbar.
@@ -264,12 +421,26 @@ class ElectrumServer:
     async def _annehmen(self) -> None:
         loop = asyncio.get_running_loop()
         while True:
-            client, _adresse = await loop.sock_accept(self._sock)
-            if len(self._verbindungen) >= self.verbindungen_hoechstens:
-                log.info("Electrum: Verbindung abgewiesen, schon %d offen",
-                         len(self._verbindungen))
+            try:
+                client, _adresse = await loop.sock_accept(self._sock)
+            except OSError as fehler:
+                # DER BEFUND VOM 16.11.2026: ohne dieses try endete die
+                # Aufgabe bei EMFILE (oder jedem anderen voruebergehenden
+                # OSError) still -- der Dienst war tot, bis jemand ihn aus-
+                # und einschaltete. Ein geschlossener Socket (beenden) ist
+                # kein vorUebergehender Fehler.
+                if self._sock.fileno() == -1:
+                    return
+                self._log_annahme("Electrum: Annehmen scheiterte: %s", fehler)
+                await asyncio.sleep(self.annahme_pause)
+                continue
+            if self._angenommen >= self.verbindungen_hoechstens:
+                self._log_abgewiesen(
+                    "Electrum: Verbindung abgewiesen, schon %d offen",
+                    self._angenommen)
                 client.close()
                 continue
+            self._angenommen += 1
             self._aufgabe(self._verbindung(client))
 
     async def _spaehen(self, client: socket.socket) -> bytes:
@@ -295,6 +466,12 @@ class ElectrumServer:
             loop.remove_reader(fd)
 
     async def _verbindung(self, client: socket.socket) -> None:
+        try:
+            await self._verbindung_halten(client)
+        finally:
+            self._angenommen -= 1
+
+    async def _verbindung_halten(self, client: socket.socket) -> None:
         client.setblocking(False)
         try:
             erstes = await self._spaehen(client)
@@ -314,14 +491,15 @@ class ElectrumServer:
                 ssl=self.tls if tls else None,
                 ssl_handshake_timeout=self.handschlag if tls else None)
         except (ssl.SSLError, OSError, asyncio.TimeoutError) as fehler:
-            log.info("Electrum: Handschlag gescheitert: %s", fehler)
+            self._log_handschlag("Electrum: Handschlag gescheitert: %s", fehler)
             client.close()
             return
         verbindung = _Verbindung(asyncio.StreamWriter(
             transport, protokoll, reader, loop))
         # Ohne verbundene App wird nicht aufgefrischt; wer neu kommt, soll
-        # nicht den Stand von vor Stunden sehen.
-        self.bestand.veraltet()
+        # nicht den Stand von vor Stunden sehen -- aber nur, wenn der Stand
+        # nicht gerade erst gelesen wurde (BESTAND_MINDESTALTER).
+        self.bestand.veraltet(self.stand_mindestalter)
         self._verbindungen.add(verbindung)
         try:
             await self._lesen(reader, verbindung)
@@ -331,10 +509,18 @@ class ElectrumServer:
 
     async def _lesen(self, reader: asyncio.StreamReader,
                      verbindung: _Verbindung) -> None:
+        beginn = time.monotonic()
         while not verbindung.sitzung.schliessen:
+            frist = self.leerlauf
+            if verbindung.sitzung.version is None:
+                # Noch keine Version genannt: nur der kurze Vorlauf, auf die
+                # GANZE Zeile gerechnet -- wer ein Byte pro Sekunde schickt,
+                # hat sie nach 30 s trotzdem nicht vollendet.
+                frist = min(frist, self.vorlauf - (time.monotonic() - beginn))
+                if frist <= 0:
+                    return
             try:
-                zeile = await asyncio.wait_for(reader.readline(),
-                                               self.leerlauf)
+                zeile = await asyncio.wait_for(reader.readline(), frist)
             except (asyncio.TimeoutError, ValueError, ConnectionError,
                     asyncio.LimitOverrunError):
                 return          # Stille, zu lange Zeile oder abgerissen
@@ -342,25 +528,73 @@ class ElectrumServer:
                 return
             if not zeile.strip():
                 continue
-            antwort = await self._verarbeiten(zeile, verbindung)
-            if antwort is not None and not await self._senden(
-                    verbindung, antwort):
+            if not await self._verarbeiten(zeile, verbindung):
                 return
 
     async def _verarbeiten(self, zeile: bytes,
-                           verbindung: _Verbindung) -> Optional[Any]:
+                           verbindung: _Verbindung) -> bool:
+        """Eine Zeile beantworten. False, wenn die Verbindung aufzugeben ist."""
+        # Das Kopfbudget gilt je Zeile (electrum.KOPF_BUDGET).
+        verbindung.sitzung.kopf_rest = electrum.KOPF_BUDGET
         try:
             nachricht = json.loads(zeile)
-        except (ValueError, UnicodeDecodeError):
-            return _fehler(_PARSE, "unlesbares JSON")
+        except (ValueError, UnicodeDecodeError, RecursionError):
+            # RecursionError: 900.000 "[" in einer Zeile unter dem Limit von
+            # 1 MB. DER BEFUND VOM 16.11.2026: er entkam bis hierher nicht
+            # nur ungefangen -- die Aufgabe der Verbindung endete mit "Task
+            # exception was never retrieved".
+            return await self._senden(verbindung,
+                                      _fehler(_PARSE, "unlesbares JSON"))
         if isinstance(nachricht, list):
             if not nachricht or len(nachricht) > self.buendel_hoechstens:
-                return _fehler(_ANFRAGE, f"Buendel mit 1 bis "
-                                         f"{self.buendel_hoechstens} Eintraegen erwartet")
-            antworten = [await self._eine(n, verbindung) for n in nachricht]
-            antworten = [a for a in antworten if a is not None]
-            return antworten or None
-        return await self._eine(nachricht, verbindung)
+                return await self._senden(verbindung, _fehler(
+                    _ANFRAGE, f"Buendel mit 1 bis "
+                              f"{self.buendel_hoechstens} Eintraegen erwartet"))
+            return await self._buendel(nachricht, verbindung)
+        antwort = await self._eine(nachricht, verbindung)
+        return antwort is None or await self._senden(verbindung, antwort)
+
+    async def _buendel(self, nachrichten: List[Any],
+                       verbindung: _Verbindung) -> bool:
+        """Ein Buendel beantworten, ohne die Antworten als Ganzes zu bauen.
+
+        Jede Antwort wird einzeln zu Text; ab antwort_hoechstens (die erste
+        zaehlt nie) gibt es statt ihrer einen Fehler. Geschrieben wird erst,
+        wenn alle da sind, Stueck fuer Stueck -- ohne ein "[...]" aus
+        allem zusammenzusetzen, das noch einmal so viel Speicher braeuchte --
+        und ohne dazwischen auf die Schleife zu warten, damit keine
+        Benachrichtigung mitten in die Zeile faehrt.
+        """
+        teile: List[str] = []
+        groesse = 0
+        for nachricht in nachrichten:
+            antwort = await self._eine(nachricht, verbindung)
+            if antwort is None:
+                continue
+            teil = json.dumps(antwort)
+            if teile and groesse + len(teil) > self.antwort_hoechstens:
+                teil = json.dumps(_fehler(
+                    electrum.ZU_VIEL, "Antwort zu gross fuer diese Zeile -- "
+                                      "einzeln erneut fragen",
+                    antwort.get("id")))
+            teile.append(teil)
+            groesse += len(teil)
+        if not teile:
+            return True
+        try:
+            writer = verbindung.writer
+            for i, teil in enumerate(teile):
+                writer.write(("[" if i == 0 else ",").encode())
+                writer.write(teil.encode())
+            writer.write(b"]\n")
+            await asyncio.wait_for(writer.drain(), self.handschlag)
+            return True
+        except (ConnectionError, asyncio.TimeoutError, OSError):
+            return False
+
+    async def _im_pool(self, funktion: Callable[..., Any], *args: Any) -> Any:
+        return await asyncio.get_running_loop().run_in_executor(
+            self._pool, funktion, *args)
 
     async def _eine(self, anfrage: Any, verbindung: _Verbindung) -> Optional[Dict]:
         if not isinstance(anfrage, dict) or not isinstance(
@@ -368,9 +602,22 @@ class ElectrumServer:
             return _fehler(_ANFRAGE, "keine gueltige Anfrage")
         kennung = anfrage.get("id")
         params = anfrage.get("params", [])
+        kosten = electrum.kosten(anfrage["method"], params,
+                                 verbindung.sitzung.kopf_rest)
+        if kosten:
+            warten = self._bremse.entnehmen(kosten, self.core_wartezeit)
+            if warten is None:
+                # DER BEFUND VOM 16.11.2026: ohne Bremse sattelten 16
+                # Verbindungen Cores RPC-Warteschlange und liessen die
+                # eigenen Aufrufe der Anwendung warten.
+                return _fehler(electrum.ZU_VIEL,
+                               "Knoten ausgelastet, bitte spaeter noch einmal",
+                               kennung) if "id" in anfrage else None
+            if warten:
+                await asyncio.sleep(warten)
         try:
             async with verbindung.sperre:
-                ergebnis = await asyncio.to_thread(
+                ergebnis = await self._im_pool(
                     self.dienst.bearbeite, verbindung.sitzung,
                     anfrage["method"], params)
             antwort = {"jsonrpc": "2.0", "id": kennung, "result": ergebnis}
@@ -384,7 +631,8 @@ class ElectrumServer:
 
     async def _senden(self, verbindung: _Verbindung, nachricht: Any) -> bool:
         try:
-            verbindung.writer.write((json.dumps(nachricht) + "\n").encode())
+            verbindung.writer.write(json.dumps(nachricht).encode())
+            verbindung.writer.write(b"\n")
             await asyncio.wait_for(verbindung.writer.drain(), self.handschlag)
             return True
         except (ConnectionError, asyncio.TimeoutError, OSError):
@@ -414,10 +662,10 @@ class ElectrumServer:
                 self._anstoss.clear()
                 self._block_neu = False
                 self._zuletzt = time.monotonic()
-                await asyncio.to_thread(self.bestand.auffrischen)
+                await self._im_pool(self.bestand.auffrischen)
                 for verbindung in list(self._verbindungen):
                     async with verbindung.sperre:
-                        meldungen = await asyncio.to_thread(
+                        meldungen = await self._im_pool(
                             self.dienst.neuigkeiten, verbindung.sitzung)
                     for methode, params in meldungen:
                         await self._senden(verbindung, {

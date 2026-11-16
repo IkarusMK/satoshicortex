@@ -40,6 +40,21 @@ services:
       # application speaks plain HTTP while the browser speaks https — and
       # only this switch gives the session cookie its "Secure" flag.
       TLS_EXTERN: ${TLS_EXTERN:-}
+      # The second, encrypted web port (8443 inside the container) with a
+      # certificate the application makes for itself. The plain HTTP port
+      # above stays exactly as it was. The browser warns on the first visit
+      # -- the certificate is the node's own; compare the fingerprint the
+      # interface shows. TLS_CERT/TLS_KEY, if set, are used here too.
+      #   WEBUI_TLS=off      no HTTPS listener at all
+      #   WEBUI_TLS_NAMES    extra host names / IPs for the certificate,
+      #                      comma separated, e.g. nas.local,192.168.1.20
+      #   WEBUI_TLS_PORT     published HTTPS port (default 3334)
+      # Set them in your .env; all three are optional.
+      WEBUI_TLS: ${WEBUI_TLS:-}
+      WEBUI_TLS_NAMES: ${WEBUI_TLS_NAMES:-}
+      # Only so the interface can link to the encrypted port; the same value
+      # and default as the port line below.
+      WEBUI_TLS_PORT: ${WEBUI_TLS_PORT:-3334}
       # Sign-in through your own identity provider (Pocket ID, Authentik,
       # Keycloak). All empty means: off, the local account applies.
       OIDC_ISSUER: ${OIDC_ISSUER:-}
@@ -77,6 +92,13 @@ services:
       # Put it behind a reverse proxy and you set 127.0.0.1 here.
       # dclint disable-line require-quotes-in-ports
       - '${LAN_BIND:-0.0.0.0}:${WEBUI_PORT:-3333}:8000'
+      # The same web interface over HTTPS, with a self-signed certificate.
+      # Your reverse proxy keeps using the port above; this one is for
+      # reaching the interface directly without sending your PIN, keys and
+      # seed words in the clear. WEBUI_TLS=off removes the listener inside the
+      # container (the published port then simply answers nothing).
+      # dclint disable-line require-quotes-in-ports
+      - '${LAN_BIND:-0.0.0.0}:${WEBUI_TLS_PORT:-3334}:8443'
       # The Electrum service for HARDWARE WALLET APPS (BitBoxApp, Trezor Suite)
       # on your home network. Off by default, exactly like LND's interface
       # below: 127.0.0.1 with NO fixed port makes Docker pick a random port on

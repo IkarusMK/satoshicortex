@@ -11,11 +11,13 @@ import shutil
 import threading
 import time
 from pathlib import Path
+from urllib.parse import urlsplit
 from typing import Dict, List, Literal, Optional, Tuple
 
 from fastapi import (APIRouter, Cookie, Depends, FastAPI, HTTPException,
                      Request, Response)
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from starlette.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel, Field, field_validator
 
@@ -28,7 +30,8 @@ from . import (auth, beitrag, betriebslog, coinbase, dyndns, electrum,
                kennzahlen, kurs, lnd, logs, mempoolstrom, merker,
                nachrichten, nodeconfig,
                oidc, onion, pools, profiles, rpc, services, settings,
-               sicherung, state, storage, store, tempo, updates, zulauf)
+               sicherung, state, storage, store, tempo, updates, webtls,
+               zulauf)
 from . import adresse as adressabfrage, cluster as mempoolcluster
 
 # lnd steht mit in der Liste, obwohl es zu Anfang nur wartet. Es zu
@@ -127,6 +130,11 @@ FZ_ONION_FRIST_SEKUNDEN = 40.0
 TOR_NEUSTART_PAUSE_SEKUNDEN = 6.0
 
 SITZUNGS_KEKS = "satcortex_sitzung"
+# Derselbe Schluessel unter dem Namen, den es NUR ueber verschluesselte Wege
+# gibt. Das Praefix "__Host-" verlangt vom Browser: Secure, Pfad "/", kein
+# Domain-Attribut -- und er setzt so ein Cookie ausschliesslich von einer
+# https-Seite aus. Siehe _setze_sitzung.
+SITZUNGS_KEKS_HOST = "__Host-" + SITZUNGS_KEKS
 # Groesse der frei belegbaren Antworten je Schritt. Ohne Deckel kann jeder ohne
 # Anmeldung die Platte volllaufen lassen -- gemessen: 195 kB aus einem Aufruf.
 MAX_ANTWORT_ZEICHEN = 4096
@@ -141,6 +149,11 @@ class Antwort(BaseModel):
 class Zugangsdaten(BaseModel):
     benutzer: str = Field(min_length=2, max_length=64)
     passwort: str = Field(min_length=auth.MIN_PASSWORTLAENGE, max_length=256)
+
+
+# Die einzigen Netze, aus denen heraus der Knoten Anfragen annimmt.
+_HEIMNETZE = tuple(ipaddress.ip_network(n) for n in (
+    "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fc00::/7"))
 
 
 def _heimnetz_pruefen(wert: str) -> str:
@@ -163,7 +176,16 @@ def _heimnetz_pruefen(wert: str) -> str:
     except ValueError as fehler:
         raise ValueError("Das ist kein gueltiges Netz (etwa "
                          "192.168.1.0/24).") from fehler
-    if netz.prefixlen == 0 or not netz.is_private:
+    # DER BEFUND VOM 15.11.2026: is_private ist KEINE Heimnetz-Pruefung. Es
+    # laesst ::ffff:0.0.0.0/96 durch (IPv4-gemappt -- das kann ganz IPv4
+    # meinen), ::1/128, 0.0.0.0/8, 240.0.0.0/4, 192.0.2.0/24 und fe80::/10.
+    # Erlaubt ist darum nur, was VOLLSTAENDIG in einem der drei RFC-1918-
+    # Bloecke oder in fc00::/7 liegt. Ein Netz, das groesser ist als ein Block
+    # (10.0.0.0/7), liegt nicht darin und faellt damit ebenfalls durch.
+    if (netz.prefixlen == 0
+            or getattr(netz.network_address, "ipv4_mapped", None) is not None
+            or not any(netz.version == heim.version and netz.subnet_of(heim)
+                       for heim in _HEIMNETZE)):
         raise ValueError("Nur private Heimnetze -- eine Freigabe ins offene "
                          "Internet gibt es hier nicht.")
     return str(netz)
@@ -287,9 +309,20 @@ class Gebuehren(BaseModel):
     """
     basis_msat: int = Field(0, ge=0, le=100_000)
     satz_ppm: int = Field(100, ge=0, le=10_000)
-    zeitsperre: int = Field(144, ge=18, le=2016)
+    # Der Boden steht bei lnd.ZEITSPERRE_MIN und nicht beim Protokollminimum
+    # 18 -- warum 40, steht dort (Befund vom 15.11.2026).
+    zeitsperre: int = Field(144, ge=lnd.ZEITSPERRE_MIN, le=2016)
     # Leer heisst: fuer alle Kanaele.
     kanalpunkt: str = Field("", max_length=128)
+
+    @field_validator("kanalpunkt")
+    @classmethod
+    def _kanalpunkt_pruefen(cls, wert: str) -> str:
+        # Befund vom 15.11.2026: "abc:xyz" lief bis int(index) durch und
+        # endete als 500. Ein 422 vor jeder Arbeit.
+        if wert and not lnd.kanalpunkt_gueltig(wert):
+            raise ValueError("kein Kanalpunkt (Txid:Nummer)")
+        return wert
 
 
 class Gebuehrenautomatik(BaseModel):
@@ -360,6 +393,10 @@ class Kanalwunsch(BaseModel):
     # teilnehmen soll, ist das die Ausnahme und nicht die Vorgabe.
     privat: bool = False
     pin: str = Field("", max_length=32)
+    # Ersatz fuer die PIN, solange KEINE eingerichtet ist (Entscheidung des
+    # Eigentuemers vom 15.11.2026): das Kontopasswort. Ist eine PIN da, zaehlt
+    # nur sie, und dieses Feld bleibt leer.
+    konto_passwort: str = Field("", max_length=512)
 
 
 class Umschichtung(BaseModel):
@@ -374,6 +411,10 @@ class Umschichtung(BaseModel):
     # Fehlt das Feld, gilt der Vorschlag -- siehe Rechnungswunsch.
     gebuehrengrenze: Optional[int] = Field(None, ge=0, le=100_000_000)
     pin: str = Field("", max_length=32)
+    # Ersatz fuer die PIN, solange KEINE eingerichtet ist (Entscheidung des
+    # Eigentuemers vom 15.11.2026): das Kontopasswort. Ist eine PIN da, zaehlt
+    # nur sie, und dieses Feld bleibt leer.
+    konto_passwort: str = Field("", max_length=512)
 
 
 class Kanalschluss(BaseModel):
@@ -387,6 +428,10 @@ class Kanalschluss(BaseModel):
     tempo: str = Field("normal", max_length=16)
     erzwingen: bool = False
     pin: str = Field("", max_length=32)
+    # Ersatz fuer die PIN, solange KEINE eingerichtet ist (Entscheidung des
+    # Eigentuemers vom 15.11.2026): das Kontopasswort. Ist eine PIN da, zaehlt
+    # nur sie, und dieses Feld bleibt leer.
+    konto_passwort: str = Field("", max_length=512)
 
 
 class Wachturm(BaseModel):
@@ -440,6 +485,10 @@ class Rechnungswunsch(BaseModel):
     # dreimal Zeit gekostet; hier haette sie Geld gekostet.
     gebuehrengrenze: Optional[int] = Field(None, ge=0, le=100_000_000)
     pin: str = Field("", max_length=32)
+    # Ersatz fuer die PIN, solange KEINE eingerichtet ist (Entscheidung des
+    # Eigentuemers vom 15.11.2026): das Kontopasswort. Ist eine PIN da, zaehlt
+    # nur sie, und dieses Feld bleibt leer.
+    konto_passwort: str = Field("", max_length=512)
 
 
 class Sendung(BaseModel):
@@ -461,6 +510,10 @@ class Sendung(BaseModel):
     alles: bool = False
     tempo: str = Field("normal", max_length=16)
     pin: str = Field("", max_length=12)
+    # Ersatz fuer die PIN, solange KEINE eingerichtet ist (Entscheidung des
+    # Eigentuemers vom 15.11.2026): das Kontopasswort. Ist eine PIN da, zaehlt
+    # nur sie, und dieses Feld bleibt leer.
+    konto_passwort: str = Field("", max_length=512)
 
 
 class Nachbesserung(BaseModel):
@@ -477,6 +530,10 @@ class Nachbesserung(BaseModel):
     ausgang: int = Field(0, ge=0, le=10_000)
     tempo: str = Field("schnell", max_length=16)
     pin: str = Field("", max_length=32)
+    # Ersatz fuer die PIN, solange KEINE eingerichtet ist (Entscheidung des
+    # Eigentuemers vom 15.11.2026): das Kontopasswort. Ist eine PIN da, zaehlt
+    # nur sie, und dieses Feld bleibt leer.
+    konto_passwort: str = Field("", max_length=512)
 
 
 class Netzwegewahl(BaseModel):
@@ -568,6 +625,16 @@ class Pineingabe(BaseModel):
     pin: str = Field(max_length=32)
 
 
+class Geraetewiderruf(BaseModel):
+    """Der Rumpf zum Widerrufen: PIN oder -- ohne PIN -- Kontopasswort.
+
+    Eigene Klasse, weil Pineingabe die PIN zwingend verlangt und fuer das
+    Abschaffen der PIN gebraucht wird.
+    """
+    pin: str = Field("", max_length=32)
+    konto_passwort: str = Field("", max_length=512)
+
+
 class Electrumschalter(BaseModel):
     an: bool
 
@@ -603,6 +670,10 @@ class Geraetewunsch(BaseModel):
     # Nur fuer den VPN-Weg: wie das Telefon den Server im Heimnetz erreicht.
     host: str = Field("", max_length=255)
     pin: str = Field("", max_length=32)
+    # Ersatz fuer die PIN, solange KEINE eingerichtet ist (Entscheidung des
+    # Eigentuemers vom 15.11.2026): das Kontopasswort. Ist eine PIN da, zaehlt
+    # nur sie, und dieses Feld bleibt leer.
+    konto_passwort: str = Field("", max_length=512)
 
 
 class Rpcfreigabe(BaseModel):
@@ -634,6 +705,10 @@ class Wallettilgung(BaseModel):
     # bewacht, waere eine Behauptung -- das Loeschen ist heute der einzige
     # Handgriff, der etwas Unwiederbringliches tut, also faengt sie dort an.
     pin: str = Field("", max_length=32)
+    # Ersatz fuer die PIN, solange KEINE eingerichtet ist (Entscheidung des
+    # Eigentuemers vom 15.11.2026): das Kontopasswort. Ist eine PIN da, zaehlt
+    # nur sie, und dieses Feld bleibt leer.
+    konto_passwort: str = Field("", max_length=512)
 
 
 class Hinweiswahl(BaseModel):
@@ -973,7 +1048,13 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
     app = FastAPI(
         title="SatoshiCortex",
         description="Eigener Bitcoin- und Lightning-Knoten",
-        docs_url="/api/doku",
+        # DER BEFUND VOM 15.11.2026: /openapi.json, /api/doku und /redoc
+        # antworteten OHNE Sitzung mit 200 und zaehlten alle 103 Operationen
+        # auf -- eine fertige Landkarte fuer jeden im Netz. Abgeschafft wird
+        # sie nicht (Beschluss des Betreibers: optimieren, nicht loeschen);
+        # die drei Adressen werden unten selbst bedient, aber nur fuer
+        # angemeldete Sitzungen.
+        docs_url=None, redoc_url=None, openapi_url=None,
     )
     konten = auth.Kontoverwaltung(konf.config_dir)
     # Das Wallet-Passwort fuer die Laufzeit -- im Speicher, nirgendwo sonst.
@@ -984,8 +1065,40 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
     freigabe = auth.Freigabe(konf.config_dir)
     api = APIRouter(prefix="/api")
 
+    def _sitzung_gilt(*token: Optional[str]) -> bool:
+        """Gilt eines der mitgeschickten Sitzungs-Cookies?
+
+        Es gibt zwei Namen (siehe _setze_sitzung), und ein Browser kann beide
+        zugleich halten -- Cookies gehoeren zum Host, nicht zum Port. Jedes wird
+        FUER SICH geprueft: ein altes, abgelaufenes unter dem einen Namen darf
+        ein gueltiges unter dem anderen nicht verdecken.
+        """
+        return any(konten.angemeldet(t) for t in token)
+
+    def sitzungsmerkmal(
+        satcortex_sitzung: Optional[str] = Cookie(default=None),
+        host_sitzung: Optional[str] = Cookie(default=None,
+                                             alias=SITZUNGS_KEKS_HOST),
+    ) -> str:
+        """Das Merkmal der GELTENDEN Sitzung -- fuer den Zaehler der Freigabe.
+
+        DER BEFUND VOM 16.11.2026, beim Zusammenfuehren mit dem eigenen TLS:
+        die Geldwege lasen nur "satcortex_sitzung". Ueber HTTPS und hinter
+        einem Proxy mit TLS_EXTERN heisst das Cookie aber
+        "__Host-satcortex_sitzung" -- dort zaehlte jede Sitzung als "", alle in
+        EINEM Topf, und eine fremde Sitzung haette den Eigentuemer wieder von
+        PIN und Kontopasswort aussperren koennen. Bevorzugt wird das
+        Host-Cookie; zaehlen darf nur ein Merkmal, das auch gilt.
+        """
+        for token in (host_sitzung, satcortex_sitzung):
+            if token and konten.angemeldet(token):
+                return token
+        return ""
+
     def benoetigt_anmeldung(
         satcortex_sitzung: Optional[str] = Cookie(default=None),
+        host_sitzung: Optional[str] = Cookie(default=None,
+                                             alias=SITZUNGS_KEKS_HOST),
     ) -> None:
         """Torwaechter fuer alles, was den Knoten betrifft.
 
@@ -994,22 +1107,39 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         Upload entfesseln oder die Verbindungen auf 8 druecken und damit eine
         Eclipse-Attacke erheblich erleichtern.
         """
-        if not konten.angemeldet(satcortex_sitzung):
+        if not _sitzung_gilt(satcortex_sitzung, host_sitzung):
             raise HTTPException(401, {"meldung": "anmeldung_noetig"})
 
     geschuetzt = [Depends(benoetigt_anmeldung)]
+
+    # Die Beschreibung der Schnittstelle -- nur mit Sitzung, siehe oben.
+    @app.get("/openapi.json", include_in_schema=False, dependencies=geschuetzt)
+    def beschreibung() -> JSONResponse:
+        return JSONResponse(app.openapi())
+
+    @app.get("/api/doku", include_in_schema=False, dependencies=geschuetzt)
+    def doku():
+        return get_swagger_ui_html(openapi_url="/openapi.json",
+                                   title="SatoshiCortex")
+
+    @app.get("/redoc", include_in_schema=False, dependencies=geschuetzt)
+    def redoc():
+        return get_redoc_html(openapi_url="/openapi.json",
+                              title="SatoshiCortex")
 
     # ----------------------------------------------------------- Konto
     @api.get("/zustand")
     def zustand_oeffentlich(
         anfrage: Request,
         satcortex_sitzung: Optional[str] = Cookie(default=None),
+        host_sitzung: Optional[str] = Cookie(default=None,
+                                             alias=SITZUNGS_KEKS_HOST),
     ) -> Dict:
         """Das Einzige, was ohne Anmeldung zu erfahren ist: ob es schon ein
         Konto gibt und ob diese Sitzung gilt."""
         return {
             "konto_vorhanden": konten.vorhanden,
-            "angemeldet": konten.angemeldet(satcortex_sitzung),
+            "angemeldet": _sitzung_gilt(satcortex_sitzung, host_sitzung),
             "version": konf.version,
             # Damit die Oberflaeche die Zahl nicht ein zweites Mal fuehren
             # muss -- zweimal getippt heisst irgendwann zweimal
@@ -1020,8 +1150,24 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
             # dieser Stelle wortlos; jetzt sagt sie es, damit man PUID/PGID
             # und die Rechte pruefen kann, statt zu raten.
             "verschluesselt": konf.tls_aktiv,
+            # Fuer den Hinweis der Oberflaeche, wenn sie ueber Klartext
+            # geladen wurde (seit dem 16.11.2026). tls_extern: davor steht ein
+            # Proxy mit TLS -- dann gibt es nichts zu melden. tls_port:
+            # der Port von AUSSEN, oder None, wenn es den zweiten Port nicht
+            # gibt (WEBUI_TLS=off) oder die Compose ihn nicht durchreicht.
+            # tls_fingerabdruck: nur gelesen, nie angelegt -- das tut der Start.
+            "tls_extern": konf.tls_extern,
+            "tls_port": (konf.webui_tls_port if konf.webui_tls_an else None),
+            "tls_fingerabdruck": webtls.fingerabdruck_fuer(konf),
             "ablage_bereit": os.access(konf.config_dir, os.W_OK),
-            "ablage_pfad": konf.config_dir,
+            # DER BEFUND VOM 15.11.2026: der Pfad stand fuer jeden ohne
+            # Anmeldung in der Antwort. Gebraucht wird er nur dort, wo die
+            # Oberflaeche ihn nennt -- im Fehlerfall "Ablage nicht
+            # beschreibbar" (app.js, ablage_nicht_bereit), damit man PUID/PGID
+            # und die Rechte am richtigen Ordner pruefen kann. Bei gesunder
+            # Ablage bleibt er weg.
+            **({} if os.access(konf.config_dir, os.W_OK)
+               else {"ablage_pfad": konf.config_dir}),
             # Womit man sich hier anmelden kann. Beides, damit die Oberflaeche
             # kein Feld zeigt, das der Server ohnehin abweist -- ein
             # Anmeldefenster, das nie funktioniert, ist schlimmer als keines.
@@ -1029,19 +1175,40 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
             "lokal_moeglich": _lokal_erlaubt(anfrage),
         }
 
-    def _verschluesselt_zum_browser() -> bool:
+    def _verschluesselt_zum_browser(anfrage: Request) -> bool:
         """Ist die Strecke bis zum Browser verschluesselt?
 
         NICHT dasselbe wie "wir halten das Zertifikat". Hinter einem Reverse
         Proxy spricht diese Anwendung Klartext, der Browser aber https --
         und genau dann braucht das Cookie sein Secure am dringendsten.
         Ohne TLS_EXTERN bekaeme es ausgerechnet im Internet-Betrieb keines.
-        """
-        return konf.tls_aktiv or konf.tls_extern
 
-    def _setze_sitzung(antwort: Response, token: str) -> None:
+        Seit dem 16.11.2026 gibt es zwei Ports, und die Antwort haengt vom
+        WEG ab, auf dem diese Anfrage kam: ueber den eigenen HTTPS-Port ist
+        das Schema "https", ueber den HTTP-Port "http". Eine einzige,
+        globale Antwort haette auf einem der beiden Ports die Anmeldung
+        zerstoert -- Secure ueber Klartext wird vom Browser verworfen.
+        """
+        return (konf.tls_aktiv or konf.tls_extern
+                or anfrage.url.scheme == "https")
+
+    def _setze_sitzung(anfrage: Request, antwort: Response, token: str) -> None:
+        # DER BEFUND VOM 16.11.2026: Cookies gehoeren zum HOST, nicht zum
+        # Port. Der Browser schickt dasselbe Cookie an Port 3333 und an
+        # Port 3334, und ein Cookie mit Secure laesst sich von einer
+        # http-Seite aus nicht ueberschreiben (moderne Browser verweigern
+        # es, auch bei gleichem Namen). Ein Name fuer beide Wege haette
+        # bedeutet: wer einmal ueber https angemeldet war, kaeme ueber den
+        # HTTP-Port nie wieder an eine neue Sitzung -- Login still kaputt.
+        #
+        # Deshalb zwei Namen. Ueber verschluesselte Wege "__Host-..." (Secure,
+        # nur von https aus setzbar -- ein Lauscher im Klartext kann es weder
+        # setzen noch ueberschreiben), ueber Klartext der bisherige. Gelesen
+        # werden beide (siehe _sitzung_gilt), damit eine Sitzung aus der Zeit
+        # vor dem Update weitergilt, auch hinter einem Proxy.
+        sicher = _verschluesselt_zum_browser(anfrage)
         antwort.set_cookie(
-            SITZUNGS_KEKS, token,
+            SITZUNGS_KEKS_HOST if sicher else SITZUNGS_KEKS, token,
             httponly=True,        # kein Zugriff aus JavaScript
             # "lax", nicht "strict" -- und das ist eine Bedingung, keine
             # Lockerung. Bei der Rueckkehr vom Ausweisdienst ist der Aufruf
@@ -1053,20 +1220,28 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
             samesite="lax",
             # Unter reinem HTTP wuerde secure das Merkmal unbrauchbar machen
             # und niemanden mehr hereinlassen.
-            secure=_verschluesselt_zum_browser(),
+            secure=sicher,
             path="/",
             max_age=auth.SITZUNG_GUELTIG_SEKUNDEN,
         )
 
     @api.post("/konto/anlegen")
-    def konto_anlegen(daten: Zugangsdaten, antwort: Response) -> Dict:
+    def konto_anlegen(daten: Zugangsdaten, antwort: Response,
+                      anfrage: Request) -> Dict:
+        # DER BEFUND VOM 15.11.2026: die Kontoanlage kannte die Nottuer nicht.
+        # Mit Ausweisdienst und frischer Installation hinter dem Proxy konnte
+        # JEDER das erste Konto anlegen und war damit drin -- am Ausweisdienst
+        # vorbei. Dieselbe Regel wie bei /anmelden.
+        if not _lokal_erlaubt(anfrage):
+            raise HTTPException(403, {"meldung": "nur_ueber_oidc"})
         try:
             konten.lege_an(daten.benutzer, daten.passwort)
         except PermissionError:
             raise HTTPException(409, {"meldung": "konto_existiert"})
         except ValueError as f:
             raise HTTPException(400, {"meldung": str(f)})
-        _setze_sitzung(antwort, konten.melde_an(daten.benutzer, daten.passwort))
+        _setze_sitzung(anfrage, antwort, konten.melde_an(
+            daten.benutzer, daten.passwort, _gegenstelle(anfrage)))
         return {"ok": True}
 
     # ── Anmeldung ueber Pocket ID, und die Nottuer dahinter ───────────────
@@ -1087,33 +1262,73 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
     # Ausweisdienst ausfaellt oder der Passkey weg ist. Auf einem Geraet mit
     # einer Wallet darin ist "ausgesperrt" kein hinnehmbarer Zustand.
 
+    # Alles, woran sich ein Zwischenhaendler verraten KANN. Vorhanden zaehlt,
+    # auch leer: ein Proxy, der eine Kopfzeile mit leerem Wert setzt, ist
+    # trotzdem ein Proxy.
+    PROXY_KOEPFE = ("x-forwarded-for", "x-forwarded-host", "x-forwarded-proto",
+                    "x-forwarded-port", "x-forwarded-server", "forwarded",
+                    "x-real-ip", "via", "cf-connecting-ip", "true-client-ip")
+
+    def _gegenstelle(anfrage: Request) -> str:
+        """Die unmittelbare Adresse der Verbindung -- NIE ein
+        X-Forwarded-For, den schreibt der Angreifer selbst."""
+        return (anfrage.client.host if anfrage.client else "") or ""
+
     def _ortsnah(anfrage: Request) -> bool:
         """Kam dieser Aufruf direkt aus dem Heimnetz -- ohne Proxy dazwischen?
 
-        Zwei Bedingungen, und beide werden gebraucht:
+        Faellt im Zweifel ZU, nicht auf. Bedingungen, alle muessen stimmen:
 
-        * Die Gegenstelle ist eine private Adresse. Allein genuegt das NICHT:
-          laeuft der Reverse Proxy auf demselben NAS, ist auch ein Aufruf aus
-          dem Internet am Ende ein Aufruf von nebenan.
-        * Es liegt KEIN Weiterleitungskopf an. Den setzt jeder Proxy von
-          selbst; faelschen kann ihn nur, wer die Anwendung ohnehin schon
-          direkt erreicht -- und dafuer muesste er im Heimnetz stehen.
+        * Die Gegenstelle ist eine private Adresse.
+        * Sie liegt NICHT im Compose-Netz. Der Proxy des Betreibers laeuft im
+          Hostnetz und verbindet ueber 127.0.0.1:<Port>; im Behaelter sieht
+          das aus wie die Adresse des Gateways (<NETWORK_PREFIX>.1) -- also
+          der Host selbst. Ein Browser im LAN behaelt dagegen seine echte
+          Quelladresse (Docker leitet per DNAT weiter) und bleibt zugelassen.
+        * Es steht keine einzige bekannte Proxy-Kopfzeile am Aufruf, auch
+          keine leere (PROXY_KOEPFE).
+        * Mit Ausweisdienst: der Host-Kopf ist nicht der Host der
+          eingetragenen Rueckkehradresse -- das ist die oeffentliche Adresse
+          dieses Knotens, und wer sie aufruft, kam ueber den Proxy.
+
+        DER BEFUND VOM 15.11.2026: hier stand "Den setzt jeder Proxy von
+        selbst". Das war nie gemessen. Ein schlichtes nginx-proxy_pass oder
+        HAProxy ohne forwardfor setzt KEINE der vier damaligen Kopfzeilen,
+        kommt aus einer privaten Adresse -- und die Nottuer stand fuer das
+        ganze Internet offen (mit TestClient nachgestellt). Darum die
+        breitere Liste, das Compose-Netz und der Host-Vergleich: jede fuer
+        sich ein zweiter Riegel, falls ein Proxy die anderen umgeht.
+
+        Preis: wer den Knoten im LAN unter der OEFFENTLICHEN Adresse aufruft
+        (Split-DNS), bekommt die Nottuer nicht -- er nimmt die IP-Adresse.
 
         Damit das stimmt, darf der Oberflaechen-Port nicht ins Internet
         weitergereicht werden. Nach aussen gehen 8333 und 9735, auf Wunsch der
         Wachturm auf 9911 -- die Oberflaeche nie.
         """
-        for kopf in ("x-forwarded-for", "x-forwarded-host",
-                     "x-forwarded-proto", "forwarded"):
-            if anfrage.headers.get(kopf):
-                return False
-        gegenstelle = (anfrage.client.host if anfrage.client else "") or ""
+        if any(kopf in anfrage.headers for kopf in PROXY_KOEPFE):
+            return False
         try:
-            adresse = ipaddress.ip_address(gegenstelle)
+            adresse = ipaddress.ip_address(_gegenstelle(anfrage))
         except ValueError:
             return False
-        return bool(adresse.is_private or adresse.is_loopback
-                    or adresse.is_link_local)
+        if isinstance(adresse, ipaddress.IPv6Address) and adresse.ipv4_mapped:
+            adresse = adresse.ipv4_mapped
+        if not (adresse.is_private or adresse.is_loopback
+                or adresse.is_link_local):
+            return False
+        try:
+            if adresse in ipaddress.ip_network(konf.compose_netz):
+                return False
+        except ValueError:
+            return False
+        if konf.oidc_aktiv:
+            oeffentlich = (urlsplit(konf.oidc_rueckweg).hostname or "").lower()
+            host = (urlsplit("//" + anfrage.headers.get("host", "")).hostname
+                    or "").lower()
+            if oeffentlich and host == oeffentlich:
+                return False
+        return True
 
     def _lokal_erlaubt(anfrage: Request) -> bool:
         """Darf sich hier jemand mit Benutzername und Passwort anmelden?
@@ -1134,22 +1349,52 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
     # zu suchen -- schon gar nicht neben einer Wallet.
     anmeldevorgaenge: Dict[str, oidc.Vorgang] = {}
 
+    # DER BEFUND VOM 15.11.2026: /anmeldung/oidc/start ist oeffentlich, und
+    # ab dem 51. offenen Vorgang rief der Code clear() -- 60 anonyme Aufrufe
+    # machten damit den angefangenen Login des Besitzers ungueltig (und jeder
+    # Aufruf kostet eine Anfrage beim Ausweisdienst). Jetzt: aelteste
+    # Vorgaenge weichen einzeln, und je Gegenstelle gibt es nur so viele
+    # Starts pro Minute, wie ein Mensch braucht. Hinter dem Proxy teilen sich
+    # alle Besucher EINE Gegenstelle (die des Proxys); die Bremse ist dort
+    # also gemeinsam -- sie nimmt einem Angreifer aber den Hebel, den
+    # Vorgang des Besitzers zu verdraengen, der vorher mit 60 Aufrufen ging.
+    MAX_VORGAENGE = 200
+    START_PRO_MINUTE = 30
+    starts: Dict[str, List[float]] = {}
+
+    def _start_erlaubt(quelle: str, jetzt: float) -> bool:
+        for k in list(starts):
+            starts[k] = [t for t in starts[k] if jetzt - t < 60]
+            if not starts[k]:
+                del starts[k]
+        if len(starts) > 1024 and quelle not in starts:
+            return False
+        if len(starts.get(quelle, [])) >= START_PRO_MINUTE:
+            return False
+        starts.setdefault(quelle, []).append(jetzt)
+        return True
+
     def _vorgaenge_aufraeumen(jetzt: float) -> None:
         for state, v in list(anmeldevorgaenge.items()):
             if jetzt - v.begonnen > oidc.VORGANG_GUELTIG_SEKUNDEN:
                 anmeldevorgaenge.pop(state, None)
 
     @api.get("/anmeldung/oidc/start")
-    def oidc_start() -> Response:
+    def oidc_start(anfrage: Request) -> Response:
         """Zum Ausweisdienst schicken."""
         if not konf.oidc_aktiv:
             raise HTTPException(404, {"meldung": "oidc_aus"})
         jetzt = time.time()
         _vorgaenge_aufraeumen(jetzt)
+        if not _start_erlaubt(_gegenstelle(anfrage), jetzt):
+            raise HTTPException(429, {"meldung": "oidc_zu_viele_starts"})
         # Ein Riegel gegen das Vollaufen: mehr offene Vorgaenge als das
-        # braucht niemand, und jeder ist ein Stueck Speicher.
-        if len(anmeldevorgaenge) > 50:
-            anmeldevorgaenge.clear()
+        # braucht niemand, und jeder ist ein Stueck Speicher. Es weicht der
+        # AELTESTE -- nie alle auf einmal.
+        while len(anmeldevorgaenge) >= MAX_VORGAENGE:
+            aeltester = min(anmeldevorgaenge,
+                            key=lambda k: anmeldevorgaenge[k].begonnen)
+            anmeldevorgaenge.pop(aeltester, None)
         try:
             adresse, vorgang = oidc.beginne(_anbieter(), jetzt)
         except oidc.OidcFehler as fehler:
@@ -1208,7 +1453,7 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
 
         log.info("Angemeldet ueber den Ausweisdienst: %s", oidc.name_aus(nutz))
         antwort = RedirectResponse("/", status_code=303)
-        _setze_sitzung(antwort, konten.sitzung_eroeffnen())
+        _setze_sitzung(anfrage, antwort, konten.sitzung_eroeffnen())
         return antwort
 
     @api.post("/anmelden")
@@ -1219,19 +1464,29 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         if not _lokal_erlaubt(anfrage):
             raise HTTPException(403, {"meldung": "nur_ueber_oidc"})
         try:
-            token = konten.melde_an(daten.benutzer, daten.passwort)
+            token = konten.melde_an(daten.benutzer, daten.passwort,
+                                    _gegenstelle(anfrage))
         except PermissionError as f:
             raise HTTPException(401, {"meldung": str(f)})
-        _setze_sitzung(antwort, token)
+        _setze_sitzung(anfrage, antwort, token)
         return {"ok": True}
 
     @api.post("/abmelden")
     def abmelden(
         antwort: Response,
         satcortex_sitzung: Optional[str] = Cookie(default=None),
+        host_sitzung: Optional[str] = Cookie(default=None,
+                                             alias=SITZUNGS_KEKS_HOST),
     ) -> Dict:
-        konten.melde_ab(satcortex_sitzung)
+        # Beide Namen beenden, auch wenn der Browser nur einen mitschickt:
+        # die Sitzung gilt serverseitig, und ein "__Host-"-Cookie laesst sich
+        # von einer http-Seite aus nicht loeschen -- es bleibt dann liegen,
+        # aber wertlos.
+        for token in (satcortex_sitzung, host_sitzung):
+            konten.melde_ab(token)
         antwort.delete_cookie(SITZUNGS_KEKS, path="/")
+        antwort.delete_cookie(SITZUNGS_KEKS_HOST, path="/", secure=True,
+                              httponly=True, samesite="lax")
         return {"ok": True}
 
     # -------------------------------------------------------------- Betrieb
@@ -2797,38 +3052,111 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
     # uebernommene SITZUNG in dieser Oberflaeche. Warum sechs Stellen dafuer
     # genuegen und was daraus folgt, steht bei auth.Freigabe.
 
-    def freigabe_pruefen(pin: str) -> None:
-        """Der Torwaechter fuer alles, was Unwiederbringliches tut.
+    def freigabe_pruefen(pin: str, konto_passwort: str = "",
+                         sitzung: Optional[str] = None) -> None:
+        """Das EINE Tor vor allem, was Unwiederbringliches tut.
 
-        Ohne eingerichtete PIN tut er NICHTS. Wer keine will, soll nicht
-        ploetzlich vor einer Abfrage stehen, die es fuer ihn gar nicht gibt.
+        DER BEFUND VOM 15.11.2026: "Ohne eingerichtete PIN tut er NICHTS" --
+        so stand es hier, und es war die Luecke: wer keine PIN eingerichtet
+        hatte (die Vorgabe), hatte eine Geldwallet, die jede uebernommene
+        Sitzung leeren konnte (POST /lightning/senden mit "alles": true -> 200).
+        Die PIN bleibt freiwillig, aber ein Schloss gibt es immer:
+
+          * Ist eine PIN eingerichtet, zaehlt sie -- wie zuvor.
+          * Ist keine eingerichtet, zaehlt das KONTOPASSWORT. Das Konto gibt es
+            immer (es entsteht vor dem Assistenten, auch bei OIDC).
+
+        Beides geht durch denselben Zaehler der Sitzung (auth.Freigabe) und
+        steht VOR allem anderen in jeder Geldroute. Die Meldungen sagen,
+        welches von beiden fehlt.
+
+        DAS TOR STEHT NICHT vor wallet/sperren: das ist die Notbremse. Der
+        Eigentuemer muss sie sofort ziehen koennen, ein Angreifer gewinnt
+        damit nur einen Aerger, kein Geld. Auch die Gebuehrenautomatik laeuft
+        ohne -- sie ist kein Handgriff einer Sitzung, und ihre Wirkung ist
+        durch den Boden der Zeitsperre und die Obergrenzen der Gebuehr
+        begrenzt.
+
+        Hinweis zur Reihenfolge: Pydantic prueft den Rumpf (Typen, Laengen)
+        BEVOR diese Funktion laeuft. "PIN vor allem" gilt ab der ersten
+        Zeile des Handlers, nicht vor der Schemapruefung.
         """
-        if not freigabe.vorhanden:
-            return
-        if not pin:
-            raise HTTPException(403, {"meldung": "pin_noetig"})
+        sitzung = sitzung or ""
+        if freigabe.vorhanden:
+            fehlt, falsch = "pin_noetig", "pin_falsch"
+            if not pin:
+                raise HTTPException(403, {"meldung": fehlt})
+            pruefung = lambda: freigabe.pruefe(pin, sitzung)  # noqa: E731
+        else:
+            fehlt, falsch = "kontopasswort_noetig", "kontopasswort_falsch"
+            if not konto_passwort:
+                raise HTTPException(403, {"meldung": fehlt})
+            konto = konten.lade()
+            if not konto:
+                # Ohne Konto gibt es kein Passwort, das stimmen koennte --
+                # und kein Weg, hier zu stehen. Lieber zu als offen.
+                raise HTTPException(403, {"meldung": fehlt})
+            pruefung = lambda: freigabe.pruefe_konto(  # noqa: E731
+                konto_passwort, konto.hash, sitzung)
         try:
-            freigabe.pruefe(pin)
+            pruefung()
         except auth.FreigabeGesperrt:
             raise HTTPException(429, {"meldung": "zu_viele_versuche",
-                                      "wartet_noch": freigabe.wartet_noch()})
+                                      "wartet_noch": freigabe.wartet_noch(
+                                          sitzung)})
         except auth.FreigabeAbgelehnt:
-            raise HTTPException(400, {"meldung": "pin_falsch",
-                                      "wartet_noch": freigabe.wartet_noch()})
+            raise HTTPException(400, {"meldung": falsch,
+                                      "wartet_noch": freigabe.wartet_noch(
+                                          sitzung)})
+
+    # Eine Geldbewegung zur Zeit je Art. DER BEFUND VOM 15.11.2026: zwei
+    # gleichzeitige, gleiche POSTs auf senden oder kanal/oeffnen liefen beide
+    # durch und buchten zweimal -- ein Doppelklick, ein Wiederholen des
+    # Browsers nach einem Zeitlimit. Der zweite bekommt jetzt ein 409.
+    laufende_vorgaenge: set = set()
+    vorgangssperre = threading.Lock()
+
+    @contextlib.contextmanager
+    def einmalig(name: str):
+        with vorgangssperre:
+            if name in laufende_vorgaenge:
+                raise HTTPException(409, {"meldung": "vorgang_laeuft_schon"})
+            laufende_vorgaenge.add(name)
+        try:
+            yield
+        finally:
+            with vorgangssperre:
+                laufende_vorgaenge.discard(name)
 
     @api.get("/freigabe", dependencies=geschuetzt)
-    def freigabe_lesen() -> Dict:
+    def freigabe_lesen(
+            satcortex_sitzung: str = Depends(sitzungsmerkmal)) -> Dict:
         return {"eingerichtet": freigabe.vorhanden,
                 # Ohne diese Zahl steht der Nutzer vor einem Feld, das nichts
                 # annimmt, und weiss nicht, ob es an ihm liegt.
-                "wartet_noch": round(freigabe.wartet_noch()),
+                "wartet_noch": round(freigabe.wartet_noch(satcortex_sitzung or "")),
                 "stellen_min": auth.PIN_MIN_STELLEN,
                 "stellen_max": auth.PIN_MAX_STELLEN}
 
     @api.post("/freigabe", dependencies=geschuetzt)
-    def freigabe_einrichten(wahl: Freigabewahl) -> Dict:
+    def freigabe_einrichten(
+            wahl: Freigabewahl,
+            satcortex_sitzung: str = Depends(sitzungsmerkmal)) -> Dict:
         konto = konten.lade()
-        if not konto or not auth.pruefe_passwort(konto.hash, wahl.passwort):
+        if not konto:
+            raise HTTPException(403, {"meldung": "passwort_falsch"})
+        # DER BEFUND VOM 15.11.2026: das Kontopasswort wurde hier OHNE Bremse
+        # geprueft -- eine uebernommene Sitzung konnte es an diesem Endpunkt
+        # beliebig oft erraten, waehrend das Tor vor dem Geld es nun zaehlt.
+        # Dieselbe Pruefung, derselbe Zaehler der Sitzung.
+        try:
+            freigabe.pruefe_konto(wahl.passwort, konto.hash,
+                                  satcortex_sitzung or "")
+        except auth.FreigabeGesperrt:
+            raise HTTPException(429, {"meldung": "zu_viele_versuche",
+                                      "wartet_noch": freigabe.wartet_noch(
+                                          satcortex_sitzung or "")})
+        except auth.FreigabeAbgelehnt:
             # Bewusst 403 und nicht 400: es ist keine Formfrage, sondern eine
             # abgelehnte Berechtigung.
             raise HTTPException(403, {"meldung": "passwort_falsch"})
@@ -2844,17 +3172,21 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         return {"ok": True, "eingerichtet": True}
 
     @api.post("/freigabe/aendern", dependencies=geschuetzt)
-    def freigabe_aendern(wahl: Pinwechsel) -> Dict:
+    def freigabe_aendern(
+            wahl: Pinwechsel,
+            satcortex_sitzung: str = Depends(sitzungsmerkmal)) -> Dict:
         if not freigabe.vorhanden:
             raise HTTPException(409, {"meldung": "keine_pin"})
         try:
-            freigabe.aendern(wahl.alt, wahl.neu)
+            freigabe.aendern(wahl.alt, wahl.neu, satcortex_sitzung or "")
         except auth.FreigabeGesperrt:
             raise HTTPException(429, {"meldung": "zu_viele_versuche",
-                                      "wartet_noch": freigabe.wartet_noch()})
+                                      "wartet_noch": freigabe.wartet_noch(
+                                          satcortex_sitzung or "")})
         except auth.FreigabeAbgelehnt:
             raise HTTPException(400, {"meldung": "pin_falsch",
-                                      "wartet_noch": freigabe.wartet_noch()})
+                                      "wartet_noch": freigabe.wartet_noch(
+                                          satcortex_sitzung or "")})
         except ValueError as fehler:
             raise HTTPException(400, {"meldung": str(fehler),
                                       "stellen_min": auth.PIN_MIN_STELLEN,
@@ -2862,7 +3194,9 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         return {"ok": True}
 
     @api.post("/freigabe/entfernen", dependencies=geschuetzt)
-    def freigabe_entfernen(wahl: Pineingabe) -> Dict:
+    def freigabe_entfernen(
+            wahl: Pineingabe,
+            satcortex_sitzung: str = Depends(sitzungsmerkmal)) -> Dict:
         """Nur, wer sie kennt, darf sie abschaffen.
 
         Das Kontopasswort waere hier KEIN zusaetzlicher Schutz: wer die PIN
@@ -2871,13 +3205,15 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         if not freigabe.vorhanden:
             return {"ok": True, "eingerichtet": False}
         try:
-            freigabe.entfernen(wahl.pin)
+            freigabe.entfernen(wahl.pin, satcortex_sitzung or "")
         except auth.FreigabeGesperrt:
             raise HTTPException(429, {"meldung": "zu_viele_versuche",
-                                      "wartet_noch": freigabe.wartet_noch()})
+                                      "wartet_noch": freigabe.wartet_noch(
+                                          satcortex_sitzung or "")})
         except auth.FreigabeAbgelehnt:
             raise HTTPException(400, {"meldung": "pin_falsch",
-                                      "wartet_noch": freigabe.wartet_noch()})
+                                      "wartet_noch": freigabe.wartet_noch(
+                                          satcortex_sitzung or "")})
         log.warning("PIN abgeschafft.")
         return {"ok": True, "eingerichtet": False}
 
@@ -3106,7 +3442,9 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         if not passwort:
             raise HTTPException(409, {"meldung": "kein_passwort"})
         try:
-            return sicherung.hole_ab(ziel["url"], ziel["benutzer"], passwort)
+            sicherung.pruefe_ziel(ziel["url"], konf.netz_praefix)
+            return sicherung.hole_ab(ziel["url"], ziel["benutzer"], passwort,
+                                     netz_praefix=konf.netz_praefix)
         except sicherung.ZielFehler as fehler:
             # Kennt die Anwendung den Fall, sagt sie, was zu tun ist; der
             # Wortlaut des Servers geht trotzdem mit.
@@ -3123,6 +3461,7 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         if not passwort:
             return "kein_passwort"
         try:
+            sicherung.pruefe_ziel(ziel["url"], konf.netz_praefix)
             sicherung.lade_hoch(blob, ziel["url"], ziel["benutzer"], passwort)
         except sicherung.ZielFehler as fehler:
             if fehler.grund:
@@ -3288,6 +3627,13 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
             raise HTTPException(503, {"meldung": "lnd_antwortet_nicht"})
 
         try:
+            # DER BEFUND VOM 15.11.2026: das Ziel wurde nie geprueft --
+            # "https://host/v1/state#" liess die Anwendung einen fremden Pfad
+            # mit Basic-Anmeldung abrufen, "http://10.83.33.12:8080/" machte
+            # sie zum Wegweiser ins Compose-Netz. Die Form und die Adresse
+            # werden VOR dem ersten Aufruf geprueft; ohne eine Abfrage beim
+            # Eigentuemer, es ist eine unsichtbare Haertung.
+            sicherung.pruefe_ziel(wahl.url, konf.netz_praefix)
             sicherung.lade_hoch(d["blob"], wahl.url, wahl.benutzer, wahl.passwort)
         except sicherung.ZielFehler as fehler:
             raise HTTPException(400, {"meldung": fehler.grund
@@ -3500,8 +3846,15 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
             erneuert = lnd.macaroon_da(knoten)
             lnd.lege_macaroon_ab(lnd.backe_macaroon(knoten), knoten.macaroons)
             lnd.merke_rechte(knoten.macaroons)
-            log.info("Eigenes Macaroon %s -- ohne onchain:write, also ohne "
-                     "die Moeglichkeit, Geld zu bewegen.",
+            # DER BEFUND VOM 15.11.2026: das Protokoll behauptete hier, das
+            # Macaroon halte kein onchain:write und koenne darum kein Geld
+            # bewegen -- falsch seit dem 10.09.2026. EIGENE_RECHTE haelt onchain:write UND offchain:write
+            # mit Absicht (Senden, Kanaele, Zahlen, Umschichten); geschuetzt
+            # wird dort, wo das Geld die Anwendung verlaesst, durch das Tor
+            # (freigabe_pruefen), nicht durch fehlende Rechte.
+            log.info("Eigenes Macaroon %s -- mit onchain:write und "
+                     "offchain:write; Geldwege sichert das Tor in der "
+                     "Anwendung (PIN oder Kontopasswort).",
                      "erneuert (Rechte haben sich geaendert)" if erneuert
                      else "angelegt")
             return True
@@ -3676,7 +4029,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         return adresse, fernzugang.ONION_PORT
 
     @api.post("/fernzugang/geraet", dependencies=geschuetzt)
-    def geraet_verbinden(wunsch: Geraetewunsch) -> Dict:
+    def geraet_verbinden(wunsch: Geraetewunsch,
+            satcortex_sitzung: str = Depends(sitzungsmerkmal)) -> Dict:
         """Einen Schluessel fuer ein Geraet ausstellen. Gibt ihn EINMAL heraus.
 
         Die PIN zuerst, vor jeder anderen Pruefung. Gebacken wird zuletzt --
@@ -3684,7 +4038,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         Schluessel ueberhaupt ankommt. Ein Schluessel ohne Weg waere einer,
         der irgendwo herumliegt.
         """
-        freigabe_pruefen(wunsch.pin)
+        freigabe_pruefen(wunsch.pin, wunsch.konto_passwort,
+                        satcortex_sitzung)
         with fz_sperre:
             return _geraet_verbinden(wunsch)
 
@@ -3732,7 +4087,9 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
 
     @api.post("/fernzugang/geraet/{kennung}/widerrufen",
               dependencies=geschuetzt)
-    def geraet_widerrufen(kennung: int, eingabe: Pineingabe) -> Dict:
+    def geraet_widerrufen(
+            kennung: int, eingabe: Geraetewiderruf,
+            satcortex_sitzung: str = Depends(sitzungsmerkmal)) -> Dict:
         """Den Schluessel eines Geraets wertlos machen.
 
         Aus der Liste verschwindet es ERST, wenn LND die Wurzel geloescht
@@ -3742,7 +4099,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         Nur Kennungen aus der eigenen Liste: eine fremde -- oder gar 0, an
         der die Anwendung selbst haengt -- wird nie weitergereicht.
         """
-        freigabe_pruefen(eingabe.pin)
+        freigabe_pruefen(eingabe.pin, eingabe.konto_passwort,
+                        satcortex_sitzung)
         with fz_sperre:
             return _geraet_widerrufen(kennung)
 
@@ -3899,10 +4257,13 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         return d
 
     @api.post("/lightning/senden", dependencies=geschuetzt)
-    def senden(wunsch: Sendung) -> Dict:
+    def senden(wunsch: Sendung,
+            satcortex_sitzung: str = Depends(sitzungsmerkmal)) -> Dict:
         """On-Chain senden. UNWIDERRUFLICH.
 
-        Die PIN wird ZUERST geprueft, vor allem anderen. Eine Reihenfolge,
+        Das Tor (PIN, ohne PIN das Kontopasswort) wird ZUERST geprueft, vor
+        allem anderen. Pro Zeit laeuft nur EIN Senden: ein zweiter,
+        gleichzeitiger Aufruf bekommt 409 (Befund vom 15.11.2026). Eine Reihenfolge,
         in der erst der Betrag und dann die Berechtigung geprueft wird,
         verraet einem Angreifer, ob sein Betrag gepasst haette -- und, viel
         wichtiger, sie ist eine Zeile vom Unfall entfernt.
@@ -3912,7 +4273,12 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         schickt sie ein zweites Mal. Wer hier etwas wiederholen will, sieht
         vorher in die Kette.
         """
-        freigabe_pruefen(wunsch.pin)
+        freigabe_pruefen(wunsch.pin, wunsch.konto_passwort,
+                        satcortex_sitzung)
+        with einmalig("senden"):
+            return _senden(wunsch)
+
+    def _senden(wunsch: Sendung) -> Dict:
         knoten = sendbereit()
         adresse = sendeziel(wunsch)
         betrag = sendebetrag(wunsch)
@@ -3974,7 +4340,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
             raise HTTPException(503, {"meldung": "wegwissen_nicht_abrufbar"})
 
     @api.post("/lightning/senden/nachbessern", dependencies=geschuetzt)
-    def senden_nachbessern(wunsch: Nachbesserung) -> Dict:
+    def senden_nachbessern(wunsch: Nachbesserung,
+            satcortex_sitzung: str = Depends(sitzungsmerkmal)) -> Dict:
         """Die Gebuehr einer haengenden Ueberweisung erhoehen. KOSTET EXTRA.
 
         LND haengt eine Kind-Transaktion an unser Wechselgeld; die alte
@@ -3982,7 +4349,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         also eine zweite Transaktion, und die kostet zusaetzlich -- deshalb
         dieselbe PIN wie beim Senden, und die zuerst.
         """
-        freigabe_pruefen(wunsch.pin)
+        freigabe_pruefen(wunsch.pin, wunsch.konto_passwort,
+                        satcortex_sitzung)
         txid = (wunsch.txid or "").strip().lower()
         if len(txid) != 64 or any(z not in "0123456789abcdef" for z in txid):
             raise HTTPException(400, {"meldung": "keine_txid"})
@@ -4064,14 +4432,20 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         }
 
     @api.post("/lightning/kanal/oeffnen", dependencies=geschuetzt)
-    def kanal_oeffnen(wunsch: Kanalwunsch) -> Dict:
+    def kanal_oeffnen(wunsch: Kanalwunsch,
+            satcortex_sitzung: str = Depends(sitzungsmerkmal)) -> Dict:
         """Einen Kanal oeffnen. Das Geld ist danach GEBUNDEN.
 
         Nicht verloren -- gebunden. Es kommt erst wieder heraus, wenn der
         Kanal geschlossen wird, und das kostet ein zweites Mal Gebuehren.
         Deshalb dieselbe PIN wie beim Senden, und zuerst geprueft.
         """
-        freigabe_pruefen(wunsch.pin)
+        freigabe_pruefen(wunsch.pin, wunsch.konto_passwort,
+                        satcortex_sitzung)
+        with einmalig("kanal_oeffnen"):
+            return _kanal_oeffnen(wunsch)
+
+    def _kanal_oeffnen(wunsch: Kanalwunsch) -> Dict:
         # Die Mindestgroesse wurde bisher nur beim SCHAETZEN geprueft. Wer
         # den Endpunkt direkt ruft, ging daran vorbei und bekam statt der
         # klaren Auskunft LNDs eigene Abfuhr. Befund vom 22.09.2026.
@@ -4083,7 +4457,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         satz = sendesatz(wunsch.tempo)
         try:
             d = lnd.kanal_oeffnen(knoten, wunsch.gegenstelle, betrag,
-                                  satz, privat=wunsch.privat)
+                                  satz, privat=wunsch.privat,
+                                  netz_praefix=konf.netz_praefix)
         except lnd.Beschaeftigt as fehler:
             # Dieselbe Sache wie beim Senden: das Oeffnen ist eine
             # On-Chain-Transaktion, und ein Zeitlimit heisst nicht, dass
@@ -4414,7 +4789,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         """
         knoten = sendbereit()
         try:
-            kennung = lnd.wachturm_eintragen(knoten, wunsch.adresse)
+            kennung = lnd.wachturm_eintragen(knoten, wunsch.adresse,
+                                             konf.netz_praefix)
         except lnd.NichtErreichbar:
             raise HTTPException(503, {"meldung": "lnd_antwortet_nicht"})
         except lnd.LndFehler as fehler:
@@ -4666,7 +5042,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         return d
 
     @api.post("/lightning/rechnung/zahlen", dependencies=geschuetzt)
-    def rechnung_zahlen(wunsch: Rechnungswunsch) -> Dict:
+    def rechnung_zahlen(wunsch: Rechnungswunsch,
+            satcortex_sitzung: str = Depends(sitzungsmerkmal)) -> Dict:
         """Eine Lightning-Rechnung bezahlen. UNWIDERRUFLICH.
 
         NICHT wiederholen bei einem Zeitlimit. Die Zahlung ist womoeglich
@@ -4674,7 +5051,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         schickt sie ein zweites Mal. Wer hier etwas wiederholen will, sieht
         vorher in die Zahlungsliste.
         """
-        freigabe_pruefen(wunsch.pin)
+        freigabe_pruefen(wunsch.pin, wunsch.konto_passwort,
+                        satcortex_sitzung)
         knoten = sendbereit()
         # Erst lesen, dann zahlen -- damit die Grenze zu DIESER Rechnung
         # passt und nicht zu einer, die der Aufrufer behauptet hat.
@@ -4715,7 +5093,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         return {"ok": True, "zweck": gelesen["zweck"], **d}
 
     @api.post("/lightning/kanal/schliessen", dependencies=geschuetzt)
-    def kanal_schliessen(wunsch: Kanalschluss) -> Dict:
+    def kanal_schliessen(wunsch: Kanalschluss,
+            satcortex_sitzung: str = Depends(sitzungsmerkmal)) -> Dict:
         """Einen Kanal schliessen.
 
         Aus dem Betrieb, 12.09.2026: die Frage, ob man einen Kanal auch selbst
@@ -4729,7 +5108,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         Hinter der PIN, und die zuerst. Erzwingen ist ein eigener Schalter,
         den der Aufrufer bewusst setzen muss.
         """
-        freigabe_pruefen(wunsch.pin)
+        freigabe_pruefen(wunsch.pin, wunsch.konto_passwort,
+                        satcortex_sitzung)
         knoten = sendbereit()
         # Beim Erzwingen bestimmt LND die Gebuehr selbst -- dann brauchen wir
         # auch keine Schaetzung und scheitern nicht an ihrem Fehlen.
@@ -4753,7 +5133,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         return {"ok": True, **d}
 
     @api.post("/lightning/umschichten", dependencies=geschuetzt)
-    def umschichten(wunsch: Umschichtung) -> Dict:
+    def umschichten(wunsch: Umschichtung,
+            satcortex_sitzung: str = Depends(sitzungsmerkmal)) -> Dict:
         """Liquiditaet von einem eigenen Kanal in einen anderen schieben.
 
         Aus dem Betrieb, 12.09.2026: die Frage, ob sich mehrere Kanaele
@@ -4768,7 +5149,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         verbrennen koennte -- ein Umschichten nach dem anderen, jedes fuer
         sich unauffaellig.
         """
-        freigabe_pruefen(wunsch.pin)
+        freigabe_pruefen(wunsch.pin, wunsch.konto_passwort,
+                        satcortex_sitzung)
         knoten = sendbereit()
         # Dieselbe Sentinel-Falle wie beim Zahlen, derselbe Grund: eine
         # ausdrueckliche Null heisst "nur kostenlos", nicht "nicht gesetzt".
@@ -5482,7 +5864,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         return {"ok": True, "laeuft": True}
 
     @api.post("/lightning/wallet/loeschen", dependencies=geschuetzt)
-    def wallet_loeschen(wahl: Wallettilgung) -> Dict:
+    def wallet_loeschen(wahl: Wallettilgung,
+            satcortex_sitzung: str = Depends(sitzungsmerkmal)) -> Dict:
         """Die Wallet tilgen -- und dabei beweisen, dass man sie besitzt.
 
         Aus dem Betrieb, 09.09.2026: eine Wallet soll sich mit ihrem Passwort
@@ -5502,7 +5885,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         # UEBER diesem Kommentar -- die Zeile widersprach also dem Satz, der
         # sie erklaerte. Klein, aber es war die einzige Ausnahme von einer
         # Regel, die nur etwas wert ist, wenn sie keine hat.
-        freigabe_pruefen(wahl.pin)
+        freigabe_pruefen(wahl.pin, wahl.konto_passwort,
+                        satcortex_sitzung)
         if wallet_arbeit["laeuft"]:
             raise HTTPException(409, {"meldung": "wallet_arbeit_laeuft"})
         knoten = lndverbindung()
@@ -5552,8 +5936,10 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
         Kommentar und allem -- benutzt hat es nie jemand. Entweder bauen oder
         streichen; hier ist das Bauen.
 
-        Was es NICHT tut: einen Kanal oeffnen. Dafuer braeuchte es
-        onchain:write, und das haelt diese Anwendung ausdruecklich nicht.
+        Was es NICHT tut: einen Kanal oeffnen. Das ist ein eigener Weg
+        (/lightning/kanal/oeffnen) hinter dem Tor. Das Recht dafuer
+        (onchain:write) haelt diese Anwendung seit dem 10.09.2026 -- die
+        Aussage, sie halte es nicht, war bis zum 15.11.2026 falsch.
         """
         knoten = lndverbindung()
         if lnd.zustand(knoten)["stand"] != "bereit":
@@ -5565,7 +5951,8 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
             # sie im eigenen Graphen nachgeschlagen. Drei Knoepfe, ein
             # Verhalten -- sonst haette "Nur verbinden" wieder seine eigene
             # Kante, und genau die ist gerade weggefallen.
-            lnd.verbinde_gegenstelle(knoten, wahl.adresse)
+            lnd.verbinde_gegenstelle(knoten, wahl.adresse,
+                                     konf.netz_praefix)
         except lnd.LndFehler as fehler:
             # Eine unbrauchbare Eingabe ist etwas anderes als ein Ausfall --
             # und der Unterschied gehoert in die Antwort, sonst sucht der
@@ -7442,6 +7829,34 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
            "form-action 'self'; "
            "frame-ancestors 'none'")
 
+    # ── Zweite Verteidigung gegen fremde Seiten (CSRF) ──────────────────
+    #
+    # DER BEFUND VOM 15.11.2026: das Cookie ist SameSite=Lax. Das haelt
+    # Aufrufe von fremden WEBSEITEN ab, nicht von anderen Ports DESSELBEN
+    # Rechners (derselbe "Site"): body-lose POSTs wie einrichtung/zurueck,
+    # lightning/wallet/sperren oder nachrichten/gelesen waeren von dort aus
+    # erreichbar. Lax bleibt, weil der Rueckweg vom Ausweisdienst ein GET von
+    # fremder Seite ist (siehe _setze_sitzung).
+    #
+    # Der Browser sagt selbst, woher ein Aufruf kommt: Sec-Fetch-Site. Nur
+    # das wird gelesen -- NICHT Origin gegen Host verglichen. Hinter dem Proxy
+    # des Betreibers nennt der Browser die oeffentliche Domain, die
+    # Anwendung sieht aber 127.0.0.1:3333 ueber http; ein Vergleich wuerde
+    # jeden schreibenden Aufruf ablehnen. Sec-Fetch-Site ist von Proxys
+    # unabhaengig. Fehlt der Kopf (curl, Skripte, aeltere Browser), geht der
+    # Aufruf durch -- es bleiben Cookie und SameSite.
+    @app.middleware("http")
+    async def keine_fremden_seiten(anfrage, weiter):
+        if (anfrage.method in ("POST", "PUT", "PATCH", "DELETE")
+                and anfrage.url.path.startswith("/api/")
+                and anfrage.headers.get("sec-fetch-site", "").lower()
+                in ("cross-site", "same-site")):
+            return JSONResponse(
+                status_code=403,
+                content={"detail": {"meldung": "herkunft_unzulaessig"}},
+                headers={"Cache-Control": "no-store, max-age=0"})
+        return await weiter(anfrage)
+
     @app.middleware("http")
     async def eigene_herkunft(anfrage, weiter):
         antwort = await weiter(anfrage)
@@ -7486,9 +7901,17 @@ def baue_app(konf: Optional[settings.Einstellungen] = None) -> FastAPI:
             # ein Client wuerde HTML als Antwort missdeuten.
             if pfad.startswith("api/"):
                 raise HTTPException(404, {"meldung": "unbekannt"})
-            ziel = (web / pfad).resolve()
-            # Kein Ausbruch aus dem Web-Verzeichnis ueber ../ im Pfad.
-            if pfad and web in ziel.parents and ziel.is_file():
+            # DER BEFUND VOM 15.11.2026: GET /%00 gab einen 500 -- Path.resolve()
+            # wirft bei einem NUL-Byte ValueError, und der ging unbehandelt
+            # durch. Ein Pfad, den das Dateisystem nicht kennt, ist ein 404.
+            try:
+                ziel = (web / pfad).resolve()
+                # Kein Ausbruch aus dem Web-Verzeichnis ueber ../ im Pfad.
+                ist_datei = bool(pfad and web in ziel.parents
+                                 and ziel.is_file())
+            except (ValueError, OSError):
+                raise HTTPException(404, {"meldung": "unbekannt"})
+            if ist_datei:
                 # no-cache heisst NICHT "nicht zwischenspeichern", sondern
                 # "vor der Wiederverwendung nachfragen". Der Browser schickt
                 # dann seinen ETag mit und bekommt meist ein 304 zurueck --

@@ -406,6 +406,38 @@ def passt(text: str, weit: bool = False) -> bool:
 _GEFAEHRLICH = re.compile(rb"<!DOCTYPE|<!ENTITY", re.I)
 
 
+# DER BEFUND VOM 15.11.2026: der Riegel oben sucht ASCII-Bytes. Ein Feed in
+# UTF-16 oder UTF-32 (oder EBCDIC) hat <!DOCTYPE nicht als diese Bytes -- der
+# Riegel sah nichts, und expat las das Dokument trotzdem. Dass dessen eigene
+# Vervielfachungsgrenze die Speicherfalle heute noch abfaengt, ist ein Glueck
+# der Bibliothek, kein Verdienst dieses Riegels. Darum wird nur gelesen, was
+# ASCII-kompatibel ist: kein NUL-Byte, kein BOM fremder Kodierungen, und eine
+# XML-Deklaration, die UTF-8, ASCII oder eine der ASCII-kompatiblen
+# Latin-Kodierungen nennt (echte Feeds liefern gelegentlich ISO-8859-1).
+_KODIERUNG = re.compile(rb"^\s*<\?xml[^>]*?encoding\s*=\s*[\"']([^\"']+)[\"']",
+                        re.I)
+_ERLAUBTE_KODIERUNGEN = {
+    b"utf-8", b"utf8", b"us-ascii", b"ascii", b"iso-8859-1", b"latin-1",
+    b"latin1", b"iso-8859-15", b"windows-1252", b"cp1252"}
+
+
+def _pruefe_dokument(roh: bytes) -> None:
+    """Wirft Abgewiesen, wenn der Riegel gegen DTDs nicht greifen koennte."""
+    if b"\x00" in roh or roh.startswith((b"\xff\xfe", b"\xfe\xff")):
+        raise Abgewiesen("Die Antwort ist nicht UTF-8/ASCII -- kein Feed "
+                         "aus unseren Quellen ist es.")
+    kopf = roh[3:] if roh.startswith(b"\xef\xbb\xbf") else roh
+    # Ein XML-Dokument beginnt mit "<". In EBCDIC (cp037) steht dort ein "L".
+    if not kopf.lstrip()[:1] == b"<":
+        raise Abgewiesen("Die Antwort beginnt nicht wie ein XML-Dokument.")
+    treffer = _KODIERUNG.match(kopf[:512])
+    if treffer and treffer.group(1).lower() not in _ERLAUBTE_KODIERUNGEN:
+        raise Abgewiesen("Die Antwort nennt eine Kodierung, die wir nicht "
+                         "lesen: " + treffer.group(1).decode("ascii", "replace"))
+    if _GEFAEHRLICH.search(roh):
+        raise Abgewiesen("Die Antwort enthaelt eine DTD -- kein Feed tut das.")
+
+
 class Abgewiesen(Exception):
     """Die Antwort war keine, mit der wir weiterarbeiten."""
 
@@ -430,8 +462,7 @@ def hole(adresse: str, proxy: Optional[str] = None,
             roh = antwort.read(hoechstlaenge)
     except (urllib.error.URLError, OSError, ValueError, TimeoutError) as f:
         raise Abgewiesen(_deutung(f, proxy)) from f
-    if _GEFAEHRLICH.search(roh):
-        raise Abgewiesen("Die Antwort enthaelt eine DTD -- kein Feed tut das.")
+    _pruefe_dokument(roh)
     return roh
 
 
@@ -640,8 +671,7 @@ def _lies_xml(roh: bytes) -> ET.Element:
     Aufruf mit Bytes aus einer anderen Quelle waere sonst ungeschuetzt. Ein
     Schutz, der an der Aufrufreihenfolge haengt, ist keiner.
     """
-    if _GEFAEHRLICH.search(roh):
-        raise Abgewiesen("Die Antwort enthaelt eine DTD -- kein Feed tut das.")
+    _pruefe_dokument(roh)
     # Der Riegel oben ist die Gegenmassnahme -- Begruendung im Text.
     return ET.fromstring(roh)  # nosec B314
 

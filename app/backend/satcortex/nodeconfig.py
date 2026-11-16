@@ -140,12 +140,82 @@ LND_ADRESSE_AUS = """# Keine eigene Adresse angegeben. Ohne sie kuendigt der Kno
 # einer Datei liest. Bei bitcoind faengt das heute die DNS-Aufloesung ab, weil
 # nur auflösbare Namen und gueltige IPs durchkommen. Das ist Schutz aus zweiter
 # Hand; hier steht er ausdruecklich da.
+#
+# DER BEFUND VOM 15.11.2026: "nur \r und \n und alles unter 32" war zu wenig.
+# str.splitlines() trennt auch an U+2028, U+2029, U+0085, \x0b, \x0c und
+# \x1c-\x1e, und die Lese-Aendern-Schreiben-Helfer unten zerlegten die Datei
+# damit und setzten sie mit "\n" wieder zusammen: aus dem unscheinbaren
+# Zeichen wurde beim naechsten Schreibgang eine echte Zeile. Gemessen: ein
+# Alias "x<U+2028>no-macaroons=true" schrieb eine eigene Zeile
+# `no-macaroons=true` in die lnd.conf. Deshalb jetzt die positive Regel --
+# nur druckbare Zeichen (das Leerzeichen gehoert dazu, Umlaute und Emoji auch)
+# --, und zusaetzlich zerlegen die Helfer nur noch an "\n", und die Ablage
+# verweigert alles andere (services.Konfigurationsablage.schreibe). Drei
+# Sperren, weil jede einzelne schon einmal zu wenig war.
 def nur_eine_zeile(wert: str) -> str:
-    """Fuehrende/abschliessende Leerzeichen weg, Steuerzeichen verboten."""
+    """Fuehrende/abschliessende Leerzeichen weg, nur druckbare Zeichen."""
     sauber = (wert or "").strip()
-    if any(z in sauber for z in "\r\n") or any(ord(z) < 32 for z in sauber):
+    if not sauber.isprintable():
         raise ValueError("Steuerzeichen sind in diesem Feld nicht erlaubt.")
     return sauber
+
+
+# Ein Hostname nach RFC 1123: Labels aus Buchstaben, Ziffern und Bindestrich,
+# nicht am Rand, je hoechstens 63 Zeichen, insgesamt hoechstens 253.
+_HOSTLABEL = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9_-]{0,61}[A-Za-z0-9])?$")
+
+
+def _port_pruefen(text: str) -> int:
+    if not (text.isascii() and text.isdigit()):
+        raise ValueError("Kein gueltiger Port.")
+    port = int(text)
+    if not 1 <= port <= 65535:
+        raise ValueError("Kein gueltiger Port.")
+    return port
+
+
+def normiere_adresse(wert: str) -> str:
+    """Eine Adresse streng lesen und NORMALISIERT wieder ausgeben.
+
+    DER BEFUND VOM 15.11.2026: ipaddress.ip_address() nimmt seit Python 3.9
+    Scope-Kennungen an -- "fe80::1%x startupnotify=..." ist fuer sie eine
+    gueltige Adresse mit der Kennung "x startupnotify=...". Wer den Eingang
+    durchwinkt und dann den ROHEN Text in die Datei schreibt, hat seine
+    Pruefung ausgehoehlt. Darum: Scope-Kennungen sind verboten, und
+    geschrieben wird nie die Eingabe, sondern str() der geparsten Adresse
+    (plus Port).
+
+    Erlaubt: IPv4, IPv4:Port, IPv6, [IPv6]:Port, und ein Hostname nach
+    RFC 1123 mit oder ohne Port. Alles andere wirft ValueError.
+    """
+    roh = (wert or "").strip()
+    if not roh or not roh.isprintable() or "%" in roh or " " in roh:
+        raise ValueError("Keine gueltige Adresse.")
+    if roh.startswith("["):
+        innen, trenn, rest = roh[1:].partition("]")
+        if not trenn:
+            raise ValueError("Keine gueltige Adresse.")
+        adresse = ipaddress.IPv6Address(innen)
+        if not rest:
+            return str(adresse)
+        if not rest.startswith(":"):
+            raise ValueError("Keine gueltige Adresse.")
+        return f"[{adresse}]:{_port_pruefen(rest[1:])}"
+    try:
+        return str(ipaddress.ip_address(roh))
+    except ValueError:
+        pass
+    host, trenn, port = roh.partition(":")
+    if trenn and ":" in port:
+        raise ValueError("Keine gueltige Adresse.")
+    try:
+        name = str(ipaddress.IPv4Address(host))
+    except ValueError:
+        if (len(host) > 253
+                or not all(_HOSTLABEL.match(l) for l in host.split("."))):
+            raise ValueError("Keine gueltige Adresse.")
+        name = host
+    return f"{name}:{_port_pruefen(port)}" if trenn else name
 
 
 ADRESSE_AUS = """# Keine eigene Adresse angegeben. Der Knoten versucht dann, sie von seinen
@@ -168,7 +238,7 @@ def setze_dbcache(conf: str, megabyte: int) -> str:
     heraus = f"dbcache={megabyte}"
     zeilen = []
     ersetzt = False
-    for zeile in conf.splitlines():
+    for zeile in conf.split("\n"):
         if zeile.strip().startswith("dbcache="):
             zeilen.append(heraus)
             ersetzt = True
@@ -337,7 +407,7 @@ def _ohne_block(conf: str, anfaenge: tuple, schluessel: tuple,
     """
     zeilen: list = []
     ueberspringen = False
-    for zeile in conf.splitlines():
+    for zeile in conf.split("\n"):
         nackt = zeile.strip()
         eigen = nackt.startswith(schluessel) or gehoert_dazu(nackt)
         if ueberspringen:
@@ -455,7 +525,7 @@ def setze_rpc_freigabe(conf: str, heimnetz: str,
 def lies_rpc_freigabe(conf: str, compose_netz: str = RPC_COMPOSE_NETZ) -> str:
     """Welches Heimnetz laut Konfiguration gerade freigegeben ist."""
     compose = {compose_netz, *FRUEHERE_COMPOSE_NETZE}
-    for zeile in conf.splitlines():
+    for zeile in conf.split("\n"):
         nackt = zeile.strip()
         if not nackt.startswith("rpcallowip="):
             continue
@@ -471,7 +541,7 @@ def lies_rpc_compose_netz(conf: str) -> str:
     Die erste rpcallowip-Zeile des Blocks ist die des Compose-Netzes; so
     schreibt rpc_freigabe_block sie.
     """
-    for zeile in conf.splitlines():
+    for zeile in conf.split("\n"):
         nackt = zeile.strip()
         if nackt.startswith("rpcallowip="):
             return nackt.split("=", 1)[1].strip()
@@ -487,7 +557,7 @@ def lies_netze(conf: str) -> tuple:
     """
     gefunden = tuple(
         z.strip().split("=", 1)[1].strip().lower()
-        for z in conf.splitlines() if z.strip().startswith("onlynet=")
+        for z in conf.split("\n") if z.strip().startswith("onlynet=")
     )
     if not gefunden:
         return NETZE
@@ -535,12 +605,12 @@ def lies_tor(conf: str) -> bool:
     und der neuen. Bis 0.62.0 wurde hier listenonion gelesen; das steht seit
     0.63.0 immer auf 0, weil Tor die Dienste selbst haelt.
     """
-    return any(z.strip().startswith("onion=") for z in conf.splitlines())
+    return any(z.strip().startswith("onion=") for z in conf.split("\n"))
 
 
 def lies_onion(conf: str) -> str:
     """Die eigene .onion, die die Datei ankuendigt -- oder ""."""
-    for zeile in conf.splitlines():
+    for zeile in conf.split("\n"):
         nackt = zeile.strip()
         if _ist_onion_zeile(nackt):
             return nackt.split("=", 1)[1].strip()
@@ -549,7 +619,7 @@ def lies_onion(conf: str) -> str:
 
 def tor_nach_altem_muster(conf: str) -> bool:
     """Legt bitcoind laut Datei seinen Onion-Dienst noch selbst an (bis 0.62.0)?"""
-    zeilen = {z.strip() for z in conf.splitlines()}
+    zeilen = {z.strip() for z in conf.split("\n")}
     return "listenonion=1" in zeilen or any(
         z.startswith("torcontrol=") for z in zeilen)
 
@@ -563,14 +633,21 @@ def adressen_fuer_netze(adressen, ipv4: bool, ipv6: bool) -> list:
     """
     behalten = []
     for a in adressen:
+        # DER BEFUND VOM 15.11.2026: ip_address() nimmt Scope-Kennungen an
+        # ("fe80::1%x ..."), und hier wurde bisher die ROHE Eingabe
+        # weitergereicht. Jetzt: Scope-Kennungen raus, und weiter geht nur
+        # die normalisierte Schreibweise der geparsten Adresse.
         try:
-            art = ipaddress.ip_address(str(a).strip())
+            roh = str(a).strip()
+            if "%" in roh or not roh.isprintable():
+                continue
+            art = ipaddress.ip_address(roh)
         except ValueError:
             continue
         if art.version == 4 and ipv4:
-            behalten.append(str(a).strip())
+            behalten.append(str(art))
         elif art.version == 6 and ipv6:
-            behalten.append(str(a).strip())
+            behalten.append(str(art))
     return behalten
 
 
@@ -584,7 +661,7 @@ def setze_indizes(conf: str, an: bool) -> str:
     ohne die sich die Anwendung von ihrem eigenen Knoten aussperren wuerde.
     """
     zeilen = []
-    for zeile in conf.splitlines():
+    for zeile in conf.split("\n"):
         nackt = zeile.strip()
         # Die alten Schalter und die Erklaerungen dazu fallen weg; der neue
         # Block bringt seine eigenen mit.
@@ -609,7 +686,7 @@ def setze_indizes(conf: str, an: bool) -> str:
 
 def lies_indizes(conf: str) -> bool:
     """Sind die Indizes gerade an? Die Datei ist die Wahrheit, nicht ein Merker."""
-    for zeile in conf.splitlines():
+    for zeile in conf.split("\n"):
         if zeile.strip().startswith("txindex="):
             return zeile.strip().split("=", 1)[1].strip() not in ("0", "")
     return False
@@ -617,7 +694,7 @@ def lies_indizes(conf: str) -> bool:
 
 def lies_dbcache(conf: str) -> Optional[int]:
     """Was gerade eingestellt ist -- None, wenn die Zeile fehlt."""
-    for zeile in conf.splitlines():
+    for zeile in conf.split("\n"):
         nackt = zeile.strip()
         if nackt.startswith("dbcache="):
             try:
@@ -638,7 +715,7 @@ def setze_adressen(conf: str, adressen) -> str:
     die sich die Anwendung von ihrem eigenen Knoten aussperren wuerde.
     """
     behalten = []
-    for zeile in conf.splitlines():
+    for zeile in conf.split("\n"):
         nackt = zeile.strip()
         # Die eigene .onion gehoert zum Tor-Abschnitt, nicht zu den Adressen,
         # die ein DNS-Name liefert. Sie hier zu entfernen hiesse, sie bei
@@ -678,7 +755,7 @@ def adressblock(adressen) -> str:
     sauber = []
     for a in adressen:
         try:
-            wert = nur_eine_zeile(a or "")
+            wert = normiere_adresse(a or "")
         except ValueError:
             continue
         if wert and not onion.ist_onion(wert):
@@ -969,7 +1046,7 @@ def lies_lnd_adressen(conf: str) -> list:
     DNS-Aussetzer nicht als Clearnet-Adresse wieder einsetzen.
     """
     return [z.strip().split("=", 1)[1].strip()
-            for z in conf.splitlines()
+            for z in conf.split("\n")
             if z.strip().startswith("externalip=")
             and not _ist_onion_zeile(z.strip())]
 
@@ -982,7 +1059,7 @@ def lies_lnd_onion(conf: str) -> str:
 
 def lies_wachturm_onion(conf: str) -> str:
     """Die .onion des Wachturms laut Datei, ohne Port -- oder ""."""
-    for zeile in conf.splitlines():
+    for zeile in conf.split("\n"):
         nackt = zeile.strip()
         if nackt.startswith("watchtower.externalip="):
             wert = nackt.split("=", 1)[1].strip()
@@ -1000,7 +1077,7 @@ def lnd_ohne_onion(conf: str) -> str:
     alten Knoten mit dem neuen.
     """
     behalten = []
-    for zeile in conf.splitlines():
+    for zeile in conf.split("\n"):
         nackt = zeile.strip()
         schluessel, _, wert = nackt.partition("=")
         if schluessel in ("externalip", "watchtower.externalip") \
@@ -1012,7 +1089,7 @@ def lnd_ohne_onion(conf: str) -> str:
 
 def lnd_nach_altem_muster(conf: str) -> bool:
     """Legt LND laut Datei seine Onion-Dienste noch selbst an (bis 0.62.0)?"""
-    zeilen = {z.strip() for z in conf.splitlines()}
+    zeilen = {z.strip() for z in conf.split("\n")}
     return "tor.v3=true" in zeilen or any(
         z.startswith("tor.control=") for z in zeilen)
 
@@ -1039,7 +1116,7 @@ def lnd_adressblock(adressen, onion_adresse: str = "") -> str:
         sauber.append(f"{onion_adresse}:{onion.DIENSTE['lnd'].port}")
     for a in adressen:
         try:
-            wert = nur_eine_zeile(a or "")
+            wert = normiere_adresse(a or "")
         except ValueError:
             continue
         if wert and not onion.ist_onion(wert):
@@ -1095,7 +1172,7 @@ def wachturm_adressblock(adressen, port: int, onion_adresse: str = "") -> str:
     sauber = []
     for a in adressen:
         try:
-            wert = nur_eine_zeile(a or "")
+            wert = normiere_adresse(a or "")
         except ValueError:
             continue
         if wert and not onion.ist_onion(wert):
@@ -1167,7 +1244,7 @@ def setze_entsperrdatei(conf: str, pfad: str) -> str:
 
 
 def lies_entsperrdatei(conf: str) -> str:
-    for zeile in conf.splitlines():
+    for zeile in conf.split("\n"):
         nackt = zeile.strip()
         if nackt.startswith("wallet-unlock-password-file="):
             return nackt.split("=", 1)[1].strip()
@@ -1259,7 +1336,7 @@ def wirksam(conf: str) -> tuple:
     Dieselbe Regel wie bei lnd_wirksam, und aus demselben Grund: wer den Text
     vergleicht, startet einen Dienst fuer eine geaenderte Kommentarzeile neu.
     """
-    return tuple(z.strip() for z in conf.splitlines()
+    return tuple(z.strip() for z in conf.split("\n")
                  if z.strip() and not z.strip().startswith("#"))
 
 
@@ -1273,7 +1350,7 @@ def lnd_wirksam(conf: str) -> tuple:
     und bei abgeschaltetem Auto-Entsperren spraenge dabei jedes Mal die
     Wallet zu. Aus einem Abgleich waere ein Dauerausfall geworden.
     """
-    return tuple(z.strip() for z in conf.splitlines()
+    return tuple(z.strip() for z in conf.split("\n")
                  if z.strip() and not z.strip().startswith("#"))
 
 
@@ -1308,7 +1385,7 @@ def lies_adressen(conf: str) -> list:
     Frage, die ein DNS-Aussetzer beantwortet haben will.
     """
     return [z.strip().split("=", 1)[1].strip()
-            for z in conf.splitlines()
+            for z in conf.split("\n")
             if z.strip().startswith("externalip=")
             and not _ist_onion_zeile(z.strip())]
 

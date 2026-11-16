@@ -316,7 +316,7 @@ const I18N = {
     fz_vpn_bereit: "Bereit. LND antwortet im Heimnetz auf Port {port}.",
     fz_tor_aus: "Tor ist in diesem Knoten abgeschaltet.",
     el_titel: "Hardware-Wallets über Electrum (BitBoxApp, Trezor Suite)",
-    el_lead: "BitBoxApp und Trezor Suite verbinden sich nur mit einem Electrum-Server. Das übernimmt bei SatoshiCortex ein Dienst der Anwendung selbst – kein eigener Server, kein zusätzlicher Container, kein eigener Index. In der App trägst du ihn dort ein, wo sie nach einem Electrum-Server fragt. Du meldest ein Konto einmal mit seinem öffentlichen Schlüssel an, danach verfolgt dein Knoten es selbst. Unterschrieben wird weiter nur auf dem Gerät.",
+    el_lead: "BitBoxApp und Trezor Suite verbinden sich nur mit einem Electrum-Server. Das übernimmt bei SatoshiCortex ein Dienst der Anwendung selbst – kein eigener Server, kein zusätzlicher Container, kein eigener Index. In der App trägst du ihn dort ein, wo sie nach einem Electrum-Server fragt. Du meldest ein Konto einmal mit seinem öffentlichen Schlüssel an, danach verfolgt dein Knoten es selbst. Unterschrieben wird weiter nur auf dem Gerät. Der Port ist ohne Anmeldung erreichbar: Wer ihn im Heimnetz oder über Tor erreicht, kann eine Adresse abfragen und so prüfen, ob sie zu einem hier angemeldeten Konto gehört.",
     el_schalter: "Electrum-Dienst einschalten",
     el_wege_titel: "So verbindest du die App",
     el_weg_heimnetz: "Im Heimnetz",
@@ -401,6 +401,7 @@ const I18N = {
     fz_widerrufen: "Widerrufen",
     fz_widerrufen_sicher: "Wirklich widerrufen?",
     fz_pin_fuer_widerruf: "Trag oben deine PIN ein und widerrufe dann noch einmal.",
+    fz_passwort_fuer_widerruf: "Trag oben dein Kontopasswort ein und widerrufe dann noch einmal.",
     fz_widerrufen_ok: "„{name}“ ist widerrufen, der Schlüssel gilt nicht mehr.",
     fz_tor_wartet: "Tor startet neu und legt die Adresse an – das kann bis zu einer Minute dauern …",
     fz_laeuft: "Schlüssel wird erstellt …",
@@ -517,6 +518,9 @@ const I18N = {
     sich_entfernt: "Ziel entfernt. Es wird nichts mehr automatisch abgelegt.",
     ziel_nimmt_nichts_an: "Das Ziel hat die Sicherung nicht angenommen: {einzelheit}",
     ziel_anmeldung_abgelehnt: "Das Ziel hat die Anmeldung abgelehnt (401): Benutzername oder Passwort stimmen nicht. Bei Nextcloud mit Zwei-Faktor-Anmeldung gilt dein normales Passwort hier nicht — dafür braucht es ein App-Passwort (Persönliche Einstellungen → Sicherheit).",
+    ziel_url_ungueltig: "Diese Adresse taugt nicht als Sicherungsziel: erlaubt ist nur http:// oder https:// — ohne #, ohne ?, ohne Benutzername und Passwort in der Adresse (die kommen in die eigenen Felder).",
+    ziel_weiterleitung: "Das Ziel hat auf einen anderen Rechner weitergeleitet. Dem folgt SatoshiCortex nicht, damit Benutzername und Passwort nur bei deinem Ziel ankommen. Trag die Adresse ein, auf die das Ziel weiterleitet.",
+    ziel_adresse_intern: "Diese Adresse liegt im Inneren dieses Geräts (eigene Schleife, interne Dienste, das Netz der Container). Ein Sicherungsziel muss ausserhalb liegen — dein NAS im Heimnetz geht.",
     ziel_verweigert: "Das Ziel verweigert den Zugriff (403). Anders als bei 401 liegt es meist nicht am Passwort: entweder darf dieses Konto in den Ordner nicht schreiben — etwa bei einer nur lesbaren Freigabe —, oder ein vorgeschalteter Schutz wie ein Reverse-Proxy weist die Anfrage ab.",
     ziel_adresse_unbekannt: "Unter dieser Adresse kennt der Server keinen WebDAV-Ordner (404). Meist liegt das an der Adresse, nicht am Passwort. Bei Nextcloud sieht sie so aus: https://cloud.example/remote.php/dav/files/DEINNAME/Sicherungen — mit deinem Benutzernamen an der Stelle von DEINNAME. Schnellprobe: die Adresse im Browser öffnen; kommt auch dort 404, stimmt sie noch nicht.",
     ziel_ordner_fehlt: "Der Server ist der richtige, aber den Ordner gibt es dort noch nicht (409). WebDAV legt beim Hochladen keine Ordner an — leg ihn einmal von Hand an, etwa in der Nextcloud-Oberfläche, und versuch es dann noch einmal.",
@@ -1247,6 +1251,8 @@ const I18N = {
     oidc_aus: "Für diesen Knoten ist kein Ausweisdienst eingetragen.",
     oidc_nicht_erreichbar: "Dein Ausweisdienst antwortet gerade nicht. Solange er ausfällt, kommst du über das lokale Konto im Heimnetz herein.",
     nur_ueber_oidc: "Von außen geht die Anmeldung nur über deinen Ausweisdienst. Das lokale Konto ist die Nottür und öffnet sich nur im Heimnetz.",
+    oidc_zu_viele_starts: "Zu viele Anmeldeversuche in kurzer Zeit. Bitte in einer Minute noch einmal versuchen.",
+    herkunft_unzulaessig: "Dieser Aufruf kam von einer fremden Seite und wurde abgewiesen. Bitte die Oberfläche direkt über die Adresse deines Knotens öffnen.",
     g_user: "Benutzername", g_pass: "Passwort",
     g_anlegen: "Konto anlegen", g_anmelden: "Anmelden",
     g_pass_hint: "Mindestens 10 Zeichen.",
@@ -1256,10 +1262,12 @@ const I18N = {
     // ── Die PIN ─────────────────────────────────────────────────────────
     keine_pin: "Auf diesem Gerät ist keine PIN eingerichtet.",
     pin_noetig: "Dafür braucht es deine PIN.",
+    kontopasswort_noetig: "Dafür braucht es dein Kontopasswort — oder richte eine PIN ein.",
+    vorgang_laeuft_schon: "Das läuft schon — dieser zweite Aufruf wurde nicht ausgeführt. Sieh erst in der Liste nach, bevor du es noch einmal versuchst.",
     pin_titel: "PIN für Handgriffe mit Folgen",
-    pin_lead: "Ein zweites Schloss vor allem, was sich nicht rückgängig machen lässt. Freiwillig — ohne eingerichtete PIN ändert sich nichts.",
-    pin_erklaerung: "Sie schützt gegen etwas anderes als dein Entsperrweg. Der entscheidet, was jemand mit der PLATTE anfangen kann; die PIN steht gegen eine übernommene Sitzung in genau dieser Oberfläche — ein offen stehender Browser, ein fremder Zugriff auf dein Konto. Fünf Fehlversuche sperren sie fünfzehn Minuten, und der Zähler liegt in einer Datei: ein Neustart setzt ihn nicht zurück. Sie bewacht heute das Löschen der Wallet; jeder weitere Handgriff mit Folgen kommt dazu, sobald es ihn gibt.",
-    pin_stand_aus: "Zurzeit keine PIN eingerichtet.",
+    pin_lead: "Ein zweites Schloss vor allem, was sich nicht rückgängig machen lässt. Freiwillig — ohne PIN fragt dasselbe Feld stattdessen dein Kontopasswort; die PIN ist nur schneller getippt.",
+    pin_erklaerung: "Sie schützt gegen etwas anderes als dein Entsperrweg. Der entscheidet, was jemand mit der PLATTE anfangen kann; die PIN steht gegen eine übernommene Sitzung in genau dieser Oberfläche — ein offen stehender Browser, ein fremder Zugriff auf dein Konto. Fünf Fehlversuche sperren sie fünfzehn Minuten, und der Zähler liegt in einer Datei: ein Neustart setzt ihn nicht zurück. Sie bewacht Senden, Kanäle öffnen und schließen, Rechnungen zahlen, Umschichten, das Löschen der Wallet und die Schlüssel für externe Wallets.",
+    pin_stand_aus: "Zurzeit keine PIN eingerichtet — Handgriffe mit Folgen fragen dein Kontopasswort.",
     pin_stand_an: "PIN eingerichtet. Handgriffe mit Folgen fragen danach.",
     pin_stand_gesperrt: "Gesperrt nach zu vielen Fehlversuchen — noch {sekunden} Sekunden.",
     pin_kontopasswort: "Dein Kontopasswort",
@@ -1274,9 +1282,11 @@ const I18N = {
     pin_aendern: "PIN ändern",
     pin_geaendert: "Geändert.",
     pin_entfernen: "PIN abschaffen",
-    pin_entfernt: "Abgeschafft. Es fragt jetzt nichts mehr danach.",
+    pin_entfernt: "Abgeschafft. Stattdessen fragt das Feld jetzt dein Kontopasswort.",
     tg_pin: "Deine PIN",
+    tg_kontopasswort: "Dein Kontopasswort",
     tg_pin_d: "Das Löschen ist der Handgriff, den die PIN bewacht.",
+    kontopasswort_hinweis: "Ohne PIN fragt dieses Feld dein Kontopasswort (nicht das Wallet-Passwort). Eine PIN einzurichten geht schneller — unter Einstellungen.",
     zl_titel: "Lightning-Rechnung bezahlen",
     zl_lead: "Über Lightning statt über die Kette: in Sekunden statt in Blöcken, und für einen Bruchteil der Gebühr. Voraussetzung ist ein Kanal mit Guthaben auf deiner Seite.",
     zl_rechnung: "Die Rechnung",
@@ -1541,6 +1551,7 @@ const I18N = {
     pin_zu_einfoermig: "Sechsmal dieselbe Ziffer ist keine PIN.",
     pin_ist_eine_reihe: "Eine Reihe wie 123456 steht bei jedem Angreifer an erster Stelle — vorwärts wie rückwärts.",
     pin_falsch: "Die PIN passt nicht.",
+    kontopasswort_falsch: "Das Kontopasswort passt nicht.",
     wallet_nicht_gesperrt: "Dafür muss die Wallet zu sein — nur beim Entsperren kann LND prüfen, ob das Passwort stimmt. Sperre sie zuerst mit dem Knopf daneben.",
     entsperrweg_unbekannt: "Diesen Weg gibt es nicht.",
     entsperrdatei_fehlt: "Die Entsperrdatei ist nicht lesbar. Solange das so ist, kommt SatoshiCortex nicht an das Wallet-Passwort heran.",
@@ -1558,9 +1569,17 @@ const I18N = {
     passwort_fehlt: "Ohne Passwort geht die Wallet nicht auf.",
     anmeldung_fehlgeschlagen: "Benutzername oder Passwort stimmt nicht.",
     zu_viele_versuche: "Zu viele Fehlversuche. Bitte in fünf Minuten erneut versuchen.",
+    zu_viele_versuche_gesamt: "Im Moment gehen sehr viele Fehlversuche ein. Bitte in etwa zehn Sekunden noch einmal versuchen.",
     anmeldung_noetig: "Bitte zuerst anmelden.",
     sitzung_abgelaufen: "Die Sitzung ist abgelaufen. Bitte erneut anmelden.",
-    unverschluesselt: "Diese Verbindung ist unverschlüsselt — dein Passwort geht im Klartext durchs Netz. Im eigenen Heimnetz ist das vertretbar; hängen dort fremde Geräte, richte in der .env ein Zertifikat ein.",
+    // Seit dem 16.11.2026 ersetzt durch den Hinweis mit Link auf den eigenen
+    // HTTPS-Port (zeigeTlsHinweise). Der alte Satz riet zu einem Zertifikat
+    // in der .env -- das ist nicht mehr der naheliegende Weg.
+    tls_hinweis_lang: "Diese Verbindung ist unverschlüsselt. Seed-Wörter, Schlüssel für externe Wallets und die PIN lassen sich von anderen Geräten im selben Netzwerk mitlesen. Das ist ein Hinweis, keine Sperre — alles bleibt möglich.",
+    tls_hinweis_kurz: "Diese Verbindung ist unverschlüsselt: Was hier angezeigt oder eingegeben wird, lässt sich im Netzwerk mitlesen.",
+    tls_link: "Verschlüsselt erreichbar unter (der Browser warnt beim ersten Besuch, weil das Zertifikat von diesem Knoten selbst stammt):",
+    tls_schliessen: "Schließen",
+    tls_fingerabdruck: "SHA-256-Fingerabdruck des Zertifikats — beim ersten Besuch mit der Anzeige des Browsers vergleichen:",
     ablage_nicht_bereit: "Der Ordner {pfad} ist nicht beschreibbar. Damit lässt sich kein Konto anlegen. Prüfe PUID und PGID in der .env — auf UGREEN- und Synology-Geräten gehört PGID=10 dorthin — und ob die beiden Datenordner dieser Kennung gehören.",
     einrichtung_abgeschlossen: "Die Einrichtung ist bereits abgeschlossen.",
     antwort_zu_gross: "Die Eingabe ist zu groß.",
@@ -1877,7 +1896,7 @@ const I18N = {
     fz_vpn_bereit: "Ready. LND answers on your home network on port {port}.",
     fz_tor_aus: "Tor is switched off on this node.",
     el_titel: "Hardware wallets over Electrum (BitBoxApp, Trezor Suite)",
-    el_lead: "BitBoxApp and Trezor Suite connect only to an Electrum server. In SatoshiCortex a service of the application itself does that – no separate server, no extra container, no index of its own. In the app you enter it wherever it asks for an Electrum server. You register an account once with its public key, and from then on your node follows it itself. Signing still happens on the device only.",
+    el_lead: "BitBoxApp and Trezor Suite connect only to an Electrum server. In SatoshiCortex a service of the application itself does that – no separate server, no extra container, no index of its own. In the app you enter it wherever it asks for an Electrum server. You register an account once with its public key, and from then on your node follows it itself. Signing still happens on the device only. The port works without a login: anyone who can reach it on the home network or over Tor can query an address and so test whether it belongs to an account registered here.",
     el_schalter: "Switch on the Electrum service",
     el_wege_titel: "How to connect the app",
     el_weg_heimnetz: "On your home network",
@@ -1962,6 +1981,7 @@ const I18N = {
     fz_widerrufen: "Revoke",
     fz_widerrufen_sicher: "Really revoke?",
     fz_pin_fuer_widerruf: "Enter your PIN above, then revoke again.",
+    fz_passwort_fuer_widerruf: "Enter your account password above, then revoke again.",
     fz_widerrufen_ok: "“{name}” is revoked; the key no longer works.",
     fz_tor_wartet: "Tor is restarting and creating the address – this can take up to a minute …",
     fz_laeuft: "Creating key …",
@@ -2078,6 +2098,9 @@ const I18N = {
     sich_entfernt: "Target removed. Nothing will be stored automatically any more.",
     ziel_nimmt_nichts_an: "The target did not accept the backup: {einzelheit}",
     ziel_anmeldung_abgelehnt: "The destination rejected the login (401): user name or password is wrong. On Nextcloud with two-factor authentication your normal password does not work here — you need an app password (Personal settings → Security).",
+    ziel_url_ungueltig: "That address does not work as a backup target: only http:// or https:// is allowed — without #, without ?, and without a user name or password in the address (those go in their own fields).",
+    ziel_weiterleitung: "The target redirected to a different host. SatoshiCortex does not follow that, so your user name and password only reach your own target. Enter the address the target redirects to.",
+    ziel_adresse_intern: "That address lies inside this device (its own loopback, internal services, the container network). A backup target has to be outside — your NAS in the home network works.",
     ziel_verweigert: "The destination refuses access (403). Unlike a 401 this is usually not the password: either this account may not write to that folder — for example a read-only share —, or a protection in front of it, such as a reverse proxy, turns the request away.",
     ziel_adresse_unbekannt: "The server knows no WebDAV folder at this address (404). That is usually the address, not the password. On Nextcloud it looks like https://cloud.example/remote.php/dav/files/YOURNAME/Backups — with your user name in place of YOURNAME. Quick check: open the address in a browser; if that shows 404 as well, it is not right yet.",
     ziel_ordner_fehlt: "The server is the right one, but the folder does not exist there yet (409). WebDAV does not create folders on upload — create it once by hand, for example in the Nextcloud web interface, then try again.",
@@ -2806,6 +2829,8 @@ const I18N = {
     oidc_aus: "No identity provider is configured for this node.",
     oidc_nicht_erreichbar: "Your identity provider is not answering right now. While it is down, the local account on your home network still gets you in.",
     nur_ueber_oidc: "From outside, sign-in goes through your identity provider only. The local account is the emergency door and opens on your home network alone.",
+    oidc_zu_viele_starts: "Too many sign-in attempts in a short time. Please try again in a minute.",
+    herkunft_unzulaessig: "This request came from another site and was refused. Please open the interface directly at your node's own address.",
     g_user: "Username", g_pass: "Password",
     g_anlegen: "Create account", g_anmelden: "Sign in",
     g_pass_hint: "At least 10 characters.",
@@ -2815,10 +2840,12 @@ const I18N = {
     // ── The PIN ─────────────────────────────────────────────────────────
     keine_pin: "This device has no PIN set up.",
     pin_noetig: "That needs your PIN.",
+    kontopasswort_noetig: "That needs your account password — or set up a PIN.",
+    vorgang_laeuft_schon: "That is already running — this second request was not carried out. Check the list before you try again.",
     pin_titel: "PIN for actions with consequences",
-    pin_lead: "A second lock in front of everything that cannot be undone. Optional — with no PIN set up, nothing changes.",
-    pin_erklaerung: "It protects against something different from your unlock method. That one decides what someone can do with the DISK; the PIN stands against a hijacked session in this very interface — a browser left open, someone else reaching your account. Five failed attempts lock it for fifteen minutes, and the counter lives in a file: a restart does not reset it. Today it guards deleting the wallet; every further action with consequences joins it as it appears.",
-    pin_stand_aus: "No PIN set up right now.",
+    pin_lead: "A second lock in front of everything that cannot be undone. Optional — with no PIN set up, the same field asks for your account password instead; a PIN is just quicker to type.",
+    pin_erklaerung: "It protects against something different from your unlock method. That one decides what someone can do with the DISK; the PIN stands against a hijacked session in this very interface — a browser left open, someone else reaching your account. Five failed attempts lock it for fifteen minutes, and the counter lives in a file: a restart does not reset it. It guards sending, opening and closing channels, paying invoices, rebalancing, deleting the wallet and the keys for external wallets.",
+    pin_stand_aus: "No PIN set up right now — actions with consequences ask for your account password.",
     pin_stand_an: "PIN is set up. Actions with consequences ask for it.",
     pin_stand_gesperrt: "Locked after too many failed attempts — {sekunden} seconds to go.",
     pin_kontopasswort: "Your account password",
@@ -2833,9 +2860,11 @@ const I18N = {
     pin_aendern: "Change the PIN",
     pin_geaendert: "Changed.",
     pin_entfernen: "Remove the PIN",
-    pin_entfernt: "Removed. Nothing asks for it any more.",
+    pin_entfernt: "Removed. The field now asks for your account password instead.",
     tg_pin: "Your PIN",
+    tg_kontopasswort: "Your account password",
     tg_pin_d: "Deleting is the action the PIN guards.",
+    kontopasswort_hinweis: "With no PIN this field asks for your account password (not the wallet password). Setting up a PIN is quicker — under Settings.",
     zl_titel: "Pay a Lightning invoice",
     zl_lead: "Over Lightning instead of the chain: seconds instead of blocks, and a fraction of the fee. It needs a channel with balance on your side.",
     zl_rechnung: "The invoice",
@@ -3100,6 +3129,7 @@ const I18N = {
     pin_zu_einfoermig: "The same digit six times is not a PIN.",
     pin_ist_eine_reihe: "A run like 123456 is the first thing any attacker tries — forwards and backwards.",
     pin_falsch: "That PIN does not fit.",
+    kontopasswort_falsch: "That account password does not fit.",
     wallet_nicht_gesperrt: "For that the wallet has to be shut — only while unlocking can LND check whether the password is right. Lock it first with the button next to it.",
     entsperrweg_unbekannt: "There is no such way.",
     entsperrdatei_fehlt: "The unlock file cannot be read. While that is so, SatoshiCortex cannot reach the wallet password.",
@@ -3117,9 +3147,14 @@ const I18N = {
     passwort_fehlt: "Without a password the wallet stays shut.",
     anmeldung_fehlgeschlagen: "Username or password is incorrect.",
     zu_viele_versuche: "Too many failed attempts. Please try again in five minutes.",
+    zu_viele_versuche_gesamt: "A great many failed attempts are arriving right now. Please try again in about ten seconds.",
     anmeldung_noetig: "Please sign in first.",
     sitzung_abgelaufen: "Your session has expired. Please sign in again.",
-    unverschluesselt: "This connection is not encrypted — your password travels in the clear. Acceptable on your own home network; if other devices share it, configure a certificate in your .env.",
+    tls_hinweis_lang: "This connection is not encrypted. Seed words, keys for external wallets and the PIN can be read by other devices on the same network. This is information, not a block — everything stays possible.",
+    tls_hinweis_kurz: "This connection is not encrypted: what is shown or typed here can be read on the network.",
+    tls_link: "Reachable encrypted at (your browser will warn on the first visit, because this node issued the certificate itself):",
+    tls_schliessen: "Close",
+    tls_fingerabdruck: "SHA-256 fingerprint of the certificate — compare it with what the browser shows on the first visit:",
     ablage_nicht_bereit: "The folder {pfad} is not writable, so no account can be created. Check PUID and PGID in your .env — on UGREEN and Synology devices PGID=10 belongs there — and make sure both data folders belong to that identity.",
     einrichtung_abgeschlossen: "Setup has already been completed.",
     antwort_zu_gross: "That input is too large.",
@@ -3163,6 +3198,9 @@ function applyI18n() {
   });
   $$("[data-setlang]").forEach((b) => b.classList.toggle("active", b.dataset.setlang === LANG));
   document.documentElement.lang = LANG;
+  // Der Hinweis ist gebaut, nicht per data-i18n gesetzt -- er muss beim
+  // Sprachwechsel selbst neu entstehen.
+  zeigeTlsHinweise();
 }
 
 /* ── Schnittstelle ──────────────────────────────────────────────────────── */
@@ -3227,7 +3265,7 @@ function geldfehler(e, meldung, unklar) {
   // etwa weil sie in einem anderen Reiter eingerichtet wurde. Dann den
   // Stand neu holen: das Feld erscheint, und die Meldung steht nicht vor
   // einem Formular, in das man sie gar nicht eintragen kann.
-  if (d.meldung === "pin_noetig") pinLaden();
+  if (d.meldung === "pin_noetig" || d.meldung === "kontopasswort_noetig") pinLaden();
   return true;
 }
 // Die Erreichbarkeitsmessung baut echte Verbindungen ueber Tor auf: je
@@ -9654,20 +9692,21 @@ function nachbesserZeile(b, lage) {
   knopf.textContent = t("nb_knopf");
 
   // Die PIN-Felder der festen Formulare stehen in der Vorlage; diese Zeile
-  // entsteht erst beim Zeichnen, also baut sie ihres selbst -- und nur,
-  // wenn ueberhaupt eine PIN eingerichtet ist (PIN_DA). Wer keine hat, soll
-  // nicht vor einem Feld stehen, das es fuer ihn nicht gibt.
+  // entsteht erst beim Zeichnen, also baut sie ihres selbst. Seit dem
+  // 15.11.2026 immer: ohne eingerichtete PIN (PIN_DA) fragt sie das
+  // Kontopasswort -- vorher fehlte sie dann, und der Server fragte auch
+  // nichts (der Befund, der das Tor ueberhaupt erst noetig machte).
   let pinEingabe = null;
-  if (PIN_DA) {
+  {
     const feld = document.createElement("label");
     feld.className = "feld schmal";
     const kopf = document.createElement("b");
-    kopf.textContent = t("tg_pin");
+    kopf.textContent = t(PIN_DA ? "tg_pin" : "tg_kontopasswort");
     pinEingabe = document.createElement("input");
     pinEingabe.type = "password";
-    pinEingabe.inputMode = "numeric";
+    pinEingabe.inputMode = PIN_DA ? "numeric" : "text";
     pinEingabe.autocomplete = "off";
-    pinEingabe.maxLength = 12;
+    pinEingabe.maxLength = PIN_DA ? 12 : 512;
     feld.append(kopf, pinEingabe);
     var pin = feld;
   }
@@ -9679,7 +9718,8 @@ function nachbesserZeile(b, lage) {
     try {
       const d = await api("/lightning/senden/nachbessern", "POST", {
         txid: b.txid, ausgang: b.eigener_ausgang, tempo: "schnell",
-        ...(pinEingabe ? { pin: pinEingabe.value } : {}),
+        ...(PIN_DA ? { pin: pinEingabe.value }
+                   : { konto_passwort: pinEingabe.value }),
       }, FRIST_GELD_MS);
       meldung.textContent = t("nb_fertig", {
         satz: zahl(d.satz_sat_vb), hoechstens: zahl(d.hoechstens_sat) });
@@ -10671,8 +10711,9 @@ function fzWiderrufenKnopf(geraet) {
     }
     clearTimeout(scharf);
     scharf = null;
-    if (PIN_DA && !$("#fz-pin").value) {
-      meldung.textContent = t("fz_pin_fuer_widerruf");
+    if (!$("#fz-pin").value) {
+      meldung.textContent = t(PIN_DA ? "fz_pin_fuer_widerruf"
+                                     : "fz_passwort_fuer_widerruf");
       knopf.textContent = t("fz_widerrufen");
       $("#fz-pin").focus();
       return;
@@ -11345,11 +11386,44 @@ async function pinLaden() {
   if (ein) ein.classList.toggle("hidden", PIN_DA);
   if (aendern) aendern.classList.toggle("hidden", !PIN_DA);
   // Und dort, wo sie tatsaechlich gebraucht wird.
+  //
+  // DER BEFUND VOM 15.11.2026: ohne PIN verschwand die Zeile -- und der
+  // Server fragte nichts. Das war die Luecke (eine nackte Sitzung bewegte
+  // Geld). Seitdem steht die Zeile IMMER da; ohne PIN fragt sie das
+  // Kontopasswort, mit PIN die PIN. Dasselbe Feld an derselben Stelle: kein
+  // zusaetzlicher Dialog, kein zusaetzlicher Schritt.
   for (const id of ["#tg-pin-zeile", "#sd-pin-zeile", "#zl-pin-zeile",
                     "#ko-pin-zeile", "#us-pin-zeile", "#ks-pin-zeile",
                     "#fz-pin-zeile"]) {
     const zeile = $(id);
-    if (zeile) zeile.classList.toggle("hidden", !PIN_DA);
+    if (!zeile) continue;
+    zeile.classList.remove("hidden");
+    const kopf = zeile.querySelector("b");
+    const text = zeile.querySelector("span");
+    const feld = zeile.querySelector("input");
+    // Der Schluessel der PIN-Beschreibung wird einmal gemerkt, damit ein
+    // Sprachwechsel (data-i18n) den jeweils richtigen Text holt.
+    if (text && !text.dataset.pinSchluessel) {
+      text.dataset.pinSchluessel = text.dataset.i18n;
+    }
+    if (kopf) {
+      kopf.dataset.i18n = PIN_DA ? "tg_pin" : "tg_kontopasswort";
+      kopf.textContent = PIN_DA ? t("tg_pin") : t("tg_kontopasswort");
+    }
+    if (text) {
+      text.dataset.i18n = PIN_DA ? text.dataset.pinSchluessel
+                                 : "kontopasswort_hinweis";
+      // Ein fester Schluessel je Zweig: die Pruefung der Uebersetzungen
+      // findet nur Schluessel, die als Zeichenkette dastehen.
+      text.textContent = !PIN_DA ? t("kontopasswort_hinweis")
+        : text.dataset.pinSchluessel === "tg_pin_d" ? t("tg_pin_d")
+        : text.dataset.pinSchluessel === "fz_pin_d" ? t("fz_pin_d")
+        : t("sd_pin_d");
+    }
+    if (feld) {
+      feld.inputMode = PIN_DA ? "numeric" : "text";
+      feld.maxLength = PIN_DA ? 12 : 512;
+    }
   }
 }
 
@@ -12061,7 +12135,9 @@ async function kanalOeffnen() {
 }
 
 function mitPin(feld) {
-  return PIN_DA ? { pin: $(feld).value } : {};
+  // Mit PIN die PIN, ohne PIN das Kontopasswort -- derselbe Eingabekasten.
+  return PIN_DA ? { pin: $(feld).value }
+                : { konto_passwort: $(feld).value };
 }
 
 async function pinEinrichten() {
@@ -13635,6 +13711,104 @@ let LOKAL_MOEGLICH = true;
 // ergibt, wenn der Abruf gerade nicht durchkam.
 let PASSWORT_MIN = 10;
 
+// Die Lage des verschluesselten Ports, aus /api/zustand (seit dem 16.11.2026).
+// DER BEFUND VOM 15.11.2026: Seed-Woerter, Schluessel fuer externe Wallets und
+// die PIN gehen ueber den HTTP-Port im Klartext durchs Netz. Hier wird nur
+// INFORMIERT -- kein Knopf wird gesperrt, nichts bevormundet: wer im eigenen
+// Netz bewusst ueber HTTP arbeitet, soll das weiter koennen.
+//
+// TLS_EXTERN: davor steht ein Proxy mit TLS -- dann ist die Strecke zum
+// Browser verschluesselt und es gibt nichts zu melden.
+// TLS_PORT: der Port von AUSSEN; null, wenn es den zweiten Port nicht gibt.
+let TLS_EXTERN = false;
+let TLS_PORT = null;
+let TLS_FINGERABDRUCK = null;
+
+// Muss der Hinweis erscheinen? Nur im Klartext, nur ausserhalb des eigenen
+// Rechners (dort liegt kein Netz dazwischen, das mitlesen koennte) und nur
+// ohne TLS-Proxy davor. location.hostname liefert IPv6 MIT eckigen Klammern.
+function tlsHinweisNoetig(protokoll, hostname, tlsExtern) {
+  if (tlsExtern) return false;
+  if (protokoll !== "http:") return false;
+  return !["localhost", "127.0.0.1", "::1", "[::1]"].includes(hostname);
+}
+
+// Dieselbe Adresse auf dem verschluesselten Port -- oder null, wenn es keinen
+// gibt. Der Port kommt vom Server und wird trotzdem auf Ziffern geprueft: er
+// landet in einem href.
+function tlsAdresse() {
+  if (!/^[0-9]{1,5}$/.test(String(TLS_PORT || ""))) return null;
+  return "https://" + location.hostname + ":" + TLS_PORT + "/";
+}
+
+// Der grosse Hinweis laesst sich schliessen; die Wahl merkt sich der Browser.
+// localStorage kann fehlen oder werfen (privates Fenster, gesperrt) -- dann
+// gilt "nicht geschlossen", und nichts bricht.
+const TLS_ZU_SCHLUESSEL = "satcortex-tls-hinweis-zu";
+function tlsHinweisGeschlossen() {
+  try { return localStorage.getItem(TLS_ZU_SCHLUESSEL) === "1"; }
+  catch (e) { return false; }
+}
+function tlsHinweisSchliessen() {
+  try { localStorage.setItem(TLS_ZU_SCHLUESSEL, "1"); } catch (e) { /* egal */ }
+  zeigeTlsHinweise();
+}
+
+// Fuellt alle Stellen mit data-tls-hinweis ("lang" oder "kurz") oder versteckt
+// sie. "lang" ist der Kasten oben und auf der Anmeldeseite: mit Link,
+// Fingerabdruck und Schliessen-Knopf. "kurz" ist EINE Zeile an Seed und
+// Schluessel: Satz und Link, kein Knopf, keine Rueckfrage -- nichts, was den
+// Ablauf um einen Schritt verlaengert. Gebaut wird mit textContent und
+// createElement, nie mit innerHTML: Hostname und Fingerabdruck stammen aus
+// der Adresszeile und vom Server.
+function zeigeTlsHinweise() {
+  const noetig = tlsHinweisNoetig(location.protocol, location.hostname, TLS_EXTERN);
+  const ziel = tlsAdresse();
+  const zu = tlsHinweisGeschlossen();
+  $$("[data-tls-hinweis]").forEach((el) => {
+    const lang = el.dataset.tlsHinweis === "lang";
+    el.textContent = "";
+    el.classList.toggle("hidden", !noetig || (lang && zu));
+    if (!noetig || (lang && zu)) return;
+    const satz = document.createElement("div");
+    satz.textContent = lang ? t("tls_hinweis_lang") : t("tls_hinweis_kurz");
+    if (!lang && ziel) {
+      const a = document.createElement("a");
+      a.href = ziel;
+      a.textContent = ziel;
+      a.rel = "noopener";
+      satz.appendChild(document.createTextNode(" "));
+      satz.appendChild(a);
+    }
+    el.appendChild(satz);
+    if (!lang) return;
+    if (ziel) {
+      const weg = document.createElement("div");
+      weg.textContent = t("tls_link") + " ";
+      const a = document.createElement("a");
+      a.href = ziel;
+      a.textContent = ziel;
+      a.rel = "noopener";
+      weg.appendChild(a);
+      el.appendChild(weg);
+      if (TLS_FINGERABDRUCK) {
+        const fp = document.createElement("div");
+        fp.textContent = t("tls_fingerabdruck") + " ";
+        const code = document.createElement("code");
+        code.textContent = TLS_FINGERABDRUCK;
+        fp.appendChild(code);
+        el.appendChild(fp);
+      }
+    }
+    const knopf = document.createElement("button");
+    knopf.type = "button";
+    knopf.className = "btn ghost";
+    knopf.textContent = t("tls_schliessen");
+    knopf.addEventListener("click", tlsHinweisSchliessen);
+    el.appendChild(knopf);
+  });
+}
+
 function zeigeTor() {
   $("#gate").classList.remove("hidden");
   $("#wizard").classList.add("hidden");
@@ -13656,10 +13830,9 @@ function zeigeTor() {
   $("#g-err").textContent = "";
   anmeldungsergebnisZeigen();
   // Nur im Klartext und nur ausserhalb von localhost: wer ueber 127.0.0.1
-  // zugreift, hat kein Netz dazwischen, das mitlesen koennte.
-  const lokal = ["localhost", "127.0.0.1", "::1"].includes(location.hostname);
-  const warnen = location.protocol !== "https:" && !lokal;
-  $("#g-tls").textContent = warnen ? t("unverschluesselt") : "";
+  // zugreift, hat kein Netz dazwischen, das mitlesen koennte. Seit dem
+  // 16.11.2026 mit Link auf den eigenen HTTPS-Port -- siehe zeigeTlsHinweise.
+  zeigeTlsHinweise();
 }
 
 // Sichtbar ist genau eine der grossen Sektionen -- oder eben keine. Der
@@ -14137,6 +14310,10 @@ async function start() {
     OIDC_DA = !!z.oidc;
     LOKAL_MOEGLICH = z.lokal_moeglich !== false;
     if (z.passwort_mindestlaenge) PASSWORT_MIN = z.passwort_mindestlaenge;
+    TLS_EXTERN = !!z.tls_extern;
+    TLS_PORT = z.tls_port || null;
+    TLS_FINGERABDRUCK = z.tls_fingerabdruck || null;
+    zeigeTlsHinweise();
     if (z.ablage_bereit === false) {
       zeigeTor();
       $("#g-err").textContent = t("ablage_nicht_bereit", { pfad: z.ablage_pfad });

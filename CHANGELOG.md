@@ -4,6 +4,87 @@ All notable changes to SatoshiCortex. Format loosely after
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning after
 [SemVer](https://semver.org/).
 
+## [1.6.0] — 2026-11-16
+
+A security release after a full review of the application on 2026-11-15
+(details in [SECURITY.md](SECURITY.md#audit-of-2026-11-15--the-application)).
+Handling stays as it was: no new prompts in front of settings.
+
+### Fixed: a session could write its own lines into bitcoin.conf and lnd.conf
+
+The node name and the announced addresses were checked for line breaks, but
+not for the Unicode line separators U+2028, U+2029 and U+0085. The next
+rewrite of the file turned them into real lines — enough to switch off LND's
+macaroons or to have Bitcoin Core run a command at startup. A signed-in
+session was all it took. Every such value must now be printable, addresses are
+written in their parsed form, and the files are never written with a line
+separator other than a plain newline.
+
+### Changed: without a PIN, money moves only with the account password
+
+The PIN stays optional. Without one, the field in front of sending, opening
+and closing channels, paying, rebalancing, deleting the wallet and issuing or
+revoking wallet keys now asks for your account password. With a PIN, nothing
+changes. Wrong tries count per session, so a stolen session cannot lock you
+out any more.
+
+### New: the interface over HTTPS on port 3334
+
+The interface also answers over HTTPS, with a certificate the node makes for
+itself. Your reverse proxy keeps using 3333, which is unchanged. A calm,
+closable hint points to the encrypted port when you open the interface over
+plain HTTP from another machine, with the fingerprint to compare.
+
+### Fixed: the Electrum service under load
+
+One small request could make a 32 MB answer, and a few connections drove the
+application out of memory. Answers per request are bounded now, the load on
+Bitcoin Core is rate-limited, connections are counted from the start, and the
+service keeps accepting after running out of file handles. Real wallets stay
+far below the limits.
+
+### Fixed: sign-in
+
+- The emergency door (password sign-in next to an identity provider) now stays
+  shut when in doubt: any forwarding header, a caller from the host itself or
+  the container network, or the provider's public host name close it. Open it
+  by IP address from your home network.
+- Eight wrong passwords from any device no longer lock you out — the counter
+  is per device.
+- Writing calls from other sites are refused by the browser's own
+  `Sec-Fetch-Site`; this works unchanged behind a reverse proxy.
+- The API description (`/api/doku`, `/redoc`, `/openapi.json`) needs a sign-in.
+
+### Fixed: smaller things
+
+- Secret files (passwords, PIN, sessions) are created with mode 0600 from the
+  first byte instead of being tightened afterwards.
+- The channel-backup target accepts only `http(s)` addresses outside this
+  device, and fetching it follows redirects only on the same host.
+- Peers and watchtowers on internal addresses are refused before dialling.
+- `time_lock_delta` cannot be set below 40 any more (LND's minimum is 18).
+- Sending or opening a channel twice at once runs only once.
+- The log no longer claims the application's macaroon lacks `onchain:write`.
+- News feeds in encodings other than UTF-8 and Latin are refused.
+- Renovate no longer merges GitHub Actions updates on its own, and every
+  update waits seven days before it is proposed.
+- Several malformed inputs (a NUL byte in a path, an invalid channel point,
+  deeply nested JSON on the Electrum port) answer with an error instead of
+  failing inside.
+
+### Upgrading
+
+Only the application image is new; Bitcoin Core, LND and Tor keep running,
+and the wallet stays unlocked.
+
+- For HTTPS, take the new `docker-compose.yml` (it adds the line for port
+  3334). With the old one everything works as before, just without HTTPS.
+- Optional: `WEBUI_TLS_NAMES=<your NAS IP or name>` in the `.env`, so the
+  browser accepts the name as well as the certificate.
+- No PIN set up? From now on the money paths ask for your account password.
+- If you use the emergency door by your domain name from home, use the IP
+  address instead.
+
 ## [1.5.1] — 2026-10-17
 
 ### Fixed: the update check compares the LND version that actually runs

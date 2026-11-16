@@ -37,9 +37,12 @@ import logging
 import os
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Dict, Iterable, Optional
+
+from . import ziele
 
 log = logging.getLogger(__name__)
 
@@ -148,8 +151,55 @@ class Stand:
         os.replace(temp, self.datei)
 
 
+def _zerlege(basis: str):
+    """Die Adresse zerlegen und die Form pruefen -- ohne Netz."""
+    try:
+        teile = urllib.parse.urlsplit((basis or "").strip())
+        _ = teile.port          # wirft bei einem unsinnigen Port
+    except ValueError as fehler:
+        raise ZielFehler(f"Adresse nicht lesbar: {fehler}",
+                         "ziel_url_ungueltig") from fehler
+    if teile.scheme.lower() not in ("https", "http"):
+        raise ZielFehler("nur https:// oder http://", "ziel_url_ungueltig")
+    if not teile.hostname:
+        raise ZielFehler("kein Rechner in der Adresse", "ziel_url_ungueltig")
+    # DER BEFUND VOM 15.11.2026: "https://host/v1/state#" haengte unseren
+    # Dateinamen HINTER das #, der Server sah nur /v1/state -- die Anwendung
+    # rief mit Basic-Anmeldung einen Pfad ab, den niemand gemeint hatte. "?x="
+    # leistet dasselbe (der Dateiname landet im Wert). Anmeldedaten gehoeren
+    # in die eigenen Felder, nicht in die Adresse: dort stuenden sie im Log.
+    if teile.fragment or "#" in basis:
+        raise ZielFehler("kein # in der Adresse", "ziel_url_ungueltig")
+    if teile.query or "?" in basis:
+        raise ZielFehler("kein ? in der Adresse", "ziel_url_ungueltig")
+    if teile.username is not None or teile.password is not None \
+            or "@" in teile.netloc:
+        raise ZielFehler("keine Anmeldedaten in der Adresse",
+                         "ziel_url_ungueltig")
+    return teile
+
+
+def pruefe_ziel(url: str, netz_praefix: str) -> None:
+    """Ob die Anwendung dieses Ziel anwaehlen darf -- sonst ZielFehler.
+
+    Erlaubt nur http:// und https://; Fragment, Abfrage und Anmeldedaten in
+    der Adresse sind verboten; Schleife, Compose-Netz und Dienstnamen sind
+    gesperrt (ziele.py sagt warum). TLS wird NICHT gelockert: urllib prueft
+    Zertifikat und Namen bei https:// selbst, und das bleibt so.
+    """
+    teile = _zerlege(url)
+    if ziele.grund_intern(teile.hostname, netz_praefix):
+        raise ZielFehler("dieses Ziel liegt im Inneren dieses Geraets",
+                         "ziel_adresse_intern")
+
+
 def _webdav_url(basis: str) -> str:
-    return basis.rstrip("/") + "/" + DATEINAME
+    # Auch hier die Form, nicht nur an der Tuer: das Ziel liegt in einer
+    # Datei, und was dort aus einer aelteren Version steht, soll nicht
+    # ungeprueft hinausgehen. (file:// und gopher:// scheiterten bis zum
+    # 15.11.2026 nur zufaellig an der Antwort.)
+    _zerlege(basis)
+    return basis.strip().rstrip("/") + "/" + DATEINAME
 
 
 def lade_hoch(blob: str, url: str, benutzer: str, passwort: str,
@@ -179,8 +229,44 @@ def lade_hoch(blob: str, url: str, benutzer: str, passwort: str,
         raise ZielFehler(str(fehler)) from fehler
 
 
+class _NurDerselbeRechner(urllib.request.HTTPRedirectHandler):
+    """Weiterleitungen beim Holen nur auf denselben Rechner -- und nie nach innen.
+
+    DER BEFUND VOM 15.11.2026 (Rest aus der Pruefung der Geldwege,
+    geschlossen am 16.11.2026): pruefe_ziel stand VOR dem Abruf, aber urllib
+    folgt bei GET jeder Weiterleitung und nimmt die Basic-Anmeldung mit. Ein
+    Ziel, das auf einen anderen Rechner weiterleitet, bekam so Benutzer und
+    Passwort; eines, das nach innen weiterleitet (lnd:8080, das Compose-Netz),
+    eine Anfrage von hier aus.
+
+    Erlaubt bleibt, was ein echter WebDAV-Server tut: derselbe Rechnername,
+    anderer Pfad, auch http -> https oder ein anderer Port. Alles andere
+    endet mit "ziel_weiterleitung". PUT braucht das nicht -- urllib folgt
+    dort keiner Weiterleitung.
+    """
+
+    def __init__(self, netz_praefix: Optional[str]) -> None:
+        super().__init__()
+        self.netz_praefix = netz_praefix
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        alt = urllib.parse.urlsplit(req.full_url).hostname or ""
+        try:
+            neu = _zerlege(newurl)
+        except ZielFehler:
+            raise ZielFehler(f"Weiterleitung abgelehnt ({code})",
+                             "ziel_weiterleitung") from None
+        if (neu.hostname or "").lower() != alt.lower():
+            raise ZielFehler(f"Weiterleitung auf einen anderen Rechner "
+                             f"abgelehnt ({code})", "ziel_weiterleitung")
+        if self.netz_praefix is not None:
+            pruefe_ziel(newurl, self.netz_praefix)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 def hole_ab(url: str, benutzer: str, passwort: str,
-            zeitlimit: float = ZEITLIMIT_SEKUNDEN) -> str:
+            zeitlimit: float = ZEITLIMIT_SEKUNDEN,
+            netz_praefix: Optional[str] = None) -> str:
     """Die abgelegte Sicherung zurueckholen. GET, das Gegenstueck zu lade_hoch.
 
     ES GAB DIESEN WEG LANGE NICHT, und das war der Fehler: eine Sicherung, die
@@ -194,8 +280,9 @@ def hole_ab(url: str, benutzer: str, passwort: str,
     anfrage = urllib.request.Request(_webdav_url(url), method="GET")
     marke = base64.b64encode(f"{benutzer}:{passwort}".encode()).decode()
     anfrage.add_header("Authorization", "Basic " + marke)
+    oeffner = urllib.request.build_opener(_NurDerselbeRechner(netz_praefix))
     try:
-        with urllib.request.urlopen(anfrage, timeout=zeitlimit) as antwort:  # nosec B310
+        with oeffner.open(anfrage, timeout=zeitlimit) as antwort:  # nosec B310
             if antwort.status != 200:
                 raise ZielFehler(f"unerwartete Antwort {antwort.status}")
             # Begrenzt gelesen: was hier zurueckkommt, bestimmt ein fremder

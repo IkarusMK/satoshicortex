@@ -34,7 +34,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
-from . import fernzugang
+from . import fernzugang, netz, ziele
 
 log = logging.getLogger(__name__)
 
@@ -1774,7 +1774,8 @@ def loesche_wallet(verzeichnis: Path) -> None:
             shutil.rmtree(eintrag)
 
 
-def verbinde(knoten: Knoten, zeile: str) -> None:
+def verbinde(knoten: Knoten, zeile: str,
+             netz_praefix: str = netz.PRAEFIX_VORGABE) -> None:
     """Sich mit einer Gegenstelle verbinden -- ohne Kanal, ohne Geld.
 
     Befund 20 vom 09.09.2026: das Recht peers:write stand seit jeher in
@@ -1798,6 +1799,7 @@ def verbinde(knoten: Knoten, zeile: str) -> None:
     if not (trenner and kennung and wirt):
         raise LndFehler(
             "Erwartet wird Kennung@Adresse:Port, so wie im Graphen.")
+    _pruefe_aeusseres_ziel(wirt, netz_praefix)
     knoten.ruf("/v1/peers", macaroon=EIGENES_MACAROON, daten={
         "addr": {"pubkey": kennung, "host": wirt},
         # NICHT dauerhaft. perm=true liesse LND ewig nachverbinden, auch zu
@@ -1805,6 +1807,21 @@ def verbinde(knoten: Knoten, zeile: str) -> None:
         # Verbindungen, an denen ein Kanal haengt, haelt LND ohnehin selbst.
         "perm": False,
     })
+
+
+def _pruefe_aeusseres_ziel(wirt: str, netz_praefix: str) -> None:
+    """Keine Anwahl nach INNEN -- weder bei Verbinden noch beim Wachturm.
+
+    DER BEFUND VOM 15.11.2026: LND waehlt an, was wir ihm nennen, und die
+    Antwort (verbunden, abgelehnt, Zeitlimit) verraet, was am Ziel horcht.
+    "02ab...@10.83.33.12:10009" oder "...@127.0.0.1:22" machte aus dem Knoten
+    einen Portscanner fuer das Compose-Netz. Heimnetz-Adressen bleiben
+    erlaubt (ein Wachturm oder Peer im eigenen Haus ist ein echter Fall);
+    ziele.py sagt, was gesperrt ist und warum.
+    """
+    grund = ziele.grund_intern(ziele.host_aus(wirt), netz_praefix)
+    if grund:
+        raise LndFehler(f"Diese Adresse ist nicht erlaubt: {grund}.")
 
 
 # So viele angekuendigte Adressen einer Gegenstelle werden hoechstens
@@ -1830,7 +1847,8 @@ def _adressen_aus_graph(knoten: Knoten, kennung: str) -> List[str]:
             if a.get("addr")]
 
 
-def verbinde_gegenstelle(knoten: Knoten, zeile: str) -> str:
+def verbinde_gegenstelle(knoten: Knoten, zeile: str,
+                         netz_praefix: str = netz.PRAEFIX_VORGABE) -> str:
     """Verbinden -- mit angegebener Adresse ODER mit der aus dem Graphen.
 
     DIE KANTE, DIE HIER WEGFAELLT. Bis zum 19.09.2026 nahm dasselbe
@@ -1874,7 +1892,7 @@ def verbinde_gegenstelle(knoten: Knoten, zeile: str) -> str:
     letzter: Optional[LndFehler] = None
     for kandidat in kandidaten:
         try:
-            verbinde(knoten, kandidat)
+            verbinde(knoten, kandidat, netz_praefix)
             return kandidat.partition("@")[2]
         except LndFehler as fehler:
             # Schon verbunden ist kein Fehler, sondern der Normalfall bei
@@ -1939,7 +1957,8 @@ def _txid_lesbar(roh: str) -> str:
 
 
 def kanal_oeffnen(knoten: Knoten, zeile: str, betrag_sat: int,
-                  satz_sat_vb: int, privat: bool = False) -> Dict[str, Any]:
+                  satz_sat_vb: int, privat: bool = False,
+                  netz_praefix: str = netz.PRAEFIX_VORGABE) -> Dict[str, Any]:
     """Einen Kanal zu einer Gegenstelle oeffnen.
 
     Zwei Schritte, und der erste wird gern vergessen: LND oeffnet nur zu
@@ -1965,7 +1984,7 @@ def kanal_oeffnen(knoten: Knoten, zeile: str, betrag_sat: int,
 
     # Erst verbinden -- ueber die angegebene Adresse oder ueber die aus dem
     # eigenen Graphen. Eine bestehende Verbindung stoert dabei nicht.
-    verbinde_gegenstelle(knoten, zeile)
+    verbinde_gegenstelle(knoten, zeile, netz_praefix)
 
     antwort = knoten.ruf("/v1/channels", macaroon=EIGENES_MACAROON, daten={
         # REST nimmt die Kennung als base64 der rohen Bytes.
@@ -2286,7 +2305,8 @@ def eigener_turm(knoten: Knoten) -> Dict[str, Any]:
     }
 
 
-def wachturm_eintragen(knoten: Knoten, zeile: str) -> str:
+def wachturm_eintragen(knoten: Knoten, zeile: str,
+                       netz_praefix: str = netz.PRAEFIX_VORGABE) -> str:
     """Einen Wachturm eintragen. Erwartet Kennung@Adresse:Port."""
     sauber = (zeile or "").strip()
     kennung, trenner, wirt = sauber.partition("@")
@@ -2298,6 +2318,7 @@ def wachturm_eintragen(knoten: Knoten, zeile: str) -> str:
             z not in "0123456789abcdef" for z in kennung):
         raise LndFehler(
             "Das ist keine Knotenkennung -- erwartet werden 66 Hexzeichen.")
+    _pruefe_aeusseres_ziel(wirt.strip(), netz_praefix)
     knoten.ruf("/v2/watchtower/client", macaroon=EIGENES_MACAROON, daten={
         "pubkey": base64.b64encode(bytes.fromhex(kennung)).decode(),
         "address": wirt.strip(),
@@ -3197,6 +3218,30 @@ def kanal_schliessen(knoten: Knoten, kanalpunkt: str, satz_sat_vb: int = 0,
     raise LndFehler("LND hat keine Schliesstransaktion gemeldet.")
 
 
+# DER BEFUND VOM 15.11.2026: time_lock_delta (die Zeitsperre) war nach unten
+# nur durch LNDs Protokollminimum von 18 Bloecken begrenzt. Sie ist die
+# Sicherheitsspanne, die ein Weiterleitungsknoten hat, um bei einem
+# Kanalabbruch seine eigene Auszahlung noch rechtzeitig on-chain zu holen;
+# eine uebernommene Sitzung konnte sie auf 18 druecken. Der Boden 40
+# gemessen am Bestand: LND selbst nimmt 80 (bitcoin.timelockdelta), die
+# Oberflaeche und die Gebuehrenautomatik schicken 144 beziehungsweise den
+# geltenden Wert des Kanals (der bei LND-Kanaelen 80 ist), und in den
+# Testdaten des Graphen steht bei Gegenstellen 40 -- 40 trifft also keinen
+# Wert, den diese Anwendung selbst setzt, und liegt reichlich ueber den 18.
+# Wer eine geltende Zeitsperre darunter weiterreicht (ein Fremdwerkzeug hat
+# sie gesetzt), wird in setze_gebuehren auf den Boden ANGEHOBEN, nicht
+# abgewiesen: die Automatik darf an einem fremden Altwert nicht scheitern.
+ZEITSPERRE_MIN = 40
+
+_KANALPUNKT = re.compile(r"^[0-9a-f]{64}:[0-9]{1,5}$")
+
+
+def kanalpunkt_gueltig(punkt: str) -> bool:
+    """Txid (64 Hex) und Ausgangsnummer -- sonst ist es kein Kanalpunkt."""
+    treffer = _KANALPUNKT.match((punkt or "").strip().lower())
+    return bool(treffer) and int(punkt.rsplit(":", 1)[1]) <= 65535
+
+
 def setze_gebuehren(knoten: Knoten, basis_msat: int, satz_ppm: int,
                     zeitsperre: int = 144,
                     kanalpunkt: str = "",
@@ -3216,14 +3261,18 @@ def setze_gebuehren(knoten: Knoten, basis_msat: int, satz_ppm: int,
     daten: Dict[str, Any] = {
         "base_fee_msat": str(int(basis_msat)),
         "fee_rate_ppm": int(satz_ppm),
-        "time_lock_delta": int(zeitsperre),
+        "time_lock_delta": max(int(zeitsperre), ZEITSPERRE_MIN),
     }
     if int(hoechstbetrag_msat) > 0:
         daten["max_htlc_msat"] = str(int(hoechstbetrag_msat))
     if kanalpunkt:
-        txid, _, index = kanalpunkt.partition(":")
-        daten["chan_point"] = {"funding_txid_str": txid,
-                               "output_index": int(index or 0)}
+        # Vorher int(index or 0): "abc:xyz" und "abc" fielen als ValueError
+        # durch bis zum 500. Befund vom 15.11.2026.
+        if not kanalpunkt_gueltig(kanalpunkt):
+            raise LndFehler("Das ist kein Kanalpunkt (Txid:Nummer).")
+        txid, _, index = kanalpunkt.strip().partition(":")
+        daten["chan_point"] = {"funding_txid_str": txid.lower(),
+                               "output_index": int(index)}
     else:
         daten["global"] = True
     return knoten.ruf("/v1/chanpolicy", macaroon=EIGENES_MACAROON,

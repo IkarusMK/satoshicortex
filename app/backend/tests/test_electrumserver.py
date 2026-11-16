@@ -45,7 +45,7 @@ class Bestand:
     def auffrischen(self):
         self.auffrischungen += 1
 
-    def veraltet(self):
+    def veraltet(self, mindestalter=0.0):
         self.veraltet_gemeldet += 1
 
 

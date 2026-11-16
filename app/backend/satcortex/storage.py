@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
+import secrets
 import shutil
 from dataclasses import dataclass, asdict
 from enum import Enum
@@ -215,15 +216,45 @@ def lege_struktur_an(bulk: str, fast: str) -> List[str]:
     return neu
 
 
+def schreibe_privat(ziel: Path, inhalt: str) -> None:
+    """Eine Datei atomar schreiben -- und NIE breiter als 0600 sichtbar.
+
+    DER BEFUND VOM 15.11.2026: bis dahin hiess es hier und an drei Stellen
+    daneben "erst die Rechte, dann sichtbar machen" -- und gemeint war:
+    write_text, danach chmod, danach replace. Das ist genau die falsche
+    Reihenfolge. write_text legt die Zwischendatei mit 0666 & ~umask an, also
+    meist 0644, und schreibt den INHALT hinein, bevor chmod laeuft. In dem
+    Fenster konnte jeder lokale Leser Wallet-Passwort, Sicherungspasswort oder
+    PIN-Hash lesen. Die Kommentare behaupteten das Gegenteil.
+
+    Jetzt entsteht die Zwischendatei mit os.open(O_CREAT | O_EXCL, 0o600): die
+    Rechte gelten ab dem ersten Byte, der Name ist zufaellig (kein Vorhersagen,
+    kein Ueberschreiben einer untergeschobenen Datei, O_EXCL verweigert auch
+    einen Verweis), und ein Fehlschlag raeumt hinter sich auf. Das Rechte-
+    Argument von os.open kann durch die umask nur Bits verlieren, nie
+    gewinnen -- breiter als 0600 wird die Datei also nie.
+    """
+    ziel = Path(ziel)
+    temp = ziel.with_name(f".{ziel.name}.{secrets.token_hex(6)}.neu")
+    fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as datei:
+            datei.write(inhalt)
+        os.replace(temp, ziel)
+    except BaseException:
+        temp.unlink(missing_ok=True)
+        raise
+
+
 def schreibe_geheimnis(pfad: str, inhalt: str) -> None:
     """Eine Datei schreiben, die ausser dem Besitzer niemand lesen darf.
 
     Drei Dinge, die hier zusammenkommen muessen:
 
-    * 0600, und zwar BEVOR der Inhalt sichtbar wird. Deshalb erst schreiben,
-      dann Rechte setzen, dann umbenennen -- die Zwischendatei traegt einen
-      Namen, den niemand kennt, und ist nie unter dem Zielnamen zu breit
-      lesbar.
+    * 0600, und zwar von der ERSTEN Sekunde an -- die Zwischendatei wird mit
+      diesen Rechten angelegt, bevor ein Byte hineinkommt (schreibe_privat).
+      Bis zum 15.11.2026 stand hier "erst schreiben, dann Rechte setzen" --
+      das war das Zeitfenster, nicht seine Abhilfe.
     * Atomar. LND liest die Datei beim Start; eine halb geschriebene ergaebe
       ein falsches Passwort und einen Knoten, der nicht hochkommt.
     * KEIN abschliessender Zeilenumbruch. LND schneidet zwar "\r\n" ab
@@ -233,7 +264,4 @@ def schreibe_geheimnis(pfad: str, inhalt: str) -> None:
     """
     ziel = Path(pfad)
     ziel.parent.mkdir(parents=True, exist_ok=True)
-    temp = ziel.with_name(ziel.name + ".neu")
-    temp.write_text(inhalt, encoding="utf-8")
-    os.chmod(temp, 0o600)
-    os.replace(temp, ziel)
+    schreibe_privat(ziel, inhalt)
